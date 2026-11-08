@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
@@ -21,7 +21,9 @@ import {
   SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
 } from '../lib/postsApi';
-import { createEvent, deleteEvent, updateEventDetails } from '../lib/calendarApi';
+import { createEvent, deleteEvent, updateEventDetails, myTimezone } from '../lib/calendarApi';
+import TimeZonePick from '../components/TimeZonePick';
+import { allTimeZones, viewerZone } from '../lib/bookingApi';
 import { slugify } from '../lib/bookingApi';
 import { classifyCareContact } from '../lib/careTeamApi';
 import { inviteEventGuest, inviteEventGuestByPhone, mintEventLink } from '../lib/eventGuestsApi';
@@ -196,6 +198,20 @@ export default function Compose() {
   // kept on the door-post as details.invite — read by the guest page /e/
   // and the emailed card. null = the Classic template.
   const [inviteDesign, setInviteDesign] = useState<InviteDesign | null>(null);
+  // SCHEDULED SEND (the Paperless Post audit): '' = right when you post;
+  // a datetime-local value = the emailed invitations wait for that moment.
+  const [invSendAt, setInvSendAt] = useState('');
+  // EVENT TIME ZONE (founder 2026-11-08): defaults to the zone the member's
+  // calendar runs in; editable per event. '' until known.
+  const [evTz, setEvTz] = useState('');
+  const evTzTouched = useRef(false);
+  useEffect(() => {
+    if (!user?.id) return;
+    let live = true;
+    void myTimezone().then((z) => { if (live && !evTzTouched.current) setEvTz((cur) => cur || z || viewerZone()); });
+    return () => { live = false; };
+  }, [user?.id]);
+  const tzZones = useMemo(() => allTimeZones(), []);
   const [studioOpen, setStudioOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   // Category tags — the real 63-category taxonomy, loaded when opened.
@@ -717,7 +733,7 @@ export default function Compose() {
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
       condition: [...condition], availFrom, availTo, fulfillment: [...fulfillment],
-      deliverRadius, paymentPlan, currentcyOnly, catTags, inviteDesign,
+      deliverRadius, paymentPlan, currentcyOnly, catTags, inviteDesign, invSendAt, evTz,
       travelKind, routeFrom, routeTo, vehicle, seats, sleeps,
       evRange, evAllDay, evStartMin, evEndMin, bookingUrl,
       sliding, slideLow, slideHigh, unitSel, unitQty, unitText,
@@ -776,6 +792,8 @@ export default function Compose() {
       if (Array.isArray(d.fulfillment)) setFulfillment(new Set(d.fulfillment));
       s(d.deliverRadius, setDeliverRadius); s(d.paymentPlan, setPaymentPlan); s(d.currentcyOnly, setCurrentcyOnly);
       if (d.inviteDesign) setInviteDesign(readInvite(d.inviteDesign));
+      if (typeof d.invSendAt === 'string') setInvSendAt(d.invSendAt);
+      if (typeof d.evTz === 'string' && d.evTz) { evTzTouched.current = true; setEvTz(d.evTz); }
       if (Array.isArray(d.catTags)) setCatTags(d.catTags);
       s(d.travelKind, setTravelKind); s(d.routeFrom, setRouteFrom); s(d.routeTo, setRouteTo);
       s(d.vehicle, setVehicle); s(d.seats, setSeats); s(d.sleeps, setSleeps);
@@ -876,6 +894,7 @@ export default function Compose() {
         setEvAllDay(ev.all_day);
         if (ev.start_min != null) setEvStartMin(ev.start_min);
         if (ev.end_min != null) setEvEndMin(ev.end_min);
+        if (ev.timezone) { evTzTouched.current = true; setEvTz(ev.timezone); }
       }
       const d = p.details ?? {};
       setAiReadable(!d.aiExcluded);
@@ -1274,7 +1293,7 @@ export default function Compose() {
       // Invite-only event (2026-11-04): the label the bridge trigger and
       // honest copy read; the enforcement is RLS (the attendee arm).
       if (isEvent && !evAnyone && !evLichen) details.inviteOnly = true;
-      if (isEvent && inviteDesign) details.invite = inviteDesign;
+      if (isEvent && inviteDesign) details.invite = readInvite(inviteDesign);
       if (!aiReadable) details.aiExcluded = true;
       if (quiet) details.quiet = true;
       if (!downloadable) details.noDownload = true;
@@ -1397,6 +1416,7 @@ export default function Compose() {
             endDate: evRange.end ?? evRange.start,
             allDay: evAllDay,
             startMin: evStartMin, endMin: evEndMin,
+            timezone: evTz || null,
           };
           if (linkedEventId) {
             await updateEventDetails(linkedEventId, evFields);
@@ -1440,6 +1460,7 @@ export default function Compose() {
           endDate: evRange.end ?? evRange.start,
           allDay: evAllDay,
           startMin: evStartMin, endMin: evEndMin,
+          timezone: evTz || null,
           recurrence: null,
           // Members picked in the invite box are seated + belled the
           // standing way (event_attendees invited rows).
@@ -1473,7 +1494,9 @@ export default function Compose() {
           const sends: Promise<unknown>[] = [];
           for (const inv of invitees) {
             if (inv.kind === 'email') {
-              sends.push(inviteEventGuest(evId, inv.name || inv.value.split('@')[0], inv.value));
+              const at = invSendAt ? new Date(invSendAt) : null;
+              sends.push(inviteEventGuest(evId, inv.name || inv.value.split('@')[0], inv.value,
+                at && !isNaN(at.getTime()) && at.getTime() > Date.now() + 60_000 ? at.toISOString() : undefined));
             } else if (inv.kind === 'phone') {
               sends.push(inviteEventGuestByPhone(evId, inv.name, inv.sms));
             }
@@ -2058,12 +2081,31 @@ export default function Compose() {
                   </div>
                   {studioOpen && (
                     <InviteStudio design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo }}
+                      uploaderId={user?.id}
                       onClose={() => setStudioOpen(false)}
                       onDone={(dz) => { setInviteDesign(dz); setStudioOpen(false); setInvTest({ state: 'idle' }); }} />
                   )}
                   {previewOpen && (
                     <InvitePreview design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo }}
                       onClose={() => setPreviewOpen(false)} />
+                  )}
+                  {!editing && invitees.some((i) => i.kind === 'email') && (
+                    <div className="cmp__invsched">
+                      <label className="cmp__label">When the emails go out</label>
+                      <label className="cmp__invsched-opt">
+                        <input type="radio" checked={!invSendAt} onChange={() => setInvSendAt('')} /> Right when I post
+                      </label>
+                      <label className="cmp__invsched-opt">
+                        <input type="radio" checked={!!invSendAt}
+                          onChange={() => { const t = new Date(Date.now() + 86_400_000); t.setMinutes(0, 0, 0);
+                            setInvSendAt(new Date(t.getTime() - t.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)); }} /> At a time I pick
+                        {invSendAt && (
+                          <input type="datetime-local" className="cmp__invsched-at" value={invSendAt}
+                            onChange={(e) => setInvSendAt(e.target.value)} />
+                        )}
+                      </label>
+                      {invSendAt && <p className="cmp__hint-ev">Emailed invitations wait for that moment. Texts are yours to send — tap <strong>Text ›</strong> on the event page when you’re ready.</p>}
+                    </div>
                   )}
                   {editing
                     ? <p className="cmp__hint-ev">A new design reaches everyone who opens their invitation link once you save. Emails already sent keep the card they went out with.</p>
@@ -2760,6 +2802,14 @@ export default function Compose() {
                   <TimeField value={evStartMin} onChange={(m) => { setEvStartMin(m); if (evEndMin <= m) setEvEndMin(Math.min(m + 60, 1440)); }} ariaLabel="Start time" />
                   <span className="cmp__to">to</span>
                   <TimeField value={evEndMin} onChange={setEvEndMin} min={evRange.start === (evRange.end ?? evRange.start) ? evStartMin : undefined} ariaLabel="End time" />
+                </div>
+              )}
+              {!evAllDay && evTz && (
+                <div className="cmp__evtz">
+                  <span className="cmp__evtz-lab">Time zone</span>
+                  <TimeZonePick value={evTz} zones={tzZones}
+                    lead={[{ zone: evTz, label: 'this event' }, ...(viewerZone() && viewerZone() !== evTz ? [{ zone: viewerZone(), label: 'your device' }] : [])]}
+                    onChange={(z) => { evTzTouched.current = true; setEvTz(z); }} />
                 </div>
               )}
               <DateRangeCalendar value={evRange} onChange={setEvRange} />

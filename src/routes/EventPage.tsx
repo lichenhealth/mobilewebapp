@@ -22,7 +22,11 @@ import { postToCard } from '../lib/feedMapping';
 import {
   loadEventGuests, inviteEventGuest, inviteEventGuestByPhone, eventInviteSmsHref,
   mintEventLink, approveEventGuest, declineEventGuest, type EventGuest,
+  loadRsvpExtras, saveMyRsvpExtras,
 } from '../lib/eventGuestsApi';
+import EventHostSuite from '../components/EventHostSuite';
+import { zoneAbbr } from '../lib/bookingApi';
+import { readInvite, resolveInvite, formAsks } from '../lib/inviteDesign';
 import { classifyCareContact } from '../lib/careTeamApi';
 import './EventPage.css';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -73,6 +77,13 @@ export default function EventPage(props: { postId?: string } = {}) {
   const [linkCopied, setLinkCopied] = useState(false);
   const [gActBusy, setGActBusy] = useState<string | null>(null);
   const [armDecline, setArmDecline] = useState<string | null>(null);
+  // CO-HOSTS share the guest work (2026-11-08) — the viewer may be one.
+  const [isCohost, setIsCohost] = useState(false);
+  // A member's own RSVP extras (plus-ones, meal, the host's questions).
+  const [myPlus, setMyPlus] = useState(0);
+  const [myMeal, setMyMeal] = useState('');
+  const [myAns, setMyAns] = useState<Record<string, string>>({});
+  const [myXState, setMyXState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -118,7 +129,20 @@ export default function EventPage(props: { postId?: string } = {}) {
   // Load external guests (+ the standing shareable link, if minted) once
   // we know the viewer is the host.
   useEffect(() => {
-    if (!post || post.author_id !== me || !post.linked_event_id) { setGuests([]); setShareLink(null); return; }
+    if (!post?.linked_event_id || !me) { setIsCohost(false); return; }
+    let live = true;
+    void supabase.from('event_cohosts').select('profile_id').eq('event_id', post.linked_event_id).eq('profile_id', me)
+      .maybeSingle().then(({ data }) => { if (live) setIsCohost(!!data); });
+    void loadRsvpExtras(post.linked_event_id).then((xs) => {
+      const mine = xs.find((x) => x.profile_id === me);
+      if (!live || !mine) return;
+      setMyPlus(mine.plus_ones); setMyMeal(mine.meal ?? '');
+      setMyAns(Object.fromEntries(mine.answers.map((a) => [a.q, a.a])));
+    });
+    return () => { live = false; };
+  }, [post, me]);
+  useEffect(() => {
+    if (!post || !(post.author_id === me || isCohost) || !post.linked_event_id) { setGuests([]); setShareLink(null); return; }
     let live = true;
     loadEventGuests(post.linked_event_id).then((g) => { if (live) setGuests(g); });
     void supabase.from('events').select('guest_link_token').eq('id', post.linked_event_id).maybeSingle()
@@ -218,7 +242,10 @@ export default function EventPage(props: { postId?: string } = {}) {
   // event finished loading: "Rendered more hooks than during the previous
   // render".)
   const myStatus = calEvent?.attendees?.find((a) => a.profile_id === me)?.status ?? null;
-  const isHost = !!post && post.author_id === me;
+  const isCreator = !!post && post.author_id === me;
+  // Hosting work (guests, approvals, messages, replies) is shared with co-hosts.
+  const isHost = isCreator || isCohost;
+  const rsvpForm = resolveInvite(readInvite(post?.details?.invite)).form;
   // Room membership = host + going + maybes (invited-but-unanswered isn't in yet).
   const inRoom = isHost || myStatus === 'going' || myStatus === 'tentative';
 
@@ -259,7 +286,8 @@ export default function EventPage(props: { postId?: string } = {}) {
       ? day
       : `${formatDateShort(calEvent.start_date)} – ${formatDateShort(calEvent.end_date)}`;
     if (calEvent.all_day || calEvent.start_min == null) return [dates, 'All day'];
-    return [dates, `${minToLabel(calEvent.start_min)} – ${minToLabel(calEvent.end_min ?? calEvent.start_min)}`];
+    const tz = zoneAbbr(calEvent.timezone, calEvent.start_date, calEvent.start_min);
+    return [dates, `${minToLabel(calEvent.start_min)} – ${minToLabel(calEvent.end_min ?? calEvent.start_min)}${tz ? ' ' + tz : ''}`];
   })();
 
   async function toggleRsvp() {
@@ -286,7 +314,7 @@ export default function EventPage(props: { postId?: string } = {}) {
   /** Host cancels: the calendar event goes first (cascades guests' calendar
    *  entries and the event chat room), then the post itself. */
   async function cancelEvent() {
-    if (!post || !isHost) return;
+    if (!post || !isCreator) return;
     const ok = await confirmDialog({
       message: "Cancel this event? Guests' calendars and the event chat will be removed too.",
       confirmLabel: 'Cancel event', cancelLabel: 'Keep it', danger: true,
@@ -325,7 +353,7 @@ export default function EventPage(props: { postId?: string } = {}) {
             </button>
           ))}
         </div>
-        {isHost && (
+        {isCreator && (
           <div className="evp__manage">
             <button
               className="evp__manage-btn"
@@ -436,6 +464,44 @@ export default function EventPage(props: { postId?: string } = {}) {
           <p className="evp__count">
             {goingCount} going{maybeCount > 0 ? ` · ${maybeCount} maybe` : ''}
           </p>
+          {formAsks(rsvpForm) && (myStatus === 'going' || myStatus === 'tentative') && post.linked_event_id && (
+            <div className="evp__extras">
+              <p className="evp__extras-h">The host asks</p>
+              {rsvpForm.plusOnes > 0 && (
+                <label className="evp__xfield"><span>Bringing anyone?</span>
+                  <select value={myPlus} onChange={(e) => { setMyPlus(Number(e.target.value)); setMyXState('idle'); }}>
+                    {Array.from({ length: rsvpForm.plusOnes + 1 }, (_, n) => <option key={n} value={n}>{n === 0 ? 'Just me' : `Me + ${n}`}</option>)}
+                  </select>
+                </label>
+              )}
+              {rsvpForm.meals.length > 0 && (
+                <div className="evp__xfield"><span>Meal</span>
+                  <div className="evp__meals">
+                    {rsvpForm.meals.map((m) => (
+                      <button key={m} type="button" className={'evp__meal' + (myMeal === m ? ' is-on' : '')}
+                        onClick={() => { setMyMeal(myMeal === m ? '' : m); setMyXState('idle'); }}>{m}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {rsvpForm.questions.map((q) => (
+                <label className="evp__xfield" key={q}><span>{q}</span>
+                  <textarea rows={2} maxLength={500} value={myAns[q] ?? ''}
+                    onChange={(e) => { setMyAns({ ...myAns, [q]: e.target.value }); setMyXState('idle'); }} />
+                </label>
+              ))}
+              <button className="btn evp__xsave" disabled={myXState === 'saving'} onClick={async () => {
+                setMyXState('saving');
+                try {
+                  await saveMyRsvpExtras(post.linked_event_id!, me, {
+                    plus_ones: myPlus, meal: myMeal || null,
+                    answers: Object.entries(myAns).filter(([, a]) => a.trim()).map(([q, a]) => ({ q, a: a.trim() })),
+                  });
+                  setMyXState('saved');
+                } catch (e) { console.error(e); setMyXState('error'); }
+              }}>{myXState === 'saving' ? 'Saving…' : myXState === 'saved' ? 'Saved ✓' : myXState === 'error' ? 'Didn’t save — try again' : 'Send my answers'}</button>
+            </div>
+          )}
           <div className="evp__people">
             {attendees.map((a) => (
               <div className="evp__person" key={a.profile_id}>
@@ -532,7 +598,14 @@ export default function EventPage(props: { postId?: string } = {}) {
                 <ul className="evp__guests-list">
                   {guests.filter((g) => g.status !== 'requested').map((g) => (
                     <li key={g.id} className="evp__guest">
-                      <span className="evp__guest-name">{g.name}</span>
+                      <span className="evp__guest-name">
+                        {g.name}
+                        <span className="evp__guest-contact"> · {
+                          g.send_at && !g.emailed_at
+                            ? `sends ${new Date(g.send_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+                            : g.last_opened_at ? `opened ${new Date(g.last_opened_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                            : 'not opened yet'}</span>
+                      </span>
                       {g.phone && (
                         <button className="evp__guest-retext" onClick={() => void reTextGuest(g)}>Text ›</button>
                       )}
@@ -541,6 +614,8 @@ export default function EventPage(props: { postId?: string } = {}) {
                   ))}
                 </ul>
               )}
+              <EventHostSuite eventId={post.linked_event_id} me={me} isCreator={isCreator}
+                guests={guests} attendees={calEvent?.attendees ?? []} form={rsvpForm} />
             </div>
           )}
         </div>

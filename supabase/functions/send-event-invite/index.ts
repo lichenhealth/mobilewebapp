@@ -11,6 +11,7 @@
 // SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are provided automatically.
 
 import { inviteCardHtml } from '../_shared/inviteDesign.ts';
+import { whenLabel, restClient, eventLook as sharedLook, hostLine, isHost } from '../_shared/eventMail.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM = Deno.env.get('NOTIF_FROM') ?? 'Lichen <hello@lichen.health>';
@@ -27,37 +28,8 @@ const cors = {
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-function whenLabel(e: { start_date: string; end_date: string; all_day: boolean; start_min: number | null }): string {
-  const [y, m, d] = e.start_date.split('-').map(Number);
-  const date = `${MONTHS[m - 1]} ${d}, ${y}`;
-  if (e.all_day || e.start_min == null) return date;
-  const h = Math.floor(e.start_min / 60), mm = e.start_min % 60;
-  const ap = h < 12 ? 'am' : 'pm'; const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${date} · ${h12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${ap}`;
-}
-
-const sb = (path: string, init?: RequestInit) =>
-  fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...init,
-    headers: { apikey: SERVICE_KEY!, Authorization: `Bearer ${SERVICE_KEY!}`, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
-
-/** The event's door-post cover photo (public URLs by construction) —
- *  what makes the invite pretty; a miss never blocks a send. */
-async function coverPhoto(event_id: string): Promise<string | null> {
-  return (await eventLook(event_id)).photo;
-}
-/** The event's cover photo AND the host's Studio design (details.invite). */
-async function eventLook(event_id: string): Promise<{ photo: string | null; design: unknown }> {
-  try {
-    const posts = await (await sb(`posts?linked_event_id=eq.${event_id}&select=details,image_url&limit=1`)).json();
-    const po = Array.isArray(posts) ? posts[0] : null;
-    if (!po) return { photo: null, design: null };
-    const media: { type?: string; url?: string }[] = Array.isArray(po.details?.media) ? po.details.media : [];
-    return { photo: media.find((m) => m?.type === 'photo' && m?.url)?.url ?? po.image_url ?? null, design: po.details?.invite ?? null };
-  } catch { return { photo: null, design: null }; }
-}
+const sb = restClient(SUPABASE_URL ?? '', SERVICE_KEY ?? '');
+const eventLook = (event_id: string) => sharedLook(sb, event_id);
 
 /** ONE invitation-card anatomy for every mail this fn sends (cover photo,
  *  serif title, peach button, per-send stamp — the Gmail-folds-repeated-
@@ -86,7 +58,7 @@ Deno.serve(async (req) => {
   if (!uid) return json({ error: 'Unauthorized' }, 401);
 
   let body: {
-    event_id?: string; name?: string; email?: string; guest_id?: string;
+    event_id?: string; name?: string; email?: string; guest_id?: string; send_at?: string; announce?: string;
     test?: { title?: string; start_date?: string; all_day?: boolean; start_min?: number | null; location?: string; photo?: string | null; invite?: unknown };
   };
   try { body = await req.json(); } catch { return json({ error: 'Invalid body' }, 400); }
@@ -127,6 +99,51 @@ Deno.serve(async (req) => {
     return json({ ok: true, to });
   }
 
+  // HOST MESSAGE (founder 2026-11-08, the Paperless Post audit — "message
+  // all your guests"): the message row is written client-side under RLS
+  // (hosts only); this mails it to every emailed guest still coming or
+  // undecided. Member attendees were already belled by the row's trigger;
+  // phone guests read it on their own invitation page.
+  if (body.announce) {
+    const ms = await (await sb(`event_messages?id=eq.${body.announce}&select=id,event_id,author_id,body,emailed`)).json();
+    const m = Array.isArray(ms) ? ms[0] : null;
+    if (!m) return json({ error: 'Message not found' }, 404);
+    if (m.author_id !== uid) return json({ error: 'Only the author can send this message' }, 403);
+    if (m.emailed > 0) return json({ ok: true, sent: m.emailed });
+    const evs = await (await sb(`events?id=eq.${m.event_id}&select=id,creator_id,title,location,start_date,end_date,all_day,start_min,timezone`)).json();
+    const ev = Array.isArray(evs) ? evs[0] : null;
+    if (!ev || !(await isHost(sb, ev.id, ev.creator_id, uid))) return json({ error: 'Only the hosts can message guests' }, 403);
+    const gs = await (await sb(`event_guests?event_id=eq.${ev.id}&status=in.(invited,going,tentative)&email=not.is.null&select=email,token,send_at,emailed_at`)).json();
+    const authors = await (await sb(`profiles?id=eq.${uid}&select=full_name`)).json();
+    const from = (Array.isArray(authors) ? authors[0]?.full_name : null) || 'The host';
+    const look = await eventLook(ev.id);
+    const when = whenLabel(ev);
+    const where = (ev.location || '').trim();
+    const msgHtml = esc(String(m.body)).replace(/\n/g, '<br>');
+    let sent = 0;
+    for (const g of (Array.isArray(gs) ? gs : [])) {
+      if (g.send_at && !g.emailed_at) continue;   // a scheduled invite hasn't gone yet — the message would arrive first
+      const link = `${APP_URL}/e/${g.token}`;
+      const html = inviteCardHtml(look.design, {
+        title: ev.title, when, where, hostName: from, link, photo: look.photo,
+        eyebrow: `A note from ${from}`, cta: 'See your invitation',
+        fine: `<span style="display:block;font-size:15px;line-height:1.55;color:inherit;margin-bottom:10px;">${msgHtml}</span>Reply to this email to reach Lichen; your RSVP lives on your invitation.`,
+      });
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: FROM, to: [String(g.email).trim()], reply_to: REPLY_TO,
+          subject: `${from}: an update on ${ev.title}`,
+          text: `${from} sent an update about "${ev.title}":\n\n${m.body}\n\nYour invitation: ${link}\n\n— Lichen`, html,
+        }),
+      });
+      if (res.ok) sent++;
+    }
+    await sb(`event_messages?id=eq.${m.id}`, { method: 'PATCH', body: JSON.stringify({ emailed: Math.max(sent, 1) }) });
+    return json({ ok: true, sent });
+  }
+
   // APPROVED MODE (founder 2026-11-04, the open event URL): the host just
   // said yes to a link-born request — mail that EXISTING guest "you're
   // in" with their standing token. Never a second row, never caller words:
@@ -135,13 +152,12 @@ Deno.serve(async (req) => {
     const gs = await (await sb(`event_guests?id=eq.${body.guest_id}&select=id,event_id,name,email,token,status`)).json();
     const g = Array.isArray(gs) ? gs[0] : null;
     if (!g) return json({ error: 'Guest not found' }, 404);
-    const evs = await (await sb(`events?id=eq.${g.event_id}&select=creator_id,title,description,location,start_date,end_date,all_day,start_min,end_min`)).json();
+    const evs = await (await sb(`events?id=eq.${g.event_id}&select=creator_id,title,description,location,start_date,end_date,all_day,start_min,end_min,timezone`)).json();
     const ev = Array.isArray(evs) ? evs[0] : null;
     if (!ev) return json({ error: 'Event not found' }, 404);
-    if (ev.creator_id !== uid) return json({ error: 'Only the host can approve guests' }, 403);
+    if (!(await isHost(sb, g.event_id, ev.creator_id, uid))) return json({ error: 'Only the hosts can approve guests' }, 403);
     if (!g.email?.trim()) return json({ ok: true, skipped: 'no_email' });   // a phone guest gets texted instead
-    const hosts = await (await sb(`profiles?id=eq.${uid}&select=full_name`)).json();
-    const hostName = (Array.isArray(hosts) ? hosts[0]?.full_name : null) || 'A member';
+    const hostName = await hostLine(sb, g.event_id, ev.creator_id);
     const link = `${APP_URL}/e/${g.token}`;
     const when = whenLabel(ev);
     const where = (ev.location || '').trim();
@@ -165,14 +181,27 @@ Deno.serve(async (req) => {
   if (!event_id || !name?.trim() || !email?.trim()) return json({ error: 'Missing name, email, or event' }, 400);
 
   // Verify the caller created (hosts) this event.
-  const evs = await (await sb(`events?id=eq.${event_id}&select=creator_id,title,description,location,start_date,end_date,all_day,start_min,end_min`)).json();
+  const evs = await (await sb(`events?id=eq.${event_id}&select=creator_id,title,description,location,start_date,end_date,all_day,start_min,end_min,timezone`)).json();
   const ev = Array.isArray(evs) ? evs[0] : null;
   if (!ev) return json({ error: 'Event not found' }, 404);
-  if (ev.creator_id !== uid) return json({ error: 'Only the host can invite guests' }, 403);
+  if (!(await isHost(sb, event_id, ev.creator_id, uid))) return json({ error: 'Only the hosts can invite guests' }, 403);
 
-  // Host name (for the email).
-  const hosts = await (await sb(`profiles?id=eq.${uid}&select=full_name`)).json();
-  const hostName = (Array.isArray(hosts) ? hosts[0]?.full_name : null) || 'A member';
+  // SCHEDULED SEND (founder 2026-11-08, the Paperless Post audit): a future
+  // send_at mints the row now and leaves the mail to tick_event_mail.
+  const sendAt = body.send_at && !isNaN(Date.parse(body.send_at)) ? new Date(body.send_at) : null;
+  if (sendAt && sendAt.getTime() > Date.now() + 60_000) {
+    if (sendAt.getTime() > Date.now() + 1000 * 60 * 60 * 24 * 366) return json({ error: 'Pick a send time within the year' }, 400);
+    const r = await sb('event_guests', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ event_id, invited_by: uid, name: name.trim(), email: email.trim(), send_at: sendAt.toISOString() }),
+    });
+    const rr = await r.json().catch(() => null);
+    const row = Array.isArray(rr) ? rr[0] : null;
+    if (!row?.token) return json({ error: 'Could not schedule the invite', detail: rr }, 502);
+    return json({ ok: true, token: row.token, scheduled: row.send_at });
+  }
+
+  const hostName = await hostLine(sb, event_id, ev.creator_id);
 
   // THE PRETTY INVITE (founder 2026-11-04: "pretty invites, like paperless
   // post or canva"): the event's door-post cover photo crowns the emailed
@@ -184,7 +213,7 @@ Deno.serve(async (req) => {
   const insRes = await sb('event_guests', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ event_id, invited_by: uid, name: name.trim(), email: email.trim() }),
+    body: JSON.stringify({ event_id, invited_by: uid, name: name.trim(), email: email.trim(), emailed_at: new Date().toISOString() }),
   });
   const rows = await insRes.json().catch(() => null);
   const guest = Array.isArray(rows) ? rows[0] : null;

@@ -101,3 +101,17 @@
 .gev__cardcta { border: 0; cursor: pointer; font: inherit; font-weight: 600; font-size: 15px; }
 .gev__cardnote { display: inline-block; font-size: 14px; color: var(--invc-soft); font-style: italic; }
 .gev__desc--below { max-width: 460px; margin: 18px auto 0; text-align: center; white-space: pre-wrap; }
+/* The animated backdrop rides behind everything on the page. */
+.gev--card { position: relative; isolation: isolate; }
+.gev__backdrop { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+.gev__extras { margin-top: var(--s-4); padding: var(--s-4); border: 1px solid var(--bone-edge); border-radius: 14px; background: #fff; display: flex; flex-direction: column; gap: 14px; }
+.gev__xfield { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.gev__xfield > span { color: var(--ink-soft); }
+.gev__xfield select, .gev__xfield textarea { font: inherit; font-size: 15px; padding: 9px 11px; border: 1px solid var(--bone-edge); border-radius: 10px; background: var(--bone-warm, #fff); }
+.gev__meals { display: flex; flex-wrap: wrap; gap: 6px; }
+.gev__meal { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--bone-edge); background: #fff; font: inherit; font-size: 14px; cursor: pointer; }
+.gev__meal.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+.gev__xsave { align-self: flex-start; }
+.gev__note { padding: 12px 14px; border-left: 3px solid var(--peach); background: #fff; border-radius: 8px; margin: 0 0 10px; }
+.gev__note-body { margin: 0 0 6px; white-space: pre-wrap; line-height: 1.5; font-size: 15px; }
+.gev__note-by { margin: 0; font-size: 12.5px; color: var(--ink-muted); }
