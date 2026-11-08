@@ -33,6 +33,7 @@ import { READ_WEBSITE_TOOL, SAVE_WEB_IMAGE_TOOL, readWebPage, rehostWebImage, pl
 import { readPageState, writePageDraft, DRAFT_NOTE } from '../_shared/pageDraft.ts';
 import { FILE_DEV_REPORT_TOOL, fileDevReport } from '../_shared/devReport.ts';
 import { LIFE_TOOLS, LIFE_TOOL_SECTION, runLifeTool } from '../_shared/lifeTools.ts';
+import { CONFIRM_TOOLS, CONFIRM_TOOL_SECTION, runConfirmTool, type ConfirmDoor } from '../_shared/confirmTools.ts';
 import { videoServiceOf } from '../_shared/videoHosts.ts';
 
 const ANTHROPIC_API_KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
@@ -1236,7 +1237,7 @@ Deno.serve(async (req) => {
 
   let actRule = '';
   if (canAct) {
-    actRule = '\n\nYOU HAVE TWO SMALL HANDS ACROSS THEIR LIFE: save_post_to_drive (only the post shared into THIS conversation) and add_task (their calendar & to-do). Use one when they ask, or when they say yes to your offer — never unasked. Report exactly what you did every time, and never invent a date or claim a save you did not make. Anything bigger a hand could do (sending Current-cy, booking someone, joining anything) is not yours — say who or where does it.';
+    actRule = '\n\nYOU HAVE TWO SMALL HANDS ACROSS THEIR LIFE: save_post_to_drive (only the post shared into THIS conversation) and add_task (their calendar & to-do). Use one when they ask, or when they say yes to your offer — never unasked. Report exactly what you did every time, and never invent a date or claim a save you did not make. Sending Current-cy, trust/recommend/weave and joining or leaving a space go through the CONFIRM tools — they propose a card the member taps; booking someone else still lives on the booking screens.';
   }
 
   let coursesRule = '';
@@ -1265,6 +1266,7 @@ Deno.serve(async (req) => {
 
   const lifeRule = canLife
     ? '\n\nTHEIR LIFE, BY WORD (the parity rule — anything they can do by hand on a screen, you do from their words): my_lists then change_task (done, move, rename, delete), budget_line, drive_folder (create, add/remove a post), save_or_hide_post, rsvp, set_candle. Do these directly when asked and report exactly what changed — they are the member\'s own, private, and undoable. Never answer "go do it on the X screen" when one of these fits.'
+      + '\n\nACTS THAT NEED THEIR YES (confirm card + Always allow): send_currentcy (money to another member), network_signal (trust / recommend / weave), space_membership (ask to join / leave). Use the names and figures exactly as they wrote them. Each one PROPOSES — the card under your reply is where THEY decide; never say it happened unless the tool says done. They can tap Always allow to skip the card next time (money stays capped at ⚡100 a send, ⚡300 a day; anything over ⚡500 waits 24 hours, cancellable). You can never grant that allowance yourself.'
     : '';
   let calendarRule = '';
   if (canCalendar) {
@@ -1322,6 +1324,7 @@ Deno.serve(async (req) => {
   // Post drafts minted this exchange — each becomes a Review-&-post button
   // under the reply (the page_edit Preview/Publish grammar for posts).
   const postDraftDoors: { id: string; title: string }[] = [];
+  const confirmDoors: ConfirmDoor[] = [];
   // The space-side twins of readPage/patchMe — scoped to the THREAD's space
   // (or General's verified selection), never a model-supplied id.
   // Draft-first like the member pair above.
@@ -1355,6 +1358,11 @@ Deno.serve(async (req) => {
     // ── Read a website the member linked (2026-08-24). The guard IS the
     // feature: the host must appear in the member's own words in this
     // thread, so the model can only ever read what it was handed.
+    if (name in CONFIRM_TOOL_SECTION) {
+      const memberText = rows.filter((p: { author: string }) => p.author !== 'claude')
+        .map((p: { body?: string }) => p.body ?? '').join(' ');
+      return await runConfirmTool(sb, profile_id, name, input as Record<string, unknown>, offSections, memberText, confirmDoors);
+    }
     if (name in LIFE_TOOL_SECTION) {
       return await runLifeTool(sb, profile_id, name, input as Record<string, unknown>, offSections, trigger?.source_post_id ?? null);
     }
@@ -2917,6 +2925,7 @@ Deno.serve(async (req) => {
     my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
     save_post_to_drive: 'drive',
     ...LIFE_TOOL_SECTION,
+    ...CONFIRM_TOOL_SECTION,
   };
   const touchedSections = new Set<string>();
   const sectionOfTool = (name: string): string | null =>
@@ -3035,7 +3044,7 @@ Deno.serve(async (req) => {
                      ...(canCalendar ? CALENDAR_TOOLS : []),
                      ...(canCourses ? COURSE_TOOLS : []),
                      ...(canPosts ? POST_TOOLS : []),
-                     ...(canLife ? LIFE_TOOLS : []),
+                     ...(canLife ? [...LIFE_TOOLS, ...CONFIRM_TOOLS] : []),
                      ...(canReadPostDrafts ? [READ_POST_DRAFTS_TOOL] : []),
                      ...(canReadIntake ? [READ_INTAKE_DRAFT_TOOL] : []),
                      ...(!spaceId ? [SEND_APP_DOOR_TOOL, SEARCH_HISTORY_TOOL] : [])],
@@ -3163,6 +3172,7 @@ Deno.serve(async (req) => {
   // A minted post draft hangs its Review-&-post button under the reply —
   // the person's tap in the composer is what publishes (founder 2026-10-15).
   for (const d of postDraftDoors) replyAttachments.push({ type: 'post_draft', ...d });
+  for (const d of confirmDoors) replyAttachments.push(d);
   // The reply's section tags: the trigger's own (a Maps-brain exchange)
   // plus what the tools touched — minus the filing thread itself, which
   // the row already says. Personal threads only; a space thread is a

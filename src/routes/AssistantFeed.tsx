@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import ConfirmCard from '../components/ConfirmCard';
 import Avatar from '../components/Avatar';
 import AssistantComposer from '../components/AssistantComposer';
 import { useAuth } from '../auth/AuthProvider';
@@ -1462,6 +1463,14 @@ export default function AssistantFeed() {
                         onClick={() => navigate(`/compose?draft=${a.id}`)}>
                         Review &amp; post “{a.title}” →
                       </button>
+                    </div>
+                  ))}
+                {/* CONFIRM CARDS (founder 2026-11-08) — the person decides here. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'confirm' ? [a] : []))
+                  .map((a) => (
+                    <div className="afeed__pubrow" key={`${p.id}:confirm:${a.id}`}>
+                      <ConfirmCard id={a.id} kind={a.kind} summary={a.summary} amount={a.amount} />
                     </div>
                   ))}
                 {/* A COPYABLE VALUE (founder 2026-11-02, the feed URL

@@ -20,6 +20,10 @@ export type FeedAttachment =
    *  "it should be able to draft, post and edit posts for me") — the button
    *  opens the draft in the composer, where THEIR tap on Post publishes. */
   | { type: 'post_draft'; id: string; title: string }
+  /** A CONFIRM CARD (founder 2026-11-08): an act the assistant PROPOSED —
+   *  money, trust/recommend/weave, join/leave — waiting on the person's tap
+   *  (Confirm · Always allow · Not now). */
+  | { type: 'confirm'; id: string; kind: string; summary: string; amount?: number }
   /** The consent offer (same message: "would you like to switch that
    *  permission? Then link to letting them do that to turn it on") — the
    *  PERSON taps to re-enable; the model never arms anything. `which` names
