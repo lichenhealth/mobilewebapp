@@ -174,11 +174,10 @@ export default function TopBar({
     navigate('/login', { replace: true });
   }
 
-  /** Pick an identity: act as it, and stay exactly where you were (founder
-   *  2026-08-10) — you switched from this page for a reason; pages that
-   *  care who's acting (Profile's own redirect, Calendar's default
-   *  calendar) react to the actor change themselves, so the switcher
-   *  doesn't need to force navigation on top of that. */
+  /** Pick an identity: act as it and land on HOME (founder 2026-11-08,
+   *  superseding 2026-08-10's stay-where-you-were: "it shouldn't assume to
+   *  know where I want to go on the platform when i switch profiles").
+   *  Home follows the hat, so the new identity starts from its own feed. */
   function pickIdentity(target: 'self' | (typeof options)[number] | (typeof beings)[number]) {
     if (target === 'self') {
       setActor({ type: 'self' });
@@ -188,6 +187,7 @@ export default function TopBar({
       setActor({ type: 'space', ...(target as (typeof options)[number]) });
     }
     setSwitchOpen(false);
+    navigate('/home');
   }
 
   const ident = useTopIdentity();

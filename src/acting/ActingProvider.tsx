@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { listMyBeings } from '../lib/stewardshipApi';
@@ -158,9 +158,15 @@ export function ActingProvider({ children }: { children: ReactNode }) {
 export function useSelfLinkHat(subjectProfileId: string | null | undefined) {
   const { user } = useAuth();
   const { actor, setActor, ready } = useActing();
+  // ONCE per arrival (founder 2026-11-08): the flip answers the moment you
+  // land on your own link. Keyed on the subject, never on actor.type — a
+  // later DELIBERATE switch from the profile icon must stand, not be undone.
+  const done = useRef<string | null>(null);
   useEffect(() => {
     if (!ready || !user || !subjectProfileId) return;
+    if (done.current === subjectProfileId) return;
+    done.current = subjectProfileId;
     if (subjectProfileId === user.id && actor.type !== 'self') setActor({ type: 'self' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, user?.id, subjectProfileId, actor.type]);
+  }, [ready, user?.id, subjectProfileId]);
 }
