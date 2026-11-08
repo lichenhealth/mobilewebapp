@@ -289,17 +289,25 @@ export async function loadAssistantFeed(profileId: string, thread?: string): Pro
  *  — the member-entry arm self-seeds threads from before the cursor table
  *  existed, so nothing badges retroactively. Opening a thread clears it via
  *  markThreadRead (the chat last_read_at pattern). */
+/** A failed reply is not news (founder 2026-11-08: the profile circle wore
+ *  a "1" that opened onto "nothing to notify" — the unseen row was the
+ *  "I hit a snag" fallback, a reply that never happened). Badges and
+ *  unread pills skip it everywhere. */
+export function isSnagNote(body: string | null | undefined): boolean {
+  return /^I hit a snag putting an answer together/.test((body ?? '').trim());
+}
+
 export async function loadThreadBadges(profileId: string): Promise<Record<string, number>> {
   const [rowsRes, readsRes] = await Promise.all([
     supabase.from('assistant_feed_posts')
-      .select('thread, author, created_at').eq('profile_id', profileId),
+      .select('thread, author, body, created_at').eq('profile_id', profileId),
     supabase.from('assistant_thread_reads')
       .select('thread, read_at').eq('profile_id', profileId),
   ]);
   const reads = new Map(
     (((readsRes.data as { thread: string; read_at: string }[] | null) ?? []))
       .map((r) => [r.thread, new Date(r.read_at).getTime()]));
-  const rows = (rowsRes.data as { thread: string; author: string; created_at: string }[] | null) ?? [];
+  const rows = (rowsRes.data as { thread: string; author: string; body: string | null; created_at: string }[] | null) ?? [];
   const lastMine = new Map<string, number>();
   rows.forEach((r) => {
     if (r.author !== 'member') return;
@@ -313,7 +321,7 @@ export async function loadThreadBadges(profileId: string): Promise<Record<string
   const seededFloor = Date.now() - 7 * 86_400_000;
   const badges: Record<string, number> = {};
   rows.forEach((r) => {
-    if (r.author !== 'claude') return;
+    if (r.author !== 'claude' || isSnagNote(r.body)) return;
     const cursor = reads.get(r.thread);
     const seenUpTo = cursor !== undefined
       ? Math.max(cursor, lastMine.get(r.thread) ?? 0)

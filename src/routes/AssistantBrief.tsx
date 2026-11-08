@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { listSpacesByKind } from '../lib/spacesApi';
@@ -8,6 +8,7 @@ import {
   threadForSection, loadAssistantFeed, latestConvoIn, groupConvos, loadConvoNames,
   postToAssistantFeed, CONVO_GAP_MS, type ConvoGroup, type FeedPostRow,
   ASSISTANT_THREADS, BRAIN_RAIL, sectionIcon, sectionLabel, renameConvo,
+  loadThreadCursors, markThreadRead, isSnagNote,
 } from '../lib/assistantFeedApi';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import { useTopBackFor } from '../lib/topBack';
@@ -963,6 +964,37 @@ export default function AssistantBrief() {
     // landing now, so the six-row teaser cap is retired).
     return groups.filter(pertains);
   }, [me, spaceParam, briefRaw, briefNames, section, sectionTag, feedThread]);
+  // THE BADGE LANDS SOMEWHERE (founder 2026-11-08: "it showed a "1" icon
+  // on profile, so i went over to it and it says nothing to notify"): the
+  // brief IS the section's landing, so it shows WHICH conversation holds
+  // the unseen reply (the feed list's own peach pill, measured against the
+  // cursor as it stood on arrival) and then marks those threads read — the
+  // rail badge clears because the news has been put in front of you.
+  const [briefCursors, setBriefCursors] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    if (!me || spaceParam) return;
+    let live = true;
+    void loadThreadCursors().then((c) => { if (live) setBriefCursors(c); }).catch(() => {});
+    return () => { live = false; };
+  }, [me, spaceParam]);
+  const briefUnread = (c: ConvoGroup): number => {
+    if (!briefCursors) return 0;
+    const cursorAt = briefCursors[c.thread] ?? 0;
+    const lastMine = Math.max(0, ...c.entries.filter((e) => e.author === 'member').map((e) => +new Date(e.created_at)));
+    const floor = cursorAt > 0 ? Math.max(cursorAt, lastMine) : Math.max(lastMine, Date.now() - 7 * 86_400_000);
+    return c.entries.filter((e) => e.author === 'claude' && !isSnagNote(e.body) && +new Date(e.created_at) > floor).length;
+  };
+  const markedThreads = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!briefCursors || spaceParam) return;
+    const threads = new Set(briefConvos.filter((c) => briefUnread(c) > 0).map((c) => c.thread));
+    threads.forEach((t) => {
+      if (markedThreads.current.has(t)) return;
+      markedThreads.current.add(t);
+      void markThreadRead(t).catch(() => {});
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [briefCursors, briefConvos, spaceParam]);
   // RENAME ON THE ROW (founder 2026-10-12: "no way to edit the title
   // easily, can we add that in here") — the feed list's exact grammar.
   const [briefRename, setBriefRename] = useState<string | null>(null);
@@ -1260,6 +1292,7 @@ export default function AssistantBrief() {
                     </span>
                   )}
                   <span className="afeed__convo-when">{briefAgo(c.last.created_at)}</span>
+                  {briefUnread(c) > 0 && <em className="afeed__convo-pill">{briefUnread(c)}</em>}
                 </div>
               </div>
             );
