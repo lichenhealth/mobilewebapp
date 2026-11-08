@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, NavLink, useLocation } from 'react-router-dom';
 import { Icon, IconName } from './Icon';
+import { useActing } from '../acting/ActingProvider';
 import { MyceliumMark } from './MyceliumMark';
 import { listMyMemberSpaces, listMyAdminDeskCounts, type MappableSpace, type AdminDesk } from '../lib/spacesApi';
 import { useAuth } from '../auth/AuthProvider';
@@ -117,6 +118,9 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
   // the whole directory. Hidden in admin view — there is nothing to steward.
   const [idnExpanded, setIdnExpanded] = useState(false);
   const [myIdentities, setMyIdentities] = useState<{ id: string; name: string }[]>([]);
+  // Under a hat nothing here is "yours" (founder 2026-11-08) — identities
+  // belong to people; the list says whose hat is on instead.
+  const { actor: idnActor } = useActing();
   // Platform-level knock queue (founder 2026-08-02): a "Request an
   // invitation" toast disappearing shouldn't feel like the knock vanished —
   // join_requests is the permanent record (Invite.tsx "At the door"); this
@@ -391,7 +395,12 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
 
           {/* Identities ride below the spaces you belong to — same reach,
               different nature (founder 2026-08-20: an identity holds any
-              number of people and nobody runs it). */}
+              number of people and nobody runs it). Its OWN item, set apart
+              by a hairline (founder 2026-11-08: "looks like identities are
+              still under places, they need to be their own side/hamburger
+              menu item") — sitting flush under Places it read as one of
+              Places' rows. */}
+          <div className="side-menu__divider side-menu__divider--idn" aria-hidden />
           <div className="side-menu__section">
               {/* Identities sit WITH the space kinds — they're all filters
                   on the network, unlike the utilities below (founder
@@ -406,12 +415,17 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
                 <span className="side-menu__header-label">Identities</span>
                 <span className={'side-menu__chevron' + (idnExpanded ? ' is-open' : '')} aria-hidden="true" />
               </button>
-              {idnExpanded && myIdentities.length === 0 && (
+              {idnExpanded && idnActor.type !== 'self' && (
+                <ul className="side-menu__sub-list">
+                  <li className="side-menu__sub-empty">Acting as {idnActor.name} — identities are personal</li>
+                </ul>
+              )}
+              {idnExpanded && idnActor.type === 'self' && myIdentities.length === 0 && (
                 <ul className="side-menu__sub-list">
                   <li className="side-menu__sub-empty">None yet</li>
                 </ul>
               )}
-              {idnExpanded && myIdentities.length > 0 && (
+              {idnExpanded && idnActor.type === 'self' && myIdentities.length > 0 && (
                 <ul className="side-menu__sub-list">
                   {myIdentities.map((c) => (
                     <li key={c.id}>
