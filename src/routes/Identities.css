@@ -66,3 +66,20 @@
   background: var(--peach-tint); border: 1px solid var(--peach); border-radius: 14px;
 }
 .idn__hatnote p { margin: 0; flex: 1 1 240px; font-size: 14.5px; color: var(--ink-soft); }
+
+/* The note closes (founder 2026-11-08), and gives the tools row air. */
+.idn__hatnote { position: relative; padding-right: calc(var(--s-4) + 28px); margin-bottom: var(--s-4); }
+.idn__hatnote-x {
+  position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center; background: none; border: none; cursor: pointer; color: var(--ink-soft);
+}
+.idn__hatnote-x:hover { background: rgba(0,0,0,0.05); color: var(--ink); }
+/* Search · + in Home's tools grammar. */
+.idn__tools { margin: 0 0 var(--s-4); }
+.idn__add { margin-bottom: var(--s-3); }
+.idn__similar { margin: 0 var(--s-5) var(--s-3); }
+.idn__similar-head, .idn__similar-foot { margin: 0 0 var(--s-2); font-size: 13px; color: var(--ink-soft); }
+.idn__similar-foot { margin-top: var(--s-2); }
+/* The capsule carries focus, never a box inside it (the brain-search lesson). */
+.idn .dir__search-input:focus, .idn .dir__search-input:focus-visible { outline: none; box-shadow: none; }
+.idn .dir__search:focus-within { border-color: var(--peach); }
