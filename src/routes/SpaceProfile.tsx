@@ -1485,7 +1485,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
               <>
                 {noticeBanners}
                 {presenceLine}
-                {isMember && space && (
+                {/* A PERSONAL question — your own email/phone — so it never
+                    asks while you wear a space's hat (founder 2026-11-08,
+                    acting as Countryman: "in lichen view it has an admin
+                    question"). It waits for you as yourself. */}
+                {isMember && space && actor.type === 'self' && (
                   <ContactShareAsk me={me} spaceId={space.id} spaceName={space.name} />
                 )}
               </>

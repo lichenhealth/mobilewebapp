@@ -56,12 +56,37 @@ async function loadIdentityCats(): Promise<IdentityCat[]> {
 }
 
 /** /identities — the directory of identities: yours first, then all. */
+/* IDENTITIES BELONG TO PEOPLE (founder 2026-11-08, acting as Countryman
+   Stables and finding Galyn's identities marked "yours": "show none and the
+   reminder note that you're logged in as countryman stables"). Under a hat
+   nothing is "yours" and nothing can be declared; the note names the hat
+   and flips back to yourself IN PLACE — never a navigation (the acting rule). */
+function IdentityHatNote() {
+  const { actor, setActor } = useActing();
+  if (actor.type === 'self') return null;
+  return (
+    <div className="idn__hatnote">
+      <p>
+        You&rsquo;re acting as <strong>{actor.name}</strong>. Identities belong
+        to people, so {actor.name} carries none — switch back to yourself to see
+        and change yours.
+      </p>
+      <button className="btn" type="button" onClick={() => setActor({ type: 'self' })}>
+        Continue as yourself
+      </button>
+    </div>
+  );
+}
+
 export function IdentitiesDirectory() {
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
+  const { actor, ready: actingReady } = useActing();
+  const hatted = !actingReady || actor.type !== 'self';
   const [cats, setCats] = useState<IdentityCat[]>([]);
-  const [mine, setMine] = useState<string[]>([]);   // names, from identity_tags
+  const [mineRaw, setMine] = useState<string[]>([]);   // names, from identity_tags
+  const mine = hatted ? [] : mineRaw;
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   // SUGGEST FROM RIGHT HERE (founder 2026-09-24: typed "Therapist", found
@@ -149,6 +174,7 @@ export function IdentitiesDirectory() {
           suggest it to Lichen right here.
         </p>
       </header>
+      <IdentityHatNote />
 
       {/* The search shell shortens to make room for the SUGGEST door at its
           right (founder 2026-09-24) — shown only when the typed name isn't
@@ -331,7 +357,8 @@ export default function IdentityPage() {
           number of people. Communities formed around it are run by members
           and listed below.
         </p>
-        <div className="idn__carry">
+        <IdentityHatNote />
+        {actor.type === 'self' && <div className="idn__carry">
           {carried ? (
             <>
               <span className="idn__carry-state">✓ You identify as {cat.name}</span>
@@ -344,7 +371,7 @@ export default function IdentityPage() {
               {busy ? '…' : `I identify as ${cat.name}`}
             </button>
           )}
-        </div>
+        </div>}
         {/* The doors row — only rooms with something behind them, and each
             opens the REAL section scoped to this identity (founder
             2026-08-21: "marketplace with the filter of first responder
