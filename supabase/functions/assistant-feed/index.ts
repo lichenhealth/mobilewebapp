@@ -1266,7 +1266,7 @@ Deno.serve(async (req) => {
 
   const lifeRule = canLife
     ? '\n\nTHEIR LIFE, BY WORD (the parity rule — anything they can do by hand on a screen, you do from their words): my_lists then change_task (done, move, rename, delete), budget_line, drive_folder (create, add/remove a post), save_or_hide_post, rsvp, set_candle. Do these directly when asked and report exactly what changed — they are the member\'s own, private, and undoable. Never answer "go do it on the X screen" when one of these fits.'
-      + '\n\nACTS THAT NEED THEIR YES (confirm card + Always allow): send_currentcy (money to another member), network_signal (trust / recommend / weave), space_membership (ask to join / leave). Use the names and figures exactly as they wrote them. Each one PROPOSES — the card under your reply is where THEY decide; never say it happened unless the tool says done. They can tap Always allow to skip the card next time (money stays capped at ⚡100 a send, ⚡300 a day; anything over ⚡500 waits 24 hours, cancellable). You can never grant that allowance yourself.'
+      + '\n\nACTS THAT NEED THEIR YES (confirm card + Always allow): send_currentcy (money to another member), network_signal (trust / recommend / weave), space_membership (ask to join / leave), set_money_floor (their Current-cy floor — never Always allow). Use the names and figures exactly as they wrote them. Each one PROPOSES — the card under your reply is where THEY decide; never say it happened unless the tool says done. They can tap Always allow to skip the card next time (money stays capped at ⚡100 a send, ⚡300 a day; anything over ⚡500 waits 24 hours, cancellable). You can never grant that allowance yourself.'
     : '';
   let calendarRule = '';
   if (canCalendar) {
@@ -2822,11 +2822,13 @@ Deno.serve(async (req) => {
         while (left > 0) { d.setDate(d.getDate() + 1); const w = d.getDay(); if (w !== 0 && w !== 6) left--; }
         return d.toISOString().slice(0, 10);
       };
-      const [pendRes, loadRes, entRes] = await Promise.all([
+      const [pendRes, loadRes, entRes, safeRes] = await Promise.all([
         sb(`pending_loads?profile_id=eq.${profile_id}&select=amount_cents,status,created_at,stripe_session_id&order=created_at.desc&limit=8`),
         sb(`currentcy_loads?profile_id=eq.${profile_id}&select=amount_cents,created_at&order=created_at.desc&limit=8`),
         sb(`ledger_entries?or=(and(from_type.eq.profile,from_id.eq.${profile_id}),and(to_type.eq.profile,to_id.eq.${profile_id}))&select=from_type,from_id,amount,context,memo,created_at&order=created_at.desc&limit=20`),
+        sb(`profiles?id=eq.${profile_id}&select=currentcy_floor,budget_pacing`),
       ]);
+      const safe = (((await safeRes.json()) as { currentcy_floor: number | string | null; budget_pacing: boolean }[] | null) ?? [])[0];
       const pend = (((await pendRes.json()) as { amount_cents: number; status: string; created_at: string; stripe_session_id: string | null }[] | null) ?? []);
       const loads = (((await loadRes.json()) as { amount_cents: number; created_at: string }[] | null) ?? []);
       const ents = (((await entRes.json()) as { from_type: string | null; from_id: string | null; amount: string | number; context: string; memo: string | null; created_at: string }[] | null) ?? []);
@@ -2858,6 +2860,10 @@ Deno.serve(async (req) => {
       }
       return {
         ok: true,
+        safeguards: {
+          floor: safe?.currentcy_floor != null ? `⚡${Number(safe.currentcy_floor)} — the ledger refuses any spend that would cross it (change it with set_money_floor, or they can in Current-cy → Money safeguards)` : 'no floor set',
+          budget_pacing: safe?.budget_pacing === false ? 'off' : 'on — a once-a-month note when spending runs ahead of their planned monthly expenses',
+        },
         pending_transfers: pending.length ? pending : 'none',
         landed_loads: loads.length ? loads.map((l) => `$${fmt(l.amount_cents)} landed ${l.created_at.slice(0, 10)}`) : 'none yet',
         recent_moves: ents.length

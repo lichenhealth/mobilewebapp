@@ -10,6 +10,7 @@ import {
   markChatRead, visitorIdOfKey, helpPartyOrder, CLAUDE_PROFILE_ID, LICHEN_HEALTH_PROFILE_ID, type PartySpace,
 } from '../lib/chatApi';
 import { EmojiPicker } from './EmojiPicker';
+import { renderBold } from '../lib/inlineBold';
 import { loadPost, loadSpaceNames } from '../lib/postsApi';
 import type { FeedPost } from '../lib/postsApi';
 import Avatar from './Avatar';
@@ -910,7 +911,7 @@ function MessageRun({
                     ))}
                   </div>
                 )}
-                {m.body && <p className="bubble__text">{m.body}</p>}
+                {m.body && <p className="bubble__text">{run.senderId === CLAUDE_PROFILE_ID ? renderBold(m.body) : m.body}</p>}
                 {i === run.messages.length - 1 && (
                   <span className="bubble__time">
                     {formatTime(m.created_at)}

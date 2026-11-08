@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { renderBold } from '../lib/inlineBold';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { listSpacesByKind } from '../lib/spacesApi';
@@ -1195,7 +1196,7 @@ export default function AssistantBrief() {
         {doorOn && state === 'thinking' && <p className="abrief__thinking">Reading what&rsquo;s waiting…</p>}
         {doorOn && state === 'ready' && (
           <>
-            <p className="abrief__text">{linkify(brief ?? '', refs)}</p>
+            <p className="abrief__text">{renderBold(brief ?? '', (t) => linkify(t, refs))}</p>
             <p className="abrief__updated">
               {updatedAt != null && <>Updated {timeAgo(updatedAt)} · </>}
               <button type="button" className="abrief__refresh" onClick={refresh}>Refresh</button>
@@ -1280,7 +1281,7 @@ export default function AssistantBrief() {
                   )}
                   <p className="afeed__convo-snippet">
                     {(c.last.author === 'claude' ? 'Claude: ' : 'You: ')
-                      + ((c.last.body || '').trim().replace(/\s+/g, ' ') || 'a photo').slice(0, 90)}
+                      + ((c.last.body || '').replace(/\*\*/g, '').trim().replace(/\s+/g, ' ') || 'a photo').slice(0, 90)}
                   </p>
                 </div>
                 <div className="afeed__convo-side">

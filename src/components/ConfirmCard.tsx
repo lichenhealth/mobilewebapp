@@ -39,6 +39,8 @@ export default function ConfirmCard({ id, summary, kind, amount }: {
   const status = p?.status ?? 'pending';
   const money = kind === 'send_currentcy';
   const big = money && (amount ?? 0) > 500;
+  // A floor change is the safeguard itself — it always asks, so no Always allow.
+  const askAlways = kind === 'set_floor';
   return (
     <div className={`ccard ccard--${status}`}>
       <p className="ccard__what">
@@ -48,12 +50,13 @@ export default function ConfirmCard({ id, summary, kind, amount }: {
         <>
           <div className="ccard__btns">
             <button type="button" className="ccard__btn ccard__btn--go" disabled={busy} onClick={() => void act(false)}>Confirm</button>
-            <button type="button" className="ccard__btn" disabled={busy} onClick={() => void act(true)}>Always allow</button>
+            {!askAlways && <button type="button" className="ccard__btn" disabled={busy} onClick={() => void act(true)}>Always allow</button>}
             <button type="button" className="ccard__btn ccard__btn--quiet" disabled={busy} onClick={() => void cancel()}>Not now</button>
           </div>
           {money && <p className="ccard__fine">{MONEY_CEILING_NOTE}</p>}
           {big && <p className="ccard__fine">Over ⚡500 waits 24 hours after you confirm — you can cancel it any time before then.</p>}
-          {!money && <p className="ccard__fine">Always allow means Claude won't ask before doing this again. You can take it back in Profile → Privacy.</p>}
+          {askAlways && <p className="ccard__fine">Your floor is a safeguard, so changing it always asks you first.</p>}
+          {!money && !askAlways && <p className="ccard__fine">Always allow means Claude won't ask before doing this again. You can take it back in Profile → Privacy.</p>}
         </>
       )}
       {status === 'held' && (

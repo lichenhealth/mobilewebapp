@@ -138,3 +138,16 @@
   color: var(--ink-faint);
   margin: 14px 0 0;
 }
+
+/* Money safeguards' pacing switch (shares this card's paper grammar). */
+.msafe__check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.msafe__check input { margin-top: 3px; accent-color: var(--peach-deep); flex-shrink: 0; }

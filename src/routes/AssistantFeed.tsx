@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { renderBold } from '../lib/inlineBold';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import ConfirmCard from '../components/ConfirmCard';
@@ -758,7 +759,7 @@ export default function AssistantFeed() {
               const snip = matchSnippet(c);
               if (snip) return hl(snip);
               return (c.last.author === 'claude' ? 'Claude: ' : 'You: ')
-                + ((c.last.body || '').trim().replace(/\s+/g, ' ') || 'a photo').slice(0, 90);
+                + ((c.last.body || '').replace(/\*\*/g, '').trim().replace(/\s+/g, ' ') || 'a photo').slice(0, 90);
             })()}
           </p>
         </div>
@@ -1392,7 +1393,7 @@ export default function AssistantFeed() {
                   <p className="afeed__entry-text">
                     {/* Searching marks every hit in the bubbles too — the
                         iPhone-messages grammar (founder 2026-10-12). */}
-                    {needle ? hl(p.body) : p.body}
+                    {renderBold(p.body, (t) => (needle ? hl(t) : t))}
                     {/* Time rides INSIDE the bubble, lower right — the chat
                         grammar (founder 2026-09-13). */}
                     <span className="afeed__entry-when">{timeAgo(p.created_at)}</span>

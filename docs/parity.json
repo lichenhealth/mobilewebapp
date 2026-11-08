@@ -702,5 +702,11 @@
  },
  "assistantAllowanceApi:revokeAllowance": {
   "exempt": "the assistant never edits its own permissions (doctrine)"
+ },
+ "moneySafeguardsApi:loadMoneySafeguards": {
+  "exempt": "read-only RPC (the coach reads the same via my_money_activity)"
+ },
+ "moneySafeguardsApi:saveMoneySafeguards": {
+  "tool": "set_money_floor (confirm card, never Always allow); pacing switch is the member's own off-switch, like AI consent"
  }
 }

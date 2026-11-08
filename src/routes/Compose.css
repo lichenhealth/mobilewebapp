@@ -487,3 +487,28 @@
 /* Current-cy only (2026-11-06) — a two-line promise, checkbox at the top. */
 .cmp__ccyonly { align-items: flex-start; line-height: 1.4; }
 .cmp__ccyonly input { margin-top: 3px; }
+
+/* GROUPED INVITEES (founder 2026-11-08: lists below the box, members
+   indented under them, a carrot to fold a list shut). */
+.cmp__invgroup .cmp__gl { margin-bottom: 10px; }
+.cmp__gl-chip.is-on { background: var(--peach-tint); }
+.cmp__invlist { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
+.cmp__invsrc-head { display: inline-flex; align-items: center; gap: 2px; }
+.cmp__invsrc-fold {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 0;
+  font: inherit; font-size: 13px; color: var(--ink); background: none; border: 0; cursor: pointer;
+}
+.cmp__invsrc-fold > svg:first-child { transition: transform 0.15s ease; color: var(--ink-muted); }
+.cmp__invsrc-fold.is-open > svg:first-child { transform: rotate(90deg); }
+.cmp__invsrc-fold:hover { color: var(--peach-deep); }
+.cmp__invchips--sub { padding-left: 18px; margin-bottom: 4px; }
+.cmp__aud-rowwrap { display: flex; align-items: center; gap: 8px; }
+.cmp__aud-rowwrap .cmp__aud-row { flex: 1; min-width: 0; }
+.cmp__aud-peek {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  font: inherit; font-size: 12px; color: var(--peach-deep); background: none; border: 0; cursor: pointer; padding: 2px 4px;
+}
+.cmp__aud-peek svg { transition: transform 0.15s ease; }
+.cmp__aud-peek.is-open svg { transform: rotate(90deg); }
+.cmp__aud-peeknote { font-size: 12px; color: var(--ink-muted); margin: 4px 0 6px 26px; line-height: 1.4; }
+.cmp__aud-peek-list .cmp__invchips--sub { padding-left: 26px; }
