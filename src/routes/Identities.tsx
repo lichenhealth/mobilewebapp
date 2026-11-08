@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import MemberRow from '../components/MemberRow';
+import IconRow from '../components/IconRow';
 import ListingRow from '../components/ListingRow';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
@@ -63,7 +64,22 @@ async function loadIdentityCats(): Promise<IdentityCat[]> {
    and flips back to yourself IN PLACE — never a navigation (the acting rule). */
 function IdentityHatNote() {
   const { actor, setActor } = useActing();
-  if (actor.type === 'self') return null;
+  // ONCE PER HAT, AND IT CLOSES (founder 2026-11-08: "should be able to x
+  // this out… if I navigate to an identity, i clearly didn't want to switch
+  // accounts, so it should not be on other pages in the section"): the note
+  // shows on the first identities screen you reach under a hat this session;
+  // the × hides it now, and walking on counts as the answer.
+  const key = actor.type === 'self' ? '' : `lichen.idnHatSeen.${actor.id}`;
+  const [shown] = useState(() => {
+    if (!key) return false;
+    try { return !sessionStorage.getItem(key); } catch { return true; }
+  });
+  const [closed, setClosed] = useState(false);
+  useEffect(() => {
+    if (!key || !shown) return;
+    try { sessionStorage.setItem(key, '1'); } catch { /* per-visit only */ }
+  }, [key, shown]);
+  if (actor.type === 'self' || !shown || closed) return null;
   return (
     <div className="idn__hatnote">
       <p>
@@ -74,8 +90,37 @@ function IdentityHatNote() {
       <button className="btn" type="button" onClick={() => setActor({ type: 'self' })}>
         Continue as yourself
       </button>
+      <button className="idn__hatnote-x" type="button" aria-label="Close" onClick={() => setClosed(true)}>
+        <Icon name="close" size={14} />
+      </button>
     </div>
   );
+}
+
+/** Close enough to be the same identity? Plural/ending drift ("Therapists",
+ *  "Therapy"), one name inside the other, or a typo or two. Deterministic —
+ *  no AI call, the smartSearch idiom. */
+function stemOf(s: string) {
+  return s.toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim()
+    .split(' ').map((w) => w.replace(/(ists?|ies|ers?|es|s|y)$/, '')).join(' ');
+}
+function editDistance(a: string, b: string) {
+  const dp = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0]; dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cur = dp[j];
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+  }
+  return dp[b.length];
+}
+function similarIdentity(typed: string, name: string) {
+  const a = stemOf(typed), b = stemOf(name);
+  if (a.length < 3) return false;
+  if (b.includes(a) || a.includes(b)) return true;
+  return editDistance(a, b) <= Math.max(1, Math.floor(Math.min(a.length, b.length) / 5));
 }
 
 export function IdentitiesDirectory() {
@@ -89,6 +134,13 @@ export function IdentitiesDirectory() {
   const mine = hatted ? [] : mineRaw;
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  // PLATFORM GRAMMAR (founder 2026-11-08): a search circle and a + circle,
+  // like every other section. + opens the add box, which surfaces a
+  // similar identity that already exists before anything is suggested.
+  const [mode, setMode] = useState<'none' | 'search' | 'add'>('none');
+  const [addText, setAddText] = useState('');
+  const fieldRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (mode !== 'none') fieldRef.current?.focus(); }, [mode]);
   // SUGGEST FROM RIGHT HERE (founder 2026-09-24: typed "Therapist", found
   // nothing, and the only door was a pointer to Profile's Identity field):
   // a missing identity files into the SAME category_suggestions queue the
@@ -130,7 +182,11 @@ export function IdentitiesDirectory() {
   }, [cats, query]);
 
   const norm = (s: string) => s.trim().toLowerCase();
-  const typed = query.trim();
+  const typed = addText.trim();
+  const similar = useMemo(
+    () => (typed.length >= 3 ? cats.filter((c) => similarIdentity(typed, c.name)).slice(0, 6) : []),
+    [cats, typed],
+  );
   // The button shows only when the typed name isn't already in the
   // vocabulary — an existing identity is joined, never re-suggested.
   const exactExists = cats.some((c) => norm(c.name) === norm(typed));
@@ -170,33 +226,71 @@ export function IdentitiesDirectory() {
           Ways members name themselves — Firefighter, Teacher, Founder. An
           identity isn&rsquo;t a community: nobody runs it, it never needs
           tending, and it can hold any number of people. Naming one as yours
-          is how you join it. Don&rsquo;t see yours? Search for it and
-          suggest it to Lichen right here.
+          is how you join it. Don&rsquo;t see yours? Tap + to add it.
         </p>
       </header>
       <IdentityHatNote />
 
-      {/* The search shell shortens to make room for the SUGGEST door at its
-          right (founder 2026-09-24) — shown only when the typed name isn't
-          already in the vocabulary. */}
-      <div className="idn__searchrow">
-        <div className="dir__search">
-          <Icon name="search" size={16} />
-          <input className="dir__search-input" placeholder="Search identities"
-            value={query} onChange={(e) => { setQuery(e.target.value); setSuggestNote(''); }} />
-          {query && (
-            <button className="dir__search-clear" onClick={() => setQuery('')} aria-label="Clear">
-              <Icon name="close" size={14} />
-            </button>
+      <IconRow
+        className="icon-row--tools idn__tools"
+        ariaLabel="Tools"
+        onSelect={(label) => {
+          const next = label === 'Search' ? 'search' : 'add';
+          setMode((m) => (m === next ? 'none' : next));
+          setSuggestNote('');
+          if (label === 'Search') setAddText(''); else setQuery('');
+        }}
+        items={[
+          { icon: 'search', label: 'Search', variant: mode === 'search' ? 'icon-row__btn--here' : undefined },
+          { icon: 'plus', label: 'Add an identity', variant: mode === 'add' ? 'icon-row__btn--here' : undefined },
+        ]}
+      />
+
+      {mode === 'search' && (
+        <div className="idn__searchrow">
+          <div className="dir__search">
+            <Icon name="search" size={16} />
+            <input ref={fieldRef} className="dir__search-input" placeholder="Search identities"
+              value={query} onChange={(e) => setQuery(e.target.value)} />
+            {query && (
+              <button className="dir__search-clear" onClick={() => setQuery('')} aria-label="Clear">
+                <Icon name="close" size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {mode === 'add' && (
+        <div className="idn__add">
+          <div className="idn__searchrow">
+            <div className="dir__search">
+              <Icon name="plus" size={16} />
+              <input ref={fieldRef} className="dir__search-input" placeholder="Name an identity — e.g. Beekeeper"
+                value={addText} onChange={(e) => { setAddText(e.target.value); setSuggestNote(''); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && canSuggest && similar.length === 0) void suggest(); }} />
+            </div>
+            {canSuggest && (
+              <button className="btn btn-primary idn__suggest" onClick={suggest}
+                disabled={suggestBusy || alreadyPending}>
+                {alreadyPending ? 'Suggested ✓' : suggestBusy ? 'Sending…' : 'Suggest'}
+              </button>
+            )}
+          </div>
+          {similar.length > 0 && (
+            <div className="idn__similar">
+              <p className="idn__similar-head">
+                {exactExists ? 'Already on Lichen:' : 'Already on Lichen — is it one of these?'}
+              </p>
+              {similar.map((c) => row(c, mineSet.has(c.name.trim().toLowerCase())))}
+              {canSuggest && <p className="idn__similar-foot">None of these? Suggest “{typed}” to Lichen.</p>}
+            </div>
+          )}
+          {!me && typed.length >= 2 && !exactExists && (
+            <p className="idn__suggest-note">Sign in to suggest it to Lichen.</p>
           )}
         </div>
-        {canSuggest && (
-          <button className="btn btn-primary idn__suggest" onClick={suggest}
-            disabled={suggestBusy || alreadyPending}>
-            {alreadyPending ? 'Suggested ✓' : suggestBusy ? 'Sending…' : 'Suggest'}
-          </button>
-        )}
-      </div>
+      )}
       {suggestNote && <p className="idn__suggest-note">{suggestNote}</p>}
 
       <div className="dir__list">
@@ -206,11 +300,7 @@ export function IdentitiesDirectory() {
             <Icon name="search" size={20} />
             <p>No identity matches &ldquo;{query}&rdquo;</p>
             <p className="dir__empty-sub">
-              {me
-                ? (alreadyPending
-                  ? 'You’ve suggested it — Lichen is reviewing.'
-                  : 'Tap Suggest above to send it to Lichen for review.')
-                : 'Sign in to suggest it to Lichen.'}
+              {me ? 'Tap + above to suggest it to Lichen.' : 'Sign in to suggest it to Lichen.'}
             </p>
           </div>
         )}
