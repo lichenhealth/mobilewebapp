@@ -21,7 +21,7 @@ export function helpPartyOrder<T extends { profile_id: string }>(members: T[], h
   return [...members].sort((a, b) => rank(a.profile_id) - rank(b.profile_id));
 }
 
-export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help' | 'space_dm' | 'suggestion';
+export type ChatKind = 'organization' | 'community' | 'group' | 'place' | 'care_team' | 'direct' | 'help' | 'space_dm' | 'suggestion' | 'event';
 
 export type MediaType = 'photo' | 'video' | 'audio';
 /** Stored on chat_messages.attachments — `url` is the storage PATH, signed at
@@ -111,6 +111,7 @@ export const KIND_LABEL: Record<ChatKind, string> = {
   help: 'Help',
   space_dm: 'Message',
   suggestion: 'Suggestion',
+  event: 'Event',
 };
 
 const PALETTE = ['#7E6B96', '#6B8A9C', '#7C8A6D', '#9C7355', '#7C3F4F', '#4A5D3F', '#A89764', '#C97B3F'];
