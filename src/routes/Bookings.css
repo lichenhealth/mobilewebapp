@@ -23,8 +23,18 @@
 .bkg__row-sub { font-size: 12px; font-weight: 300; color: var(--ink-muted); }
 .bkg__join { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; margin-top: 2px; font-size: 13px; color: var(--ink); }
 .bkg__joinnote { font-size: 12px; color: var(--ink-muted); align-self: center; }
-.bkg__row-note { font-size: 12px; font-style: italic; color: var(--ink-soft); }
+.bkg__row-note { font-size: 12px; font-style: italic; color: var(--ink-soft); text-wrap: pretty; }
 .bkg__row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+/* THE WORDS GET THE WIDTH (founder 2026-11-09, a booker's long note
+   squeezed into a third of the card beside Reschedule · Cancel): a booking
+   card stacks — title, time, note and answers run the FULL width, and the
+   actions sit as one row at the card's foot under a hairline, right-aligned.
+   Book-from-here rows (whole-row buttons, no actions) keep their one line. */
+.bkg__row:not(.bkg__row--go) { flex-direction: column; align-items: stretch; gap: var(--s-2); }
+.bkg__row:not(.bkg__row--go) .bkg__row-actions {
+  justify-content: flex-end; flex-wrap: wrap;
+  border-top: 1px solid var(--bone-edge); padding-top: var(--s-2);
+}
 .bkg__btn { font-size: 12px; padding: 8px 14px; }
 .bkg__btn--quiet { color: var(--ink-muted); }
 /* Actionable CTAs read PEACH, with air above (founder 2026-11-02, the /b/

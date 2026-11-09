@@ -1,3 +1,4 @@
+import { useTopBackFor } from '../lib/topBack';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
@@ -86,6 +87,7 @@ export default function MyceliumDirectory() {
   // the whole of it now.
   const [urlParams] = useSearchParams();
   const fromHome = urlParams.get('from') === 'home';
+  useTopBackFor(() => navigate('/home'), fromHome);
   const [litSet, setLitSet] = useState<Set<string>>(new Set());       // "present" (candle, here now)
   const [freeSet, setFreeSet] = useState<Set<string>>(new Set());     // "available" (social hours, not booked)
   const [myPres, setMyPres] = useState<MyPresence | null>(null);
@@ -221,11 +223,6 @@ export default function MyceliumDirectory() {
 
   return (
     <div className="mycdir">
-      {fromHome && (
-        <button className="cmp__back mycdir__back" onClick={() => navigate('/home')}>
-          <Icon name="arrow-left" size={14} /> Home
-        </button>
-      )}
       <IconRow items={WEB_ICONS} onSelect={() => { setAddOpen((o) => !o); setQ(''); }} />
       <header className="mycdir__head">
         <p className="mycdir__crumb">

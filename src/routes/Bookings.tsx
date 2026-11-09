@@ -1,3 +1,4 @@
+import { useTopBackFor } from '../lib/topBack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
@@ -30,6 +31,7 @@ import { useConfirm } from '../components/ConfirmDialog';
  *  as real events; this page is the lifecycle view. */
 export default function Bookings() {
   const navigate = useNavigate();
+  useTopBackFor(() => navigate('/calendar'));
   const confirmDialog = useConfirm();
   const { user } = useAuth();
   const me = user?.id ?? '';
@@ -138,9 +140,6 @@ export default function Bookings() {
 
   return (
     <div className="bkg">
-      <button className="cmp__back" onClick={() => navigate('/calendar')}>
-        <Icon name="arrow-left" size={14} /> Calendar
-      </button>
       <header className="bkg__head">
         <p className="eyebrow">Bookings</p>
         <h1 className="bkg__title display-italic">Sessions & requests</h1>
@@ -241,12 +240,14 @@ export default function Bookings() {
                     people to answer in the bookings detail"). */}
                 {b.note && <span className="bkg__row-note">&ldquo;{b.note}&rdquo;</span>}
               </div>
+              <div className="bkg__row-actions">
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => navigate(`/book/${b.type_id}?reschedule=${b.id}`)}>
                 Reschedule
               </button>
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => {
                 void confirmDialog({ message: 'Cancel this session? They\u2019ll be notified.', confirmLabel: 'Cancel session', cancelLabel: 'Keep it', danger: true }).then((ok) => { if (ok) void act(() => cancelBooking(b.id)); });
               }}>Cancel</button>
+              </div>
             </div>
           ))}
           </div>))}
@@ -277,6 +278,7 @@ export default function Bookings() {
                   />
                 )}
               </div>
+              <div className="bkg__row-actions">
               {payBtn(b)}
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => navigate(`/book/${b.type_id}?reschedule=${b.id}`)}>
                 Reschedule
@@ -284,6 +286,7 @@ export default function Bookings() {
               <button className="btn bkg__btn bkg__btn--quiet" onClick={() => {
                 void confirmDialog({ message: 'Cancel this session?', confirmLabel: 'Cancel session', cancelLabel: 'Keep it', danger: true }).then((ok) => { if (ok) void act(() => cancelBooking(b.id)); });
               }}>Cancel</button>
+              </div>
             </div>
           ))}
           </div>))}

@@ -35,11 +35,12 @@ export function useTopBarMounted(): boolean {
 /** The one way to broadcast a back handler. The latest `back` always runs
  *  (a ref, so the registration never churns per render), and unmount clears
  *  it — not the caller's to forget. */
-export function useTopBackFor(back: () => void) {
+export function useTopBackFor(back: () => void, enabled = true) {
   const ref = useRef(back);
   ref.current = back;
   useEffect(() => {
+    if (!enabled) return;
     setTopBack(() => ref.current());
     return () => setTopBack(null);
-  }, []);
+  }, [enabled]);
 }

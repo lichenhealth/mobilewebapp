@@ -1,3 +1,4 @@
+import { useTopBackFor } from '../lib/topBack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import FeedCard from '../components/FeedCard';
@@ -24,6 +25,7 @@ import { setHidden } from '../lib/hiddenApi';
 import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard, weaveProps } from '../lib/feedMapping';
 import { resolveIdentityScope } from '../lib/identityScope';
+import { listMyPostDrafts, draftLabel, type PostDraftRow } from '../lib/postDraftsApi';
 import './Events.css';
 
 // All-lenses-lit is the default — Marketplace's ALL_CHIPS rule.
@@ -62,6 +64,7 @@ export default function Events() {
   const [scopeName, setScopeName] = useState('');
   const { promptSaved, openPicker } = useCollect();
   const view: 'browse' | 'mine' = useLocation().pathname.endsWith('/mine') ? 'mine' : 'browse';
+  useTopBackFor(() => navigate('/events'), view === 'mine');
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
   // Lenses mirror MARKETPLACE (founder 2026-11-04, second pass: "all the
@@ -71,6 +74,18 @@ export default function Events() {
   const [modes, setModes] = useState<EventMode[]>(ALL_EVENT_MODES);
   const [statuses, setStatuses] = useState<Map<string, MyRsvpStatus>>(new Map());
   const [showPast, setShowPast] = useState(false);
+  // DRAFT EVENTS LIVE IN MY EVENTS TOO (founder 2026-11-09: "my draft events
+  // should show up in My Events"). The same post_drafts rows Drive lists —
+  // any draft whose Where includes Events — each opening back into Compose.
+  const [evDrafts, setEvDrafts] = useState<PostDraftRow[]>([]);
+  useEffect(() => {
+    if (view !== 'mine' || !user) return;
+    let live = true;
+    void listMyPostDrafts().then((rows) => {
+      if (live) setEvDrafts(rows.filter((r) => Array.isArray(r.draft.areas) && (r.draft.areas as unknown[]).includes('events')));
+    });
+    return () => { live = false; };
+  }, [view, user]);
   const [myWebSet, setMyWebSet] = useState<Set<string>>(new Set());
   const [myMyc, setMyMyc] = useState<Set<string>>(new Set());
   const [myRecs, setMyRecs] = useState<Set<string>>(new Set());
@@ -256,9 +271,6 @@ export default function Events() {
         /* My Events is a MANAGEMENT page now (founder 2026-07-26): back chip
            home to Events, same as the calendar's. */
         <header className="mkt__head">
-          <button className="cmp__back mkt__memberback" onClick={() => navigate('/events')}>
-            <Icon name="arrow-left" size={14} /> Events
-          </button>
           <h1 className="mkt__title">
             My <span className="display-italic">Events</span>
           </h1>
@@ -381,7 +393,26 @@ export default function Events() {
 
       {view === 'mine' && (
         <section className="evt__feed">
-          {mine.upcoming.length === 0 && mine.past.length === 0 && (
+          {evDrafts.length > 0 && (
+            <div className="evt__drafts">
+              <h2 className="evt__drafts-h">Drafts</h2>
+              {evDrafts.map((d) => {
+                const r = d.draft.evRange as { start?: string | null } | undefined;
+                const when = r?.start ? formatDateShort(r.start) : 'No date yet';
+                return (
+                  <button key={d.id} className="evt__draft" onClick={() => navigate(`/compose?draft=${d.id}`)}>
+                    <span className="evt__draft-icon"><Icon name="rsvp" size={16} /></span>
+                    <span className="evt__draft-text">
+                      <span className="evt__draft-title">{draftLabel(d.draft)}</span>
+                      <span className="evt__draft-meta">Draft · {when} · saved {formatDateShort(d.updated_at.slice(0, 10))}</span>
+                    </span>
+                    <Icon name="chevron-right" size={14} />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {mine.upcoming.length === 0 && mine.past.length === 0 && evDrafts.length === 0 && (
             <p className="evt__empty">
               Nothing here yet — RSVP to something in Events, or host your own.
             </p>

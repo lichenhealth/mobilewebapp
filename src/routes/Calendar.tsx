@@ -1,3 +1,4 @@
+import { useTopBackFor } from '../lib/topBack';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
@@ -85,6 +86,7 @@ export default function Calendar() {
   // Arrived via Events > My Calendar → offer the way back (maps' ?from= pattern)
   const [urlParams] = useSearchParams();
   const fromEvents = urlParams.get('from') === 'events';
+  useTopBackFor(() => navigate('/events'), fromEvents);
   // ONE CALENDAR, FILTERED (founder 2026-08-15): a course's cohort no longer
   // carries its own "Find a time" door — it sends you here with `?space=<id>`,
   // which lands the grid on that cohort's calendar alone. Find-a-time is a
@@ -735,11 +737,6 @@ export default function Calendar() {
       {/* Frozen unit (à la Google Cal): toolbar + day header stay pinned; the
           hour grid slides up and hides beneath them. The + lives here too, so
           nothing above the pin matters — no title row, grid starts high. */}
-      {fromEvents && (
-        <button className="cmp__back calp__backchip" onClick={() => navigate('/events')}>
-          <Icon name="arrow-left" size={14} /> Events
-        </button>
-      )}
       <div className="calp__pin">
         {/* Acting doors LEFT in Home's order (Search · + · Brain), the
             calendar's own controls RIGHT (founder 2026-08-14: "for UI
