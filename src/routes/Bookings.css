@@ -206,3 +206,6 @@
   gap: 8px;
   margin: 2px 0 6px;
 }
+/* An outside guest's email / phone on the provider's rows. */
+.bkg__reach { display: block; font-size: 13px; color: var(--ink-soft); margin-top: 2px; overflow-wrap: anywhere; }
+.bkg__reach em { color: var(--ink-muted); font-style: normal; }
