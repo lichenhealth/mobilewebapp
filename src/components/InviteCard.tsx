@@ -19,6 +19,10 @@ export interface InviteFacts {
   /** Every photo the event carries, in order — the two photo slots choose
    *  from these (smart default: first on the card, second on the envelope). */
   photos?: string[];
+  /** The event's own words — they ride INSIDE the card, right under its photo
+   *  (founder 2026-11-09: "should be on the inside of the card… attached to
+   *  the bottom of the photo"), never as a paragraph below the card. */
+  description?: string;
 }
 
 /** "Zoom" / a Meet link / "Teams" → the service's name, so the card can wear
@@ -146,6 +150,7 @@ export function InviteCard({ design, facts, cta, footer, onRsvp, rsvp, onPick, c
         <p className="invc__arttitle">{facts.title}</p>
         <p className="invc__artline">{facts.when}</p>
         {whereEl}
+        {facts.description && <p className="invc__artline invc__artline--msg">{facts.description}</p>}
         {r.message && <p className="invc__artline invc__artline--msg">{r.message}</p>}
         <p className="invc__artline">Hosted by <strong>{facts.host}</strong></p>
         {linkRow}
@@ -160,6 +165,7 @@ export function InviteCard({ design, facts, cta, footer, onRsvp, rsvp, onPick, c
         ['--invc-soft' as string]: r.inkSoft, ['--invc-accent' as string]: r.accent,
         ['--invc-font' as string]: r.fontCss }}>
       {cardPhoto && <img className="invc__photo" src={cardPhoto} alt="" />}
+      {facts.description && <p className="invc__desc">{facts.description}</p>}
       {t.id === 'celebration' && <div className="invc__confetti" aria-hidden="true" style={{ background: linerCss('confetti', r.accent) }} />}
       <div className="invc__body">
         {t.ornament && <p className="invc__orn" aria-hidden="true">{t.ornament}</p>}

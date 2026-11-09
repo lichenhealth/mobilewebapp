@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
   let body: {
     event_id?: string; name?: string; email?: string; guest_id?: string; send_at?: string; announce?: string;
-    test?: { title?: string; start_date?: string; all_day?: boolean; start_min?: number | null; location?: string; photo?: string | null; invite?: unknown };
+    test?: { to?: string; title?: string; start_date?: string; all_day?: boolean; start_min?: number | null; location?: string; photo?: string | null; invite?: unknown };
   };
   try { body = await req.json(); } catch { return json({ error: 'Invalid body' }, 400); }
 
@@ -79,16 +79,25 @@ Deno.serve(async (req) => {
     const ures = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${uid}`, {
       headers: { apikey: SERVICE_KEY!, Authorization: `Bearer ${SERVICE_KEY!}` },
     });
-    const to = ((await ures.json().catch(() => null))?.email ?? '').trim();
+    const own = ((await ures.json().catch(() => null))?.email ?? '').trim();
+    // The test defaults to the host's own inbox; they may type another address
+    // (founder 2026-11-09: "auto setup for your email… but you can edit or send
+    // to a different address as well"). One address, a plain [Test] card.
+    const asked = String(t.to ?? '').trim().toLowerCase();
+    if (asked && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(asked)) return json({ error: 'That email doesn’t look complete' }, 400);
+    const to = asked || own;
+    const toSelf = !asked || asked === own.toLowerCase();
     if (!to) return json({ error: 'No email on your account to send a test to' }, 400);
     const hosts = await (await sb(`profiles?id=eq.${uid}&select=full_name`)).json();
     const hostName = (Array.isArray(hosts) ? hosts[0]?.full_name : null) || 'A member';
     const when = whenLabel({ start_date: sd, end_date: sd, all_day: !!t.all_day, start_min: startMin });
     const link = `${APP_URL}/events`;
-    const text = `[Test — only you received this]\n\n${hostName} invited you to "${title}" on Lichen.\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}\n\nYour guests' RSVP button opens their own invitation once you post.\n\n— Lichen`;
+    const text = `[Test${toSelf ? ' — only you received this' : ` — sent by ${hostName} as a preview`}]\n\n${hostName} invited you to "${title}" on Lichen.\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}\n\nYour guests' RSVP button opens their own invitation once you post.\n\n— Lichen`;
     const html = inviteCard({
       title, when, where, hostName, link, photo, design: t.invite ?? null,
-      fine: '<strong>This is a test, sent only to you.</strong> Your guests receive this same card — their RSVP button opens their own invitation once you post the event.',
+      fine: toSelf
+        ? '<strong>This is a test, sent only to you.</strong> Your guests receive this same card — their RSVP button opens their own invitation once you post the event.'
+        : `<strong>This is a test preview from ${hostName.replace(/[<>&]/g, '')}.</strong> It isn't your invitation yet — the real one arrives once the event is posted.`,
     });
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',

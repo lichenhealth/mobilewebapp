@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ChangeEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
@@ -235,6 +236,22 @@ export default function Compose() {
   useEffect(() => { void zoomMintAllowed(user?.id).then(setZoomOk); }, [user?.id]);
   const [studioOpen, setStudioOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  // Send-a-test goes to your own email by default; edit it to send elsewhere.
+  const [invTestTo, setInvTestTo] = useState('');
+  useEffect(() => { if (user?.email) setInvTestTo((v) => v || user.email!); }, [user?.email]);
+  // THE SPLIT BUILDER (founder 2026-11-09: "the preview on the right and the
+  // build tools on the left on desktop and tablet, but keep mobile a vertical
+  // build, kinda like Calendar"): from 1024px an event's invitation rides a
+  // sticky right column; narrower, it stays in the flow. WATCHED, never
+  // sampled once (a cold load can run before layout has a width).
+  const [wideBuild, setWideBuild] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const on = () => setWideBuild(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const [sideEl, setSideEl] = useState<HTMLElement | null>(null);
   // THE DRAFT'S OWN ZOOM ROOM (founder 2026-11-09): the hold mints it; the
   // Preview's Join door opens it, and Post carries the same room over.
   const [draftZoomUrl, setDraftZoomUrl] = useState<string | null>(null);
@@ -1684,8 +1701,10 @@ export default function Compose() {
 
   if (loading || !editReady) return <div className="cmp"><p className="cmp__muted">Loading…</p></div>;
 
+  const evSplit = isEvent && wideBuild;
   return (
-    <div className="cmp">
+    <div className={'cmp' + (evSplit ? ' cmp--evsplit' : '')}>
+    <div className="cmp__main">
       {/* The way back lives in the TopBar's arrow now (useTopBackFor above).
           The chip stands only in a pop-up, where Back means "never mind —
           close this window". */}
@@ -2154,7 +2173,7 @@ export default function Compose() {
               <label className="cmp__evrow cmp__genlink">
                 <input type="checkbox" checked={genLink} onChange={(e) => setGenLink(e.target.checked)} />
                 <span>
-                  <strong>Generate a shareable link</strong> — it follows whoever
+                  <strong>Make a shareable link</strong> — one link to text or post anywhere, instead of entering emails and numbers; copy it from the event page once you post. It follows whoever
                   you picked above: {evAnyone
                     ? 'open to anyone — whoever opens it can RSVP straight away.'
                     : evLichen
@@ -2182,8 +2201,13 @@ export default function Compose() {
               const when = inviteWhen(evRange.start ?? '', evAllDay, evStartMin, evTz);
               const sendTest = async () => {
                 setInvTest({ state: 'sending' });
+                const testTo = invTestTo.trim();
+                if (testTo && !testTo.includes('@')) {
+                  setInvTest({ state: 'error', msg: 'Tests go by email for now — texts go from your own phone once the event is posted (Text › beside each name on the event page).' });
+                  return;
+                }
                 const { data, error } = await supabase.functions.invoke('send-event-invite', {
-                  body: { test: { title: evTitle, start_date: evRange.start, all_day: evAllDay, start_min: evAllDay ? null : evStartMin, location: where, photo, invite: { ...(inviteDesign ?? { template: 'classic' }), cardPhoto: invitePhotos(inviteDesign, photos).card ?? 'none' } } },
+                  body: { test: { to: testTo || undefined, title: evTitle, start_date: evRange.start, all_day: evAllDay, start_min: evAllDay ? null : evStartMin, location: where, photo, invite: { ...(inviteDesign ?? { template: 'classic' }), cardPhoto: invitePhotos(inviteDesign, photos).card ?? 'none' } } },
                 });
                 const d = data as { ok?: boolean; to?: string; error?: string } | null;
                 if (error || !d?.ok) setInvTest({ state: 'error', msg: d?.error ?? 'The test didn’t send — try again in a moment.' });
@@ -2193,8 +2217,10 @@ export default function Compose() {
                 <div className="cmp__invprev">
                   <label className="cmp__label">The invitation</label>
                   <p className="cmp__hint-ev">What your guests receive — by email, and on their invitation link, where it arrives in an envelope. <strong>Edit design</strong> picks a template, the words, colours and envelope.</p>
+                  {(() => {
+                    const stageBlock = (<>
                   <div className="cmp__invstage">
-                    <InviteCard design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos }} />
+                    <InviteCard design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos, description: body.trim() || undefined }} />
                   </div>
                   <div className="cmp__invtest">
                     <button type="button" className="cmp__invtest-btn" onClick={() => setPreviewOpen(true)}>
@@ -2203,21 +2229,35 @@ export default function Compose() {
                     <button type="button" className="cmp__invtest-btn" onClick={() => setStudioOpen(true)}>
                       <Icon name="palette" size={14} /> Edit design
                     </button>
+                    <input className="cmp__invtest-to" type="email" value={invTestTo}
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                      onChange={(e) => { setInvTestTo(e.target.value); setInvTest({ state: 'idle' }); }}
+                      aria-label="Send the test to" placeholder="Your email" />
                     <button type="button" className="cmp__invtest-btn" onClick={() => void sendTest()}
                       disabled={invTest.state === 'sending' || !evRange.start}>
-                      <Icon name="send" size={14} /> {invTest.state === 'sending' ? 'Sending…' : invTest.state === 'sent' ? 'Send another test' : 'Send me a test'}
+                      <Icon name="send" size={14} /> {invTest.state === 'sending' ? 'Sending…' : invTest.state === 'sent' ? 'Send another test' : 'Send a test'}
                     </button>
-                    {invTest.state === 'sent' && <span className="cmp__invtest-note">Sent to {invTest.msg} ✓ — only you.</span>}
+                    {invTest.state === 'sent' && <span className="cmp__invtest-note">Sent to {invTest.msg} ✓</span>}
                     {invTest.state === 'error' && <span className="cmp__invtest-note cmp__invtest-note--err">{invTest.msg}</span>}
                   </div>
+                    </>);
+                    return evSplit && sideEl
+                      ? <>
+                          <p className="cmp__hint-ev">The invitation is beside you — every change shows there as you build.</p>
+                          {createPortal(<div className="cmp__sidecard"><p className="cmp__label">The invitation</p>{stageBlock}</div>, sideEl)}
+                        </>
+                      : stageBlock;
+                  })()}
                   {studioOpen && (
-                    <InviteStudio design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos }}
+                    <InviteStudio design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos, description: body.trim() || undefined }}
                       uploaderId={user?.id}
+                      onTitle={(t) => setTitle(t)}
+                      onDescription={(t) => setBody(t)}
                       onClose={() => setStudioOpen(false)}
                       onDone={(dz) => { setInviteDesign(dz); setStudioOpen(false); setInvTest({ state: 'idle' }); }} />
                   )}
                   {previewOpen && (
-                    <InvitePreview design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos }}
+                    <InvitePreview design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos, description: body.trim() || undefined }}
                       joinUrl={online && /^https:\/\//i.test(meetingUrl.trim()) ? meetingUrl.trim() : draftZoomUrl}
                       uploaderId={user?.id}
                       cal={evRange.start ? {
@@ -3117,6 +3157,8 @@ export default function Compose() {
           </button>
         </p>
       )}
+    </div>
+    {evSplit && <aside className="cmp__side" ref={setSideEl} />}
     </div>
   );
 }

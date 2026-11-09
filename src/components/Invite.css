@@ -279,3 +279,7 @@ button.invc__cta { border: 0; cursor: pointer; font: inherit; }
    envelope but the flap's own opening, so the card sits right up to the seam
    and only shows once the flap lifts. Faint folds from the bottom corners. */
 .invenv__seams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+/* The event's own words, inside the card right under its photo. */
+.invc__desc { margin: 0; padding: 16px 22px 0; font-family: var(--invc-font); font-size: 17px; line-height: 1.5; color: var(--invc-ink); text-align: center; white-space: pre-wrap; text-wrap: pretty; }
+.cmp__invtest-to { flex: 1 1 200px; min-width: 0; padding: 8px 12px; border: 1px solid var(--bone-edge); border-radius: 999px; font: inherit; font-size: 14px; background: #fff; }
+.cmp__genlink--inv { margin: 4px 0 10px; }
