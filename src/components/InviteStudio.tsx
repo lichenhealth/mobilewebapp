@@ -21,10 +21,15 @@ import './Invite.css';
 type Tab = 'design' | 'words' | 'replies' | 'style' | 'envelope';
 const OCCASIONS = ['All', 'Celebrations', 'Gatherings', 'Seasonal', 'Simple'] as const;
 
-export function InviteStudio({ design, facts, onDone, onClose, uploaderId }: {
+export function InviteStudio({ design, facts, onDone, onClose, uploaderId, onTitle, onDescription }: {
   design: InviteDesign | null;
   facts: InviteFacts;
   uploaderId?: string;
+  /** The EVENT's own title and words, edited right here (founder 2026-11-09:
+   *  "the edit sections should have all the details that the compose does —
+   *  including the title"). They change the event itself, live. */
+  onTitle?: (t: string) => void;
+  onDescription?: (t: string) => void;
   onDone: (d: InviteDesign) => void;
   onClose: () => void;
 }) {
@@ -131,7 +136,20 @@ export function InviteStudio({ design, facts, onDone, onClose, uploaderId }: {
               <input value={d.headline ?? templateById(d.template).headline} maxLength={80}
                 onChange={(e) => set({ headline: e.target.value })} />
             </label>
-            <p className="invst__note">The event&rsquo;s title, date and place come from the event itself — change them in the composer.</p>
+            {onTitle && (
+              <label className="invst__field">
+                <span className="invst__label">Event title</span>
+                <input value={facts.title} maxLength={200} onChange={(e) => onTitle(e.target.value)} />
+              </label>
+            )}
+            {onDescription && (
+              <label className="invst__field">
+                <span className="invst__label">Inside the card, under the photo</span>
+                <textarea value={facts.description ?? ''} maxLength={2000} placeholder="Let's celebrate…"
+                  onChange={(e) => onDescription(e.target.value)} />
+              </label>
+            )}
+            <p className="invst__note">These change the event itself. The date, time and place stay in the composer.</p>
             <label className="invst__field">
               <span className="invst__label">A note from you</span>
               <textarea value={d.message ?? ''} maxLength={600} placeholder="Come as you are — we'll have tea and a fire going."

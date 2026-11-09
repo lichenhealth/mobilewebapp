@@ -165,7 +165,7 @@ export default function GuestEvent() {
           button walks down to the RSVP below. */}
       <InviteEnvelope design={design} peek={ev.title}>
         <InviteCard design={design}
-          facts={{ title: ev.title, when: whenText(ev), where: ev.location || undefined, host: ev.host_name, photo: ev.photo_url }}
+          facts={{ title: ev.title, when: whenText(ev), where: ev.location || undefined, host: ev.host_name, photo: ev.photo_url, description: ev.description || undefined }}
           cta={requested ? <span className="gev__cardnote">Your request is with <span className="nobr">{ev.host_name}</span></span> : undefined}
           rsvpLabel={info ? undefined : 'Ask to come'}
           onRsvp={info ? undefined : () => document.getElementById('gev-act')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
@@ -175,7 +175,6 @@ export default function GuestEvent() {
           cal={info && cal ? { ...cal, url: zoomUrl ?? undefined } : null}
           joinUrl={info && !requested ? zoomUrl : null} />
       </InviteEnvelope>
-      {ev.description && <p className="gev__desc gev__desc--below">{ev.description}</p>}
 
       {/* FROM THE HOST (the host's messages to everyone) — newest first. */}
       {notes.length > 0 && (

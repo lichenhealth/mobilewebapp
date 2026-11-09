@@ -533,3 +533,13 @@
 .cmp__polladd { align-self: flex-start; border: 0; background: none; color: var(--peach-deep); font: inherit; font-size: 13px; cursor: pointer; padding: 4px 0; }
 .cmp__polldl { width: auto; }
 .cmp__pollrules { width: 100%; resize: vertical; }
+/* THE SPLIT BUILDER (founder 2026-11-09): from 1024px an event is built on
+   the left with its invitation standing in a sticky column on the right —
+   the Calendar-settings shape. Phones keep the one vertical build. */
+@media (min-width: 1024px) {
+  .cmp.cmp--evsplit { max-width: 1120px; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 36px; align-items: start; }
+  .cmp__main { min-width: 0; }
+  .cmp__side { position: sticky; top: calc(var(--top-h) + 16px); max-height: calc(100vh - var(--top-h) - 32px); overflow-y: auto; }
+  .cmp__sidecard { padding: 14px 4px 8px; }
+  .cmp__sidecard .cmp__invstage .invc { max-width: none; }
+}
