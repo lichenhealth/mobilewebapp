@@ -56,7 +56,7 @@ export default function GuestBooking() {
   // Arriving straight from the booking flow (founder 2026-11-02: "bring all
   // the details from the 'see your booking' page one page forward") — the
   // confirmation LANDS here now, so say the email is coming.
-  const justBooked = new URLSearchParams(location.search).get('just') === '1';
+  const justBooked = new URLSearchParams(location.search).get('just');
 
   // The pickers' two-month browsable window (the SlotMonth standard).
   const moveFrom = useMemo(() => todayISO(), []);
@@ -180,7 +180,9 @@ export default function GuestBooking() {
           {row.type_location ? ` · ${row.type_location}` : ''}
         </p>
         <p className="bkg__sub">{s.sub}</p>
-        {justBooked && <p className="bkg__sub">A confirmation email is on its way to your inbox.</p>}
+        {justBooked && (justBooked === 'phone'
+          ? <p className="bkg__sub"><strong>Save or bookmark this page</strong> — it’s your booking: the calendar buttons, any join link, and where you can reschedule or cancel. {row.provider_name.split(' ')[0]} has your number.</p>
+          : <p className="bkg__sub">A confirmation email is on its way to your inbox.</p>)}
       </header>
 
       {/* THE WAY FORWARD (founder 2026-11-02, from the cancelled page whose

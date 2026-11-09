@@ -92,6 +92,7 @@ export interface BookingRow {
    *  email, and an unguessable token that is their whole authorization. */
   guest_name?: string | null;
   guest_email?: string | null;
+  guest_phone?: string | null;
   guest_token?: string | null;
   /** The session's video link (Zoom, Meet…) — stamped server-side when the
    *  booking is CONFIRMED, never on a pending request. */
@@ -844,11 +845,14 @@ export async function guestCreateBooking(
   typeId: string, date: string, startMin: number,
   name: string, email: string, note: string,
   answers?: { q: string; a: string }[],
+  /** A phone instead of (or beside) the email — pass email '' then. */
+  phone?: string,
 ): Promise<string> {
   const { data, error } = await supabase.rpc('guest_create_booking', {
     p_type: typeId, p_date: date, p_start: startMin,
-    p_name: name, p_email: email, p_note: note,
+    p_name: name, p_email: email || null, p_note: note,
     p_answers: answers?.length ? answers : null,
+    p_phone: phone || null,
   });
   if (error) throw error;
   return data as string;
@@ -1009,7 +1013,7 @@ export async function savePayoutPref(me: string, pref: 'keep' | 'auto_cashout'):
 }
 
 const BOOKING_EMBED =
-  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, answers, guest_name, guest_email, guest_token, meeting_url, price_cents, paid_at, pay_choice, payment_pending_at, ' +
+  'id, type_id, provider_id, booker_id, on_date, start_min, end_min, status, note, answers, guest_name, guest_email, guest_phone, guest_token, meeting_url, price_cents, paid_at, pay_choice, payment_pending_at, ' +
   'type:booking_types(title, price, location, approval, pay_methods), ' +
   'provider:profiles!bookings_provider_id_fkey(full_name), ' +
   'booker:profiles!bookings_booker_id_fkey(full_name)';
@@ -1027,4 +1031,14 @@ export async function listMyBookings(me: string): Promise<{ asProvider: BookingR
     asProvider: (prov.data as unknown as BookingRow[] | null) ?? [],
     asBooker: (book.data as unknown as BookingRow[] | null) ?? [],
   };
+}
+
+/** A booker's contact line, read as email or phone (BOOK WITH A PHONE,
+ *  founder 2026-11-09). Invisible marks a phone's Contacts paste carries are
+ *  stripped; a phone is no letters and at least 7 digits. */
+export function bookingContact(raw: string): { kind: 'email' | 'phone' | null; value: string } {
+  const v = raw.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '').trim();
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return { kind: 'email', value: v };
+  if (!/[a-z]/i.test(v) && v.replace(/\D/g, '').length >= 7) return { kind: 'phone', value: v };
+  return { kind: null, value: v };
 }

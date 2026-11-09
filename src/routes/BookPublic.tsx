@@ -14,7 +14,7 @@ import {
   resolveBookingVanity, slotsForDay, seatsLeft, viewerZone, zoneSlotLabel, allTimeZones,
   startBookingCheckout, usdLabel, setBookingPayChoice, listBookableTypes,
   familyBySlugPrefix, groupTypesByTitle, lengthByAlias, sessionLengthLabel, slugify,
-  saveBookResume, readBookResume, clearBookResume, emailIsMember, type BookResume,
+  saveBookResume, readBookResume, clearBookResume, emailIsMember, bookingContact, type BookResume,
   type PublicBookingPage, type BookingBoard, type BookingType,
 } from '../lib/bookingApi';
 import TimeZonePick from '../components/TimeZonePick';
@@ -282,6 +282,7 @@ export default function BookPublic() {
   // pick (the round trip). Booking as a guest stays one tap away; the
   // nudge never blocks.
   const [knownMember, setKnownMember] = useState(false);
+  const contact = bookingContact(email);
   useEffect(() => {
     if (user) { setKnownMember(false); return; }
     const v = email.trim();
@@ -650,8 +651,14 @@ export default function BookPublic() {
           )}
           <input className="bkg__note bkpub__field" value={name}
             onChange={(e) => setName(e.target.value)} placeholder="Your name" />
-          <input className="bkg__note bkpub__field" type="email" value={email}
-            onChange={(e) => setEmail(e.target.value)} placeholder="Your email — the confirmation lands here" />
+          {/* BOOK WITH A PHONE (founder 2026-11-09: "let's let people book with
+              their phone number, too"): one box, read as email or phone. */}
+          <input className="bkg__note bkpub__field" type="text" inputMode="email" value={email}
+            autoCapitalize="none" autoCorrect="off" spellCheck={false}
+            onChange={(e) => setEmail(e.target.value)} placeholder="Your email or phone number" />
+          {email.trim() && contact.kind === 'phone' && (
+            <p className="bkpub__fine">Booking by phone — {first} gets your number, and the next page is yours to keep: it holds your booking, the calendar buttons and any join link.</p>
+          )}
           {!user && knownMember && (
             <p className="bkpub__fine bkpub__known">
               That email already has a Lichen account —{' '}
@@ -676,25 +683,26 @@ export default function BookPublic() {
             placeholder={`Anything ${first} should know? (optional)`} />
           <button
             className="btn btn-primary bkg__btn"
-            disabled={busy || !name.trim() || !/\S+@\S+\.\S+/.test(email) || unanswered}
+            disabled={busy || !name.trim() || !contact.kind || unanswered}
             onClick={async () => {
               setBusy(true); setError('');
               try {
                 const token = await guestCreateBooking(
-                  typeId!, pick.iso, pick.start, name.trim(), email.trim(), note.trim(),
+                  typeId!, pick.iso, pick.start, name.trim(), contact.kind === 'email' ? contact.value : '', note.trim(),
                   questions.map((q, i) => ({ q, a: (answers[i] ?? '').trim() })).filter((x) => x.a),
+                  contact.kind === 'phone' ? contact.value : undefined,
                 );
                 // Record the invoice-me-later intent BEFORE the mail, so the
                 // email speaks it (best-effort — the booking stands either way).
                 if (payLater) await setBookingPayChoice({ token, later: true }).catch(console.error);
-                sendBookingMail(token);
+                if (contact.kind === 'email') sendBookingMail(token);
                 // THE CONFIRMATION IS THE BOOKING PAGE (founder 2026-11-02:
                 // "bring all the details from the 'see your booking' page one
                 // page forward so you're not clicking more than we need to"):
                 // land straight on /b/<token> — status, add-to-calendar, the
                 // Join link, reschedule, cancel and the pay door all live
                 // there. One source of truth, zero extra clicks.
-                navigate(`/b/${token}?just=1`);
+                navigate(`/b/${token}?just=${contact.kind === 'phone' ? 'phone' : '1'}`);
               } catch (e) {
                 setError((e as { message?: string } | null)?.message || 'Something went wrong.');
                 setBusy(false);

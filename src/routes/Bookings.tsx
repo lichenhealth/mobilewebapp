@@ -110,6 +110,16 @@ export default function Bookings() {
   // A guest row has no member behind it — name it honestly.
   const who = (b: BookingRow) =>
     b.booker_id ? (b.booker?.full_name ?? 'A member') : `${b.guest_name ?? 'A guest'} · from outside Lichen`;
+  // How to reach an outside guest — email and/or the phone they booked with
+  // (BOOK WITH A PHONE, 2026-11-09: no SMS provider, so the provider texts
+  // from their own phone). Phone-only guests get no emails from Lichen.
+  const reach = (b: BookingRow) => (!b.booker_id && (b.guest_email || b.guest_phone)) ? (
+    <span className="bkg__reach">
+      {b.guest_email && <a className="link-cue" href={`mailto:${b.guest_email}`}>{b.guest_email}</a>}
+      {b.guest_phone && <>{b.guest_email ? ' · ' : ''}<a className="link-cue" href={`sms:${b.guest_phone.replace(/[^\d+]/g, '')}`}>Text {b.guest_phone}</a>
+        {!b.guest_email && <em> — booked by phone, so Lichen can’t email them</em>}</>}
+    </span>
+  ) : null;
   // Guests hear by email, not bell — after a decision, the mail function
   // reads the row's CURRENT status and writes accordingly.
   const decideGuest = (b: BookingRow, accept: boolean) =>
@@ -216,6 +226,7 @@ export default function Bookings() {
             <div className="bkg__row" key={b.id}>
               <div className="bkg__row-body">
                 <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
+                {reach(b)}
                 <span className="bkg__row-sub">{when(b)}</span>
                 {!!b.price_cents && !b.paid_at && (
                   <span className="bkg__row-note">{usdLabel(b.price_cents)} — their payment link opens once you accept</span>
@@ -242,6 +253,7 @@ export default function Bookings() {
             <div className="bkg__row" key={b.id}>
               <div className="bkg__row-body">
                 <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
+                {reach(b)}
                 <span className="bkg__row-sub">{timeOnly(b)}</span>
                 <JoinLink b={b} />
                 {payState(b)}
