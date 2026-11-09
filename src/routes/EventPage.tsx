@@ -26,6 +26,7 @@ import {
 } from '../lib/eventGuestsApi';
 import EventHostSuite from '../components/EventHostSuite';
 import { zoneAbbr } from '../lib/bookingApi';
+import { loadEventMeetingUrl } from '../lib/calendarApi';
 import { readInvite, resolveInvite, formAsks } from '../lib/inviteDesign';
 import { classifyCareContact } from '../lib/careTeamApi';
 import './EventPage.css';
@@ -84,6 +85,8 @@ export default function EventPage(props: { postId?: string } = {}) {
   const [myMeal, setMyMeal] = useState('');
   const [myAns, setMyAns] = useState<Record<string, string>>({});
   const [myXState, setMyXState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  // The event's own Zoom room — RLS hands it only to hosts and attendees.
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -133,6 +136,7 @@ export default function EventPage(props: { postId?: string } = {}) {
     let live = true;
     void supabase.from('event_cohosts').select('profile_id').eq('event_id', post.linked_event_id).eq('profile_id', me)
       .maybeSingle().then(({ data }) => { if (live) setIsCohost(!!data); });
+    void loadEventMeetingUrl(post.linked_event_id).then((u) => { if (live) setZoomUrl(u); });
     void loadRsvpExtras(post.linked_event_id).then((xs) => {
       const mine = xs.find((x) => x.profile_id === me);
       if (!live || !mine) return;
@@ -378,7 +382,21 @@ export default function EventPage(props: { postId?: string } = {}) {
               <span className="evp__infocard-cta">{going ? 'On your calendar ✓' : 'Add to Cal'}</span>
               {whenLines.map((l) => <span className="evp__infocard-line" key={l}>{l}</span>)}
             </button>
-            {location ? (
+            {calEvent?.zoom_unique && !location ? (
+              zoomUrl ? (
+                <a className="evp__infocard" href={zoomUrl} target="_blank" rel="noopener noreferrer">
+                  <Icon name="video" size={20} />
+                  <span className="evp__infocard-cta">Join Zoom</span>
+                  <span className="evp__infocard-line">This event's own room</span>
+                </a>
+              ) : (
+                <div className="evp__infocard">
+                  <Icon name="video" size={20} />
+                  <span className="evp__infocard-cta">Online · Zoom</span>
+                  <span className="evp__infocard-line">{isHost ? 'The room is being made…' : 'RSVP to get the link'}</span>
+                </div>
+              )
+            ) : location ? (
               <div className="evp__infocard">
                 <Icon name="location" size={20} />
                 <span className="evp__infocard-cta">Add to Maps</span>

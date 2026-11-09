@@ -23,7 +23,7 @@ import {
 } from '../lib/postsApi';
 import { createEvent, deleteEvent, updateEventDetails, myTimezone } from '../lib/calendarApi';
 import TimeZonePick from '../components/TimeZonePick';
-import { allTimeZones, viewerZone } from '../lib/bookingApi';
+import { allTimeZones, viewerZone, zoomMintAllowed } from '../lib/bookingApi';
 import { slugify } from '../lib/bookingApi';
 import { classifyCareContact } from '../lib/careTeamApi';
 import { inviteEventGuest, inviteEventGuestByPhone, mintEventLink } from '../lib/eventGuestsApi';
@@ -212,6 +212,11 @@ export default function Compose() {
     return () => { live = false; };
   }, [user?.id]);
   const tzZones = useMemo(() => allTimeZones(), []);
+  // A UNIQUE ZOOM ROOM PER EVENT (founder 2026-11-09): Lichen's Zoom mints the
+  // meeting; only hosts and guests ever see the link. Gated like bookings.
+  const [evZoom, setEvZoom] = useState(false);
+  const [zoomOk, setZoomOk] = useState(false);
+  useEffect(() => { void zoomMintAllowed(user?.id).then(setZoomOk); }, [user?.id]);
   const [studioOpen, setStudioOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   // Category tags — the real 63-category taxonomy, loaded when opened.
@@ -733,7 +738,7 @@ export default function Compose() {
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
       condition: [...condition], availFrom, availTo, fulfillment: [...fulfillment],
-      deliverRadius, paymentPlan, currentcyOnly, catTags, inviteDesign, invSendAt, evTz,
+      deliverRadius, paymentPlan, currentcyOnly, catTags, inviteDesign, invSendAt, evTz, evZoom,
       travelKind, routeFrom, routeTo, vehicle, seats, sleeps,
       evRange, evAllDay, evStartMin, evEndMin, bookingUrl,
       sliding, slideLow, slideHigh, unitSel, unitQty, unitText,
@@ -794,6 +799,7 @@ export default function Compose() {
       if (d.inviteDesign) setInviteDesign(readInvite(d.inviteDesign));
       if (typeof d.invSendAt === 'string') setInvSendAt(d.invSendAt);
       if (typeof d.evTz === 'string' && d.evTz) { evTzTouched.current = true; setEvTz(d.evTz); }
+      if (d.evZoom === true) { setEvZoom(true); setOnline(true); }
       if (Array.isArray(d.catTags)) setCatTags(d.catTags);
       s(d.travelKind, setTravelKind); s(d.routeFrom, setRouteFrom); s(d.routeTo, setRouteTo);
       s(d.vehicle, setVehicle); s(d.seats, setSeats); s(d.sleeps, setSleeps);
@@ -895,6 +901,7 @@ export default function Compose() {
         if (ev.start_min != null) setEvStartMin(ev.start_min);
         if (ev.end_min != null) setEvEndMin(ev.end_min);
         if (ev.timezone) { evTzTouched.current = true; setEvTz(ev.timezone); }
+        if (ev.zoom_unique) { setEvZoom(true); setOnline(true); }
       }
       const d = p.details ?? {};
       setAiReadable(!d.aiExcluded);
@@ -1304,7 +1311,8 @@ export default function Compose() {
       // Events' calendar rows show ONE location line — the address when in
       // person, else the meeting link (SmartLocation renders links as Join).
       const effLocation = inPerson && location.trim() ? location.trim()
-        : online && meetingUrl.trim() ? meetingUrl.trim() : location.trim();
+        : online && meetingUrl.trim() ? meetingUrl.trim()
+        : isEvent && evZoom && zoomOk ? 'Zoom' : location.trim();
       if (isActionable) {
         if (hasMode('paid')) {
           // The unit rides IN the price text ("$45 per hour", "$500 per 3
@@ -1417,6 +1425,9 @@ export default function Compose() {
             allDay: evAllDay,
             startMin: evStartMin, endMin: evEndMin,
             timezone: evTz || null,
+            // Only a known provider answer may change the room — never a
+            // still-loading gate silently switching an existing meeting off.
+            zoomUnique: zoomOk ? evZoom : undefined,
           };
           if (linkedEventId) {
             await updateEventDetails(linkedEventId, evFields);
@@ -1461,6 +1472,7 @@ export default function Compose() {
           allDay: evAllDay,
           startMin: evStartMin, endMin: evEndMin,
           timezone: evTz || null,
+          zoomUnique: evZoom && zoomOk,
           recurrence: null,
           // Members picked in the invite box are seated + belled the
           // standing way (event_attendees invited rows).
@@ -2046,7 +2058,8 @@ export default function Compose() {
               // The SAME location line the event row stores (publish's effLocation)
               // — the preview never shows something prettier than the real mail.
               const where = inPerson && location.trim() ? location.trim()
-                : online && meetingUrl.trim() ? meetingUrl.trim() : location.trim();
+                : online && meetingUrl.trim() ? meetingUrl.trim()
+                : evZoom && zoomOk ? 'Zoom' : location.trim();
               const photo = media.find((m) => m.type === 'photo')?.url ?? null;
               const when = inviteWhen(evRange.start ?? '', evAllDay, evStartMin);
               const sendTest = async () => {
@@ -2773,7 +2786,16 @@ export default function Compose() {
               {' '}In person
             </label>
           </div>
-          {online && (
+          {online && isEvent && zoomOk && (
+            <label className="cmp__evrow">
+              <input type="checkbox" checked={evZoom} onChange={(e) => setEvZoom(e.target.checked)} />
+              {' '}Create a unique Zoom meeting for this event
+            </label>
+          )}
+          {online && isEvent && zoomOk && evZoom && (
+            <p className="cmp__hint-ev">Lichen makes the Zoom room when you post. Only your hosts and guests see the link — on the event page and their invitation. Change the time and the meeting moves with it.</p>
+          )}
+          {online && !(isEvent && zoomOk && evZoom) && (
             <input
               className="cmp__input"
               value={meetingUrl}

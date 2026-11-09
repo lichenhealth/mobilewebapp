@@ -28,6 +28,7 @@ export interface EventRow {
   recurrence: Recurrence | null;
   /** Whose wall clock the minutes are (IANA); null = the creator's zone. */
   timezone?: string | null;
+  zoom_unique?: boolean;
   created_at: string;
   attendees?: EventAttendee[];
   /** Synthetic row imported from an external calendar (owner's view only). */
@@ -52,7 +53,7 @@ export interface EventRow {
 
 const EVENT_COLS =
   'id, creator_id, owner_profile_id, owner_space_id, title, description, location, lat, lng, ' +
-  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, created_at';
+  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, created_at';
 // event_attendees has TWO FKs to profiles (profile_id + invited_by) — the
 // embed must name the one it means (house rule; see CLAUDE.md).
 const ATTENDEE_EMBED =
@@ -129,6 +130,7 @@ export interface EventInput {
   recurrence?: Recurrence | null;
   inviteeIds: string[];
   timezone?: string | null;
+  zoomUnique?: boolean;
 }
 
 export async function createEvent(me: string, input: EventInput): Promise<string> {
@@ -149,6 +151,7 @@ export async function createEvent(me: string, input: EventInput): Promise<string
     end_min: input.allDay ? null : input.endMin,
     recurrence: input.recurrence ?? null,
     ...(input.timezone ? { timezone: input.timezone } : {}),
+    ...(input.zoomUnique ? { zoom_unique: true } : {}),
   }).select('id').single();
   if (error) throw error;
   const id = (data as { id: string }).id;
@@ -181,9 +184,10 @@ export async function loadEvent(id: string): Promise<EventRow | null> {
  *  the guest list and everyone's RSVPs; Compose's event editing must not.) */
 export async function updateEventDetails(
   id: string,
-  input: Pick<EventInput, 'title' | 'description' | 'location' | 'lat' | 'lng' | 'startDate' | 'endDate' | 'allDay' | 'startMin' | 'endMin' | 'timezone'>,
+  input: Pick<EventInput, 'title' | 'description' | 'location' | 'lat' | 'lng' | 'startDate' | 'endDate' | 'allDay' | 'startMin' | 'endMin' | 'timezone' | 'zoomUnique'>,
 ): Promise<void> {
   const { error } = await supabase.from('events').update({
+    ...(input.zoomUnique !== undefined ? { zoom_unique: input.zoomUnique } : {}),
     ...(input.timezone ? { timezone: input.timezone } : {}),
     title: input.title,
     description: input.description,
@@ -563,4 +567,10 @@ export function calendarFeedUrl(token: string): string {
 export async function myTimezone(): Promise<string | null> {
   const { data } = await supabase.rpc('my_timezone');
   return (data as string | null) ?? null;
+}
+
+/** The event's own Zoom room, for its hosts and attendees (RLS-gated). */
+export async function loadEventMeetingUrl(eventId: string): Promise<string | null> {
+  const { data } = await supabase.from('event_meetings').select('join_url').eq('event_id', eventId).maybeSingle();
+  return (data as { join_url: string } | null)?.join_url ?? null;
 }
