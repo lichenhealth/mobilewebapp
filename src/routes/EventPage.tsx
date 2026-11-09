@@ -20,7 +20,7 @@ import {
 import { loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, posterTrustKey, trustPostPoster } from '../lib/myceliumApi';
 import { loadMySaved, setSaved } from '../lib/savedApi';
 import type { MyceliumSignals } from '../components/EngagementFooter';
-import { postToCard } from '../lib/feedMapping';
+import { postToCard, postOpenPath } from '../lib/feedMapping';
 import {
   loadEventGuests, inviteEventGuest, inviteEventGuestByPhone, eventInviteSmsHref,
   mintEventLink, approveEventGuest, declineEventGuest, type EventGuest,
@@ -76,6 +76,7 @@ export default function EventPage(props: { postId?: string } = {}) {
   // host-minted, rotatable (the kill switch for a leaked link); link-born
   // asks arrive as 'requested' rows the host answers right here.
   const [shareLink, setShareLink] = useState<string | null>(null);
+  const [addrCopied, setAddrCopied] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [gActBusy, setGActBusy] = useState<string | null>(null);
@@ -271,6 +272,8 @@ export default function EventPage(props: { postId?: string } = {}) {
   if (!post) return <div className="evp"><p className="evp__muted">This event isn't available.</p></div>;
 
   const hostName = post.author_space?.name || post.author?.full_name || 'A member';
+  const friendlyPath = post.slug ? postOpenPath(post) : '';
+  const friendlyUrl = friendlyPath && !friendlyPath.startsWith('/events/' + post.id) ? `https://lichen.health${friendlyPath}` : '';
   const title = post.title || hostName + "'s event";
   const hero = post.image_url
     ?? (Array.isArray(post.details?.media)
@@ -592,6 +595,20 @@ export default function EventPage(props: { postId?: string } = {}) {
                   on-list recognized, everyone else knocks. Enforced
                   server-side off the post's visibility in
                   request_event_spot. "New link" stays the kill switch. */}
+              {/* THE EVENT'S OWN ADDRESS (founder 2026-11-09: "copy the link URL…
+                  under the pertinent send areas"): the link name, copyable here. */}
+              {friendlyUrl && (
+                <div className="evp__sharelink">
+                  <p className="evp__guests-sub">Your event’s address{post.visibility === 'public' ? '' : ' — once you create the shareable link below, it opens for anyone you send it to (they ask to come; you approve)'}:</p>
+                  <p className="evp__sharelink-url">{friendlyUrl}</p>
+                  <div className="evp__sharelink-row">
+                    <button className="btn evp__sharelink-btn" onClick={() => {
+                      void navigator.clipboard?.writeText(friendlyUrl).then(() => { setAddrCopied(true); window.setTimeout(() => setAddrCopied(false), 2000); })
+                        .catch(() => window.prompt('Copy this link', friendlyUrl));
+                    }}>{addrCopied ? 'Copied ✓' : 'Copy the address'}</button>
+                  </div>
+                </div>
+              )}
               <div className="evp__sharelink">
                 <p className="evp__guests-sub">
                   Or share one link anywhere — a flyer, a group text, a post. It follows your

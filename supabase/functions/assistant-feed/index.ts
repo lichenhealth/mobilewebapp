@@ -563,6 +563,7 @@ const POST_TOOLS = [
         all_day: { type: 'boolean' },
         location: { type: 'string', description: 'A place, in their words ("Our house", an address). Not a link.' },
         meeting_link: { type: 'string', description: 'A video link (Zoom, Meet…) EXACTLY as they wrote it in this conversation; a link they did not write is refused. For a fresh Zoom room made by Lichen, use unique_zoom instead.' },
+        skip_feed: { type: 'boolean', description: 'true when they say to keep it off the feed / skip the feed / not a story on Home: the event still lives in Events, on their profile and for its guests — Compose\'s "Skip the feed" box, ticked.' },
         unique_zoom: { type: 'boolean', description: 'true when they want Lichen to make a unique Zoom meeting for this event (only hosts and guests ever see the link; it moves with the event and closes if the event is cancelled). Available only to members Lichen\'s Zoom serves — if refused, say so plainly and suggest pasting their own link.' },
         price: { type: 'string', enum: ['free', 'trade', 'paid'], description: 'How admission works. Default free.' },
         guests: {
@@ -2848,6 +2849,7 @@ Deno.serve(async (req) => {
         evLichen: vis === 'lichen', evAnyone: vis === 'anyone',
         invitees, genLink: !!input.share_link,
         evMode, modes: [evMode], media: [],
+        ...(input.skip_feed === true ? { quiet: true } : {}),
         // A TIME POLL (2026-11-09): candidate times guests vote on.
         ...(() => {
           const raw = Array.isArray(input.poll_times) ? input.poll_times as { date?: string; start_min?: number; end_min?: number }[] : [];
