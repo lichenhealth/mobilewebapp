@@ -225,3 +225,10 @@ export function eventInviteSmsHref(sms: string, hostName: string, title: string,
   const body = `${hostName} invited you to "${title}" — ${when}. Details, RSVP & add it to your calendar (no account needed): https://lichen.health/e/${token}`;
   return { href: `sms:${sms}?&body=${encodeURIComponent(body)}`, body };
 }
+
+/** Guest page: the event's own Zoom room, once the guest is in. */
+export async function loadGuestMeetingUrl(token: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('guest_event_meeting', { p_token: token });
+  if (error) return null;
+  return (data as string | null) ?? null;
+}

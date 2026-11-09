@@ -56,12 +56,15 @@ Deno.serve(async (req) => {
       fine: `No account needed — RSVP as a guest and add it to your own calendar in one tap.`,
     });
   } else {
+    // The event's own Zoom room rides the reminder for guests who are in.
+    const zm = await (await sb(`event_meetings?event_id=eq.${ev.id}&select=join_url`)).json().catch(() => null);
+    const zoom: string | null = Array.isArray(zm) && zm[0]?.join_url ? zm[0].join_url : null;
     subject = `Coming up: ${ev.title}`;
-    text = `A reminder from ${hostName}: "${ev.title}" is coming up.\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}\n\nYour invitation, RSVP and calendar links:\n${link}\n\n— Lichen`;
+    text = `A reminder from ${hostName}: "${ev.title}" is coming up.\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}${zoom ? `\nJoin Zoom: ${zoom}` : ''}\n\nYour invitation, RSVP and calendar links:\n${link}\n\n— Lichen`;
     html = inviteCardHtml(look.design, {
       title: ev.title, when, where, hostName, link, photo: look.photo,
       eyebrow: 'A reminder', cta: 'See your invitation',
-      fine: `You said you'd ${g.status === 'going' ? 'be there' : 'maybe come'} — change your RSVP any time from your invitation.`,
+      fine: `${zoom ? `<a href="${zoom}" style="color:#5E89AD;font-weight:600">Join Zoom</a> — this room is just for the event's guests.<br><br>` : ''}You said you'd ${g.status === 'going' ? 'be there' : 'maybe come'} — change your RSVP any time from your invitation.`,
     });
   }
   const res = await fetch('https://api.resend.com/emails', {

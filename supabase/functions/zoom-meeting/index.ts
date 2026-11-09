@@ -12,7 +12,7 @@
 // Secrets: ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET (+ optional
 // ZOOM_HOST_EMAIL), PUSH_HOOK_SECRET.
 
-import { reconcileBookingZoom, zoomConfigured } from '../_shared/zoomMeeting.ts';
+import { reconcileBookingZoom, reconcileEventZoom, deleteEventZoom, zoomConfigured } from '../_shared/zoomMeeting.ts';
 
 const WEBHOOK_SECRET = Deno.env.get('PUSH_HOOK_SECRET');
 
@@ -24,9 +24,12 @@ Deno.serve(async (req) => {
     return json({ error: 'Unauthorized' }, 401);
   }
   try {
-    const { booking_id } = await req.json().catch(() => ({}));
-    if (typeof booking_id !== 'string') return json({ error: 'No booking_id' }, 400);
+    const { booking_id, event_id, delete_zoom_id } = await req.json().catch(() => ({}));
     if (!zoomConfigured()) return json({ ok: false, error: 'Zoom not configured' });
+    // EVENTS (2026-11-09): the event_zoom_poke trigger's two shapes.
+    if (typeof delete_zoom_id === 'string') { await deleteEventZoom(delete_zoom_id); return json({ ok: true }); }
+    if (typeof event_id === 'string') { const u = await reconcileEventZoom(event_id); return json({ ok: true, has_link: !!u }); }
+    if (typeof booking_id !== 'string') return json({ error: 'No booking_id' }, 400);
     const url = await reconcileBookingZoom(booking_id);
     return json({ ok: true, has_link: !!url });
   } catch (e) {

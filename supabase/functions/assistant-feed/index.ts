@@ -562,7 +562,8 @@ const POST_TOOLS = [
         end_min: { type: 'integer', description: 'End time, minutes after midnight. Omit to default to two hours after the start.' },
         all_day: { type: 'boolean' },
         location: { type: 'string', description: 'A place, in their words ("Our house", an address). Not a link.' },
-        meeting_link: { type: 'string', description: 'A video link (Zoom, Meet…) EXACTLY as they wrote it in this conversation; a link they did not write is refused. Lichen does not mint a fresh Zoom room for EVENTS yet (only for bookings) — if they want one, say so plainly, suggest they paste their own link, and file it with file_dev_report as a wanted feature.' },
+        meeting_link: { type: 'string', description: 'A video link (Zoom, Meet…) EXACTLY as they wrote it in this conversation; a link they did not write is refused. For a fresh Zoom room made by Lichen, use unique_zoom instead.' },
+        unique_zoom: { type: 'boolean', description: 'true when they want Lichen to make a unique Zoom meeting for this event (only hosts and guests ever see the link; it moves with the event and closes if the event is cancelled). Available only to members Lichen\'s Zoom serves — if refused, say so plainly and suggest pasting their own link.' },
         price: { type: 'string', enum: ['free', 'trade', 'paid'], description: 'How admission works. Default free.' },
         guests: {
           type: 'array',
@@ -2732,6 +2733,16 @@ Deno.serve(async (req) => {
         .filter((l) => /^https:\/\/[^\s<>"]+$/i.test(l.url) && memberLower.includes(l.url.toLowerCase().replace(/\/$/, ''))).slice(0, 3);
       if (linksOk.length) designExtra.links = linksOk;
       if (['confetti', 'snow', 'petals', 'stars', 'bubbles', 'leaves'].includes(String(input.backdrop))) designExtra.backdrop = String(input.backdrop);
+      // A unique Zoom room: the same provider gate bookings use.
+      let zoomIn = false;
+      if (input.unique_zoom === true) {
+        const zs = await (await sb('platform_settings?key=eq.zoom_providers&select=value')).json().catch(() => null);
+        const zv = Array.isArray(zs) ? zs[0]?.value : null;
+        if (!Array.isArray(zv) || !zv.includes(profile_id)) {
+          return { ok: false, error: 'Unique Zoom meetings are made on Lichen\'s own Zoom account, which serves a few hosts for now — and not this member yet. Say so plainly (a capacity limit, not an outage) and suggest pasting their own meeting link instead.' };
+        }
+        zoomIn = true;
+      }
       let evTzIn = '';
       if (typeof input.time_zone === 'string' && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+)+$/.test(input.time_zone.trim())) {
         try { new Intl.DateTimeFormat('en-US', { timeZone: input.time_zone.trim() }); evTzIn = input.time_zone.trim(); } catch { /* unknown zone */ }
@@ -2750,6 +2761,7 @@ Deno.serve(async (req) => {
         // The Studio (2026-11-08): a template + their own words, the same
         // details.invite shape Compose's Edit design writes.
         ...(evTzIn ? { evTz: evTzIn } : {}),
+        ...(zoomIn ? { evZoom: true, online: true } : {}),
         ...(Object.keys(designExtra).length || INVITE_TEMPLATE_IDS.includes(String(input.invite_template ?? ''))
           || input.invite_message || input.invite_headline
           ? { inviteDesign: {
@@ -2782,7 +2794,7 @@ Deno.serve(async (req) => {
         change: `drafted the event "${title}"${date ? ` on ${date}` : ' (no date yet)'}${startMin != null ? ` at minute ${startMin}` : ''}, ${invitees.length} guest${invitees.length === 1 ? '' : 's'} ready, visible to ${vis}${listLine}`,
         ...(unplaced.length ? { unplaced: `couldn't place: ${unplaced.join(', ')} — ask for an email or phone` } : {}),
         ...(notes.length ? { notes } : {}),
-        note: 'A "Review & post" button rides under this reply and the draft waits in Drive → Drafts. Nothing is sent and nobody is invited until THEY tap Post. Photos/slides are added in the composer. Lichen mints unique Zoom rooms for bookings, not events (yet) — if they want a video room, they paste their own link. RSVP questions, plus-ones, meal choices, registry links, backdrop and time zone, when passed, are in the design already — they can change any of it with Edit design before posting.',
+        note: 'A "Review & post" button rides under this reply and the draft waits in Drive → Drafts. Nothing is sent and nobody is invited until THEY tap Post. Photos/slides are added in the composer. A unique Zoom room (unique_zoom) is made when THEY post, and only hosts and guests see its link. RSVP questions, plus-ones, meal choices, registry links, backdrop and time zone, when passed, are in the design already — they can change any of it with Edit design before posting.',
       };
     }
 

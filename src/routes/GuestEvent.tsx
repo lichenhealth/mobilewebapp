@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { LichenMark } from '../components/LichenMark';
 import {
-  loadGuestEvent, guestRsvp, loadOpenEvent, requestEventSpot, markGuestOpened, loadGuestMessages,
+  loadGuestEvent, guestRsvp, loadOpenEvent, requestEventSpot, markGuestOpened, loadGuestMessages, loadGuestMeetingUrl,
   type GuestEventInfo, type GuestStatus, type OpenEventInfo,
 } from '../lib/eventGuestsApi';
 import { classifyCareContact } from '../lib/careTeamApi';
@@ -57,6 +57,7 @@ export default function GuestEvent() {
   const [xSaved, setXSaved] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [xErr, setXErr] = useState('');
   const [notes, setNotes] = useState<{ body: string; author_name: string; created_at: string }[]>([]);
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -70,6 +71,7 @@ export default function GuestEvent() {
         setReady(true);
         void markGuestOpened(token);
         void loadGuestMessages(token).then((m) => { if (live) setNotes(m); });
+        void loadGuestMeetingUrl(token).then((u) => { if (live) setZoomUrl(u); });
         return;
       }
       const o = await loadOpenEvent(token);
@@ -186,6 +188,14 @@ export default function GuestEvent() {
           </button>{' '}
           and RSVP as yourself.
         </p>
+      )}
+
+      {info && !requested && zoomUrl && (
+        <div className="gev__section">
+          <p className="gev__label">Join online</p>
+          <a className="btn gev__btn gev__zoom" href={zoomUrl} target="_blank" rel="noopener noreferrer">Join Zoom</a>
+          <p className="gev__muted">This link is just for you and the host’s other guests — please don’t share it.</p>
+        </div>
       )}
 
       {info && !requested && (

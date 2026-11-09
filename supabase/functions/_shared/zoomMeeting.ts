@@ -198,3 +198,103 @@ export async function reconcileBookingZoom(bookingId: string): Promise<string | 
   }
   return made.join_url;
 }
+
+// ── EVENTS (founder 2026-11-09) ─────────────────────────────────────────────
+// The same reconcile, for an event that asked for its own Zoom room
+// (events.zoom_unique). The meeting lives in event_meetings — readable by
+// the event's hosts and attendees only — never on the event row itself.
+
+interface EventRow {
+  id: string; creator_id: string; title: string; zoom_unique: boolean;
+  start_date: string; end_date: string; all_day: boolean;
+  start_min: number | null; end_min: number | null; timezone: string | null; location: string | null;
+}
+
+async function zoomDelete(zid: string): Promise<void> {
+  if (!/^\d{6,20}$/.test(zid)) return;
+  const token = await zoomToken();
+  if (!token) return;
+  const r = await fetch(`https://api.zoom.us/v2/meetings/${zid}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok && r.status !== 404) console.error('zoom delete (event):', r.status, await r.text().catch(() => ''));
+}
+
+/** A deleted event's meeting: close the room in Zoom. */
+export async function deleteEventZoom(zid: string): Promise<void> {
+  if (!zoomConfigured()) return;
+  await zoomDelete(zid);
+}
+
+/** Reconcile one event's Zoom meeting to the row's current state. */
+export async function reconcileEventZoom(eventId: string): Promise<string | null> {
+  if (!zoomConfigured() || !/^[0-9a-f-]{36}$/i.test(eventId)) return null;
+  const ev = (await sbGet<EventRow[]>(
+    `events?id=eq.${eventId}&select=id,creator_id,title,zoom_unique,start_date,end_date,all_day,start_min,end_min,timezone,location`,
+  ))?.[0];
+  const have = (await sbGet<{ zoom_meeting_id: string; join_url: string }[]>(
+    `event_meetings?event_id=eq.${eventId}&select=zoom_meeting_id,join_url`,
+  ))?.[0];
+  if (!ev) return null;
+
+  // Switched off: close the room, forget it.
+  if (!ev.zoom_unique) {
+    if (have) {
+      await zoomDelete(have.zoom_meeting_id);
+      await fetch(`${SUPABASE_URL}/rest/v1/event_meetings?event_id=eq.${eventId}`, { method: 'DELETE', headers: svc });
+    }
+    return null;
+  }
+
+  const allowed = (await sbGet<{ value: unknown }[]>(`platform_settings?key=eq.zoom_providers&select=value`))?.[0]?.value;
+  if (!Array.isArray(allowed) || !allowed.includes(ev.creator_id)) return have?.join_url ?? null;
+
+  const tz = ev.timezone || (await sbGet<{ timezone: string | null }[]>(
+    `profiles?id=eq.${ev.creator_id}&select=timezone`,
+  ))?.[0]?.timezone || 'America/Denver';
+  const startMin = ev.all_day || ev.start_min == null ? 9 * 60 : ev.start_min;
+  const start = `${ev.start_date}T${pad(Math.floor(startMin / 60))}:${pad(startMin % 60)}:00`;
+  const duration = ev.all_day || ev.start_min == null
+    ? 480
+    : Math.max(15, Math.min(1440, ((ev.end_min ?? ev.start_min + 60) - ev.start_min) || 60));
+
+  const token = await zoomToken();
+  if (!token) return have?.join_url ?? null;
+
+  if (have) {
+    const r = await fetch(`https://api.zoom.us/v2/meetings/${encodeURIComponent(have.zoom_meeting_id)}`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic: `${ev.title} (via Lichen)`, start_time: start, duration, timezone: tz }),
+    });
+    if (r.status !== 404) {
+      if (!r.ok) console.error('zoom patch (event):', r.status, await r.text().catch(() => ''));
+      return have.join_url;
+    }
+    // Deleted in Zoom's own UI — mint a fresh one below.
+    await fetch(`${SUPABASE_URL}/rest/v1/event_meetings?event_id=eq.${eventId}`, { method: 'DELETE', headers: svc });
+  }
+
+  const create = await fetch(`https://api.zoom.us/v2/users/${encodeURIComponent(ZOOM_HOST)}/meetings`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic: `${ev.title} (via Lichen)`, type: 2, start_time: start, duration, timezone: tz }),
+  });
+  if (!create.ok) { console.error('zoom create (event):', create.status, await create.text().catch(() => '')); return null; }
+  const made = await create.json().catch(() => null) as { id?: number | string; join_url?: string } | null;
+  if (!made?.id || !made.join_url) return null;
+  const zid = String(made.id);
+  // Insert-if-absent: a doubled poke can't leave two rooms — the loser deletes its own.
+  const ins = await fetch(`${SUPABASE_URL}/rest/v1/event_meetings?on_conflict=event_id`, {
+    method: 'POST', headers: { ...svc, Prefer: 'resolution=ignore-duplicates,return=representation' },
+    body: JSON.stringify({ event_id: eventId, zoom_meeting_id: zid, join_url: made.join_url }),
+  });
+  const rows = (await ins.json().catch(() => [])) as unknown[];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    await zoomDelete(zid);
+    return (await sbGet<{ join_url: string }[]>(`event_meetings?event_id=eq.${eventId}&select=join_url`))?.[0]?.join_url ?? null;
+  }
+  // The event's public "where" says Zoom (the service name, never the link).
+  if (!(ev.location ?? '').trim()) {
+    await fetch(`${SUPABASE_URL}/rest/v1/events?id=eq.${eventId}`, {
+      method: 'PATCH', headers: svc, body: JSON.stringify({ location: 'Zoom' }),
+    });
+  }
+  return made.join_url;
+}
