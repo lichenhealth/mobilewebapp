@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { LichenMark } from '../components/LichenMark';
 import {
-  loadGuestEvent, guestRsvp, loadOpenEvent, requestEventSpot, markGuestOpened, loadGuestMessages, loadGuestMeetingUrl,
+  loadGuestEvent, guestRsvp, loadOpenEvent, requestEventSpot, joinEventByLink, markGuestOpened, loadGuestMessages, loadGuestMeetingUrl,
   type GuestEventInfo, type GuestStatus, type OpenEventInfo,
 } from '../lib/eventGuestsApi';
 import { classifyCareContact } from '../lib/careTeamApi';
@@ -299,9 +299,27 @@ export default function GuestEvent() {
       {!info && open && (
         <div className="gev__section" id="gev-act">
           <p className="gev__label">Want to come?</p>
+          {/* WHO THE LINK LETS IN (2026-11-09): a members/circles link asks you to
+              sign in and come as yourself; anyone/invited links keep the ask. */}
+          {(open.link_tier === 'members' || open.link_tier === 'circles') ? (
+            user ? (<>
+              <p className="gev__muted">{open.link_tier === 'circles'
+                ? `This link is for members of ${open.host_name}’s chosen circles.`
+                : 'This link is for Lichen members — come as yourself.'}</p>
+              <button className="btn btn-primary gev__btn" disabled={busy} onClick={async () => {
+                setBusy(true); setOMsg('');
+                try { const pid = await joinEventByLink(token); navigate(pid ? `/events/${pid}` : '/events'); }
+                catch (e) { setOMsg((e as Error).message || 'That didn’t work.'); setBusy(false); }
+              }}>{busy ? 'One moment…' : 'Come as myself'}</button>
+            </>) : (<>
+              <p className="gev__muted">This link is for {open.link_tier === 'circles' ? `members of ${open.host_name}’s chosen communities and groups` : 'Lichen members'}. Sign in to come as yourself.</p>
+              <button className="btn btn-primary gev__btn" onClick={() => navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`)}>Sign in</button>
+            </>)
+          ) : (<>
           <p className="gev__muted">
-            Tell {open.host_name} who you are — if they invited you directly, your invitation
-            opens right away; otherwise they’ll get your request.
+            {open.link_tier === 'anyone'
+              ? <>Tell {open.host_name} who you are and you’re in.</>
+              : <>Invited? Enter the phone number or email {open.host_name} invited you with — your invitation opens right away. Anyone else sends {open.host_name} a request.</>}
           </p>
           <div className="gev__ask">
             <input className="gev__ask-input" placeholder="Your name"
@@ -315,6 +333,7 @@ export default function GuestEvent() {
             </button>
           </div>
           {oMsg && <p className="gev__muted">{oMsg}</p>}
+          </>)}
         </div>
       )}
 

@@ -157,3 +157,13 @@
 /* Outside calendars under the tiles (2026-11-09) */
 .evp__extcal { margin: var(--s-3) 0 var(--s-4); display: flex; flex-direction: column; align-items: center; gap: var(--s-2); }
 .evp__extcal-lab { font-size: 12px; color: var(--ink-muted); margin: 0; }
+/* Who the shareable link lets in. */
+.evp__linkperm-h { margin-top: 10px; }
+.evp__linkperm { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 12px; }
+.evp__linkperm-opt { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.4; padding: 8px 10px; border: 1px solid var(--bone-edge); border-radius: 10px; background: #fff; cursor: pointer; }
+.evp__linkperm-opt.is-on { border-color: var(--peach); background: var(--peach-tint); }
+.evp__linkperm-opt input { margin-top: 3px; accent-color: var(--peach-deep); }
+/* A TRUE CARD (2026-11-09): photo and words share one card. */
+.evp__card { background: #fff; border: 1px solid var(--bone-edge); border-radius: var(--r-lg); overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
+.evp__card .evp__hero { border: 0; border-radius: 0; display: block; max-height: 420px; }
+.evp__card .evp__desc { background: none; border: 0; border-radius: 0; padding: var(--s-4) var(--s-5) var(--s-5); font-size: 15px; }

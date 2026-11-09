@@ -753,5 +753,11 @@
  },
  "calendarApi:carryDraftZoom": {
   "exempt": "Plumbing inside Compose's Post — moves the draft's Zoom room to the live event; not a member-facing act of its own."
+ },
+ "calendarApi:setEventLinkAccess": {
+  "gap": "3"
+ },
+ "eventGuestsApi:joinEventByLink": {
+  "exempt": "A member coming to an event through its shareable link — the person's own tap on the guest page."
  }
 }
