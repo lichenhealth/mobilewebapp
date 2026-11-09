@@ -477,3 +477,8 @@ body.is-website::before { content: none; }   /* the paper grain is Lichen's, not
 /* Claude's **bold** (renderBold): body type is 300, where a bare <strong>
  * only climbs to 400 and reads unbolded — say it plainly. */
 .afeed__entry-text strong, .abrief__text strong, .bubble__text strong { font-weight: 600; }
+
+/* WHO SEES IT ON MY CALENDAR — shared pills (Compose events + calendar items, 2026-11-09) */
+.cmp__evshare { display: flex; flex-wrap: wrap; gap: 6px; }
+.cmp__evshare-pill { font: inherit; font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--bone-edge); background: #fff; color: var(--ink-soft); cursor: pointer; }
+.cmp__evshare-pill.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }

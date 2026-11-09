@@ -516,3 +516,7 @@
 .cmp__invsched-at { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--bone-edge); border-radius: 10px; background: #fff; }
 .cmp__evtz { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 12px; font-size: 14px; }
 .cmp__evtz-lab { color: var(--ink-soft); }
+
+/* Calendar hold (2026-11-09); the who-sees pills live in global.css */
+.cmp__evcal { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-3); }
+.cmp__evcal-lab { font-size: 12px; color: var(--ink-muted); }

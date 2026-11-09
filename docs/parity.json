@@ -732,5 +732,8 @@
  },
  "eventGuestsApi:loadGuestMeetingUrl": {
   "exempt": "plumbing / guest-token page / pipeline, not a member act"
+ },
+ "calendarApi:syncDraftHold": {
+  "exempt": "Plumbing of Compose's draft autosave — the hold follows the post_drafts row; draft_event writes the draft, and the hold is minted when the member opens it."
  }
 }

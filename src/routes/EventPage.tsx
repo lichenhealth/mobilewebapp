@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import FeedCard from '../components/FeedCard';
 import { LinkifiedText, CarePreview } from '../components/CarePostCard';
 import { SmartLocation } from './Calendar';
+import AddToCal from '../components/AddToCal';
 import { useAuth } from '../auth/AuthProvider';
 import { loadEvent, deleteEvent, minToLabel, type EventRow } from '../lib/calendarApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
@@ -409,6 +410,25 @@ export default function EventPage(props: { postId?: string } = {}) {
               </div>
             )}
           </div>
+
+          {/* ALSO OUTSIDE CALENDARS (founder 2026-11-09: "adding events to
+              cal should add to lichen seamlessly, but also provide the
+              opportunity to add to outside calendars, like Google and Apple
+              … some people might not use internal cal, but want to use
+              Events"). Once you're going (or hosting), the same four doors
+              guests get. */}
+          {calEvent && (going || isHost) && (
+            <div className="evp__extcal">
+              <p className="evp__extcal-lab">Also add it to your other calendar</p>
+              <AddToCal file={`${post.title || 'event'}.ics`} ev={{
+                title: post.title || calEvent.title, description: post.body ?? '',
+                location: location || (calEvent.zoom_unique ? 'Zoom' : ''),
+                start_date: calEvent.start_date, end_date: calEvent.end_date, all_day: calEvent.all_day,
+                start_min: calEvent.start_min, end_min: calEvent.end_min,
+                url: zoomUrl ?? undefined,
+              }} />
+            </div>
+          )}
 
           <div className="evp__desc">
             <LinkifiedText text={post.body} />

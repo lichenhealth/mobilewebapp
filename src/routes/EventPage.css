@@ -153,3 +153,7 @@
 .evp__meal { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--bone-edge); background: #fff; font: inherit; font-size: 14px; cursor: pointer; }
 .evp__meal.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
 .evp__xsave { align-self: flex-start; }
+
+/* Outside calendars under the tiles (2026-11-09) */
+.evp__extcal { margin: var(--s-3) 0 var(--s-4); display: flex; flex-direction: column; align-items: center; gap: var(--s-2); }
+.evp__extcal-lab { font-size: 12px; color: var(--ink-muted); margin: 0; }

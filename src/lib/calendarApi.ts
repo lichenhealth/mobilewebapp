@@ -29,6 +29,11 @@ export interface EventRow {
   /** Whose wall clock the minutes are (IANA); null = the creator's zone. */
   timezone?: string | null;
   zoom_unique?: boolean;
+  /** A DRAFT event's time-hold (2026-11-09) — opens back into Compose. */
+  is_draft?: boolean;
+  draft_id?: string | null;
+  /** The event's own cap over calendar sharing: null = follow it. */
+  share_level?: 'busy' | 'hidden' | null;
   created_at: string;
   attendees?: EventAttendee[];
   /** Synthetic row imported from an external calendar (owner's view only). */
@@ -53,7 +58,7 @@ export interface EventRow {
 
 const EVENT_COLS =
   'id, creator_id, owner_profile_id, owner_space_id, title, description, location, lat, lng, ' +
-  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, created_at';
+  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, is_draft, draft_id, share_level, created_at';
 // event_attendees has TWO FKs to profiles (profile_id + invited_by) — the
 // embed must name the one it means (house rule; see CLAUDE.md).
 const ATTENDEE_EMBED =
@@ -131,6 +136,8 @@ export interface EventInput {
   inviteeIds: string[];
   timezone?: string | null;
   zoomUnique?: boolean;
+  /** null/undefined = follow calendar sharing; 'busy' | 'hidden' narrow it. */
+  shareLevel?: 'busy' | 'hidden' | null;
 }
 
 export async function createEvent(me: string, input: EventInput): Promise<string> {
@@ -152,6 +159,7 @@ export async function createEvent(me: string, input: EventInput): Promise<string
     recurrence: input.recurrence ?? null,
     ...(input.timezone ? { timezone: input.timezone } : {}),
     ...(input.zoomUnique ? { zoom_unique: true } : {}),
+    share_level: input.shareLevel ?? null,
   }).select('id').single();
   if (error) throw error;
   const id = (data as { id: string }).id;
@@ -184,9 +192,10 @@ export async function loadEvent(id: string): Promise<EventRow | null> {
  *  the guest list and everyone's RSVPs; Compose's event editing must not.) */
 export async function updateEventDetails(
   id: string,
-  input: Pick<EventInput, 'title' | 'description' | 'location' | 'lat' | 'lng' | 'startDate' | 'endDate' | 'allDay' | 'startMin' | 'endMin' | 'timezone' | 'zoomUnique'>,
+  input: Pick<EventInput, 'title' | 'description' | 'location' | 'lat' | 'lng' | 'startDate' | 'endDate' | 'allDay' | 'startMin' | 'endMin' | 'timezone' | 'zoomUnique' | 'shareLevel'>,
 ): Promise<void> {
   const { error } = await supabase.from('events').update({
+    ...(input.shareLevel !== undefined ? { share_level: input.shareLevel } : {}),
     ...(input.zoomUnique !== undefined ? { zoom_unique: input.zoomUnique } : {}),
     ...(input.timezone ? { timezone: input.timezone } : {}),
     title: input.title,
@@ -209,6 +218,7 @@ export async function updateEventDetails(
 export async function updateEvent(me: string, id: string, input: EventInput): Promise<void> {
   const recurring = !!input.recurrence;
   const { error } = await supabase.from('events').update({
+    ...(input.shareLevel !== undefined ? { share_level: input.shareLevel } : {}),
     owner_profile_id: input.ownerProfileId ?? null,
     owner_space_id: input.ownerSpaceId ?? null,
     title: input.title,
@@ -573,4 +583,40 @@ export async function myTimezone(): Promise<string | null> {
 export async function loadEventMeetingUrl(eventId: string): Promise<string | null> {
   const { data } = await supabase.from('event_meetings').select('join_url').eq('event_id', eventId).maybeSingle();
   return (data as { join_url: string } | null)?.join_url ?? null;
+}
+
+/** DRAFT EVENTS HOLD YOUR TIME (founder 2026-11-09: "Drafts should show up
+ *  on cal as well and block your time, if they've chosen the time and want
+ *  it added to cal, which should be the default on"). One events row per
+ *  post_drafts row (draft_id, ON DELETE CASCADE — posting or deleting the
+ *  draft removes the hold by itself). No attendees, no post: only its owner
+ *  reads it, others see at most busy (free_busy caps drafts). Pass null to
+ *  release the hold. */
+export async function syncDraftHold(
+  me: string, draftId: string,
+  hold: { title: string; startDate: string; endDate: string; allDay: boolean; startMin?: number; endMin?: number; timezone?: string | null; location: string; shareLevel: 'busy' | 'hidden' | null } | null,
+): Promise<void> {
+  const { data: cur } = await supabase.from('events').select('id').eq('draft_id', draftId).maybeSingle();
+  const curId = (cur as { id: string } | null)?.id ?? null;
+  if (!hold) {
+    if (curId) await supabase.from('events').delete().eq('id', curId);
+    return;
+  }
+  const row = {
+    title: hold.title, description: '', location: hold.location,
+    start_date: hold.startDate, end_date: hold.endDate, all_day: hold.allDay,
+    start_min: hold.allDay ? null : hold.startMin ?? null,
+    end_min: hold.allDay ? null : hold.endMin ?? null,
+    share_level: hold.shareLevel,
+    ...(hold.timezone ? { timezone: hold.timezone } : {}),
+  };
+  if (curId) {
+    const { error } = await supabase.from('events').update(row).eq('id', curId);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from('events').insert({
+      ...row, creator_id: me, owner_profile_id: me, is_draft: true, draft_id: draftId,
+    });
+    if (error) throw error;
+  }
 }
