@@ -840,7 +840,7 @@ export default function Profile() {
           <span className="prof__avatar-edit">{avatarBusy ? '…' : '✎'}</span>
         </button>
         <input
-          ref={avatarInputRef} type="file" accept="image/*" hidden
+          ref={avatarInputRef} type="file" accept="image/*,.heic,.heif" hidden
           onChange={(e) => { onAvatarFile(e.target.files?.[0]); e.target.value = ''; }}
         />
         <h1 className="prof__name">{fullName || 'Your profile'}</h1>

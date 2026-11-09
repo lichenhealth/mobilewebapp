@@ -49,7 +49,7 @@ function isDark(h: string): boolean {
 
 export interface ResolvedInvite {
   id: string; headline: string; message: string; rsvp: string; font: InviteFont; fontCss: string;
-  accent: string; paper: string; ink: string; soft: string; ornament: string; border: string; photo: boolean;
+  accent: string; paper: string; ink: string; soft: string; ornament: string; border: string; photo: boolean; cardPhoto: string | null | undefined;
   artwork: string | null; links: { label: string; url: string }[];
 }
 
@@ -71,6 +71,9 @@ export function resolveInvite(raw: unknown): ResolvedInvite {
     soft: dark ? '#CFC8B8' : '#5A554C',
     ornament: t.ornament, border: t.border,
     photo: r.photo !== false,
+    // The card's own photo slot (client twin: invitePhotos) — null = the host
+    // emptied it, undefined = the smart default (the event's first photo).
+    cardPhoto: r.cardPhoto === 'none' ? null : (artworkUrl(r.cardPhoto) ?? undefined),
     artwork: artworkUrl(r.artwork),
     links: readLinks(r.links),
   };
@@ -139,7 +142,7 @@ export function inviteCardHtml(design: unknown, o: {
   <div style="max-width:520px;margin:0 auto;padding:32px 24px">
     <p style="font-size:22px;font-weight:600;margin:0 0 14px">Lichen</p>
     ${artCard || `<div style="background:${d.paper};border-radius:16px;overflow:hidden;margin:0 0 22px;box-shadow:0 10px 30px rgba(42,51,56,0.10);border:1px solid #e6e1d8">
-      ${d.photo && o.photo ? `<img src="${esc(o.photo)}" alt="" width="520" style="display:block;width:100%;max-height:300px;object-fit:cover">` : ''}
+      ${(() => { const ph = !d.photo ? null : d.cardPhoto === undefined ? o.photo : d.cardPhoto; return ph ? `<img src="${esc(ph)}" alt="" width="520" style="display:block;width:100%;max-height:300px;object-fit:cover">` : ''; })()}
       ${confetti}
       <div style="padding:${frame ? '14px' : '0'}">
       <div style="${frame}border-radius:8px;padding:30px 22px 24px;text-align:center">

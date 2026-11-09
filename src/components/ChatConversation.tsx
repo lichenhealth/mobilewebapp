@@ -1,3 +1,4 @@
+import { isHeic } from '../lib/heic';
 import { Fragment, useEffect, useMemo, useRef, useState, RefObject, ChangeEvent } from 'react';
 import { Icon } from './Icon';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -1154,7 +1155,7 @@ function ChatInputBar({
   function takeFiles(files: File[]) {
     for (const f of files) {
       const type: MediaType | null =
-        f.type.startsWith('image/') ? 'photo'
+        f.type.startsWith('image/') || isHeic(f) ? 'photo'
         : f.type.startsWith('video/') ? 'video'
         : f.type.startsWith('audio/') ? 'audio' : null;
       if (!type) continue;
@@ -1257,7 +1258,7 @@ function ChatInputBar({
               </button>
             </div>
           )}
-          <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, 'photo')} />
+          <input ref={photoRef} type="file" accept="image/*,.heic,.heif" hidden onChange={(e) => onFile(e, 'photo')} />
           <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => onFile(e, 'video')} />
         </div>
         {/* The ⊕ is the DOCUMENT door, its own button (founder 2026-10-21:

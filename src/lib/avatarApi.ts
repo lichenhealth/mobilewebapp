@@ -1,8 +1,11 @@
+import { webSafeImage } from './heic';
 import { supabase } from './supabase';
 
 /** Downscale an image file to a square-ish JPEG capped at `max` px (avatars
  *  don't need originals — keeps the public bucket light and uploads fast). */
-export function downscaleImage(file: File, max = 512): Promise<Blob> {
+export async function downscaleImage(raw: File | Blob, max = 512): Promise<Blob> {
+  // HEIC can't be drawn to a canvas in most browsers — convert first.
+  const { file } = await webSafeImage(raw, ((raw as File).name ?? '').split('.').pop() ?? '');
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();

@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { isHeic } from '../lib/heic';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
 import { speechRecognition, startDictation, type DictationSession } from '../lib/dictation';
@@ -92,7 +93,7 @@ export default function AssistantComposer({
     setUpBusy(true);
     try {
       for (const f of files) {
-        if (!f.type.startsWith('image/')) continue;
+        if (!f.type.startsWith('image/') && !isHeic(f)) continue;
         const url = await uploadPageImage(uploaderId, f);
         setImages((cur) => [...cur, url]);
       }
@@ -100,10 +101,37 @@ export default function AssistantComposer({
     setUpBusy(false);
   }
 
+  // THE WHOLE BRAIN SCREEN IS A DROP ZONE (founder 2026-11-09: "you can't
+  // drag and drop content from desktop into the feed for some brain chats…
+  // make sure you can drag and drop but also upload content via any Ai chat
+  // brain"): a file dropped ANYWHERE on the screen — the conversation, the
+  // brief, the empty space — lands in this composer, not just on the box.
+  const addFilesRef = useRef(addFiles);
+  addFilesRef.current = addFiles;
+  useEffect(() => {
+    if (!uploaderId) return;
+    const hasFiles = (e: DragEvent) => [...(e.dataTransfer?.items ?? [])].some((it) => it.kind === 'file');
+    const over = (e: DragEvent) => { if (hasFiles(e)) { e.preventDefault(); setDragOver(true); } };
+    const leave = (e: DragEvent) => { if (!e.relatedTarget) setDragOver(false); };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e) && !(e.dataTransfer?.files?.length)) return;
+      e.preventDefault(); setDragOver(false);
+      void addFilesRef.current([...(e.dataTransfer?.files ?? [])]);
+    };
+    window.addEventListener('dragover', over);
+    window.addEventListener('dragleave', leave);
+    window.addEventListener('drop', drop);
+    return () => {
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('dragleave', leave);
+      window.removeEventListener('drop', drop);
+    };
+  }, [uploaderId]);
+
   function onPaste(e: React.ClipboardEvent) {
     if (!uploaderId) return;
     const files = [...e.clipboardData.items]
-      .filter((it) => it.kind === 'file' && it.type.startsWith('image/'))
+      .filter((it) => it.kind === 'file' && (it.type.startsWith('image/') || it.type === ''))
       .map((it) => it.getAsFile())
       .filter((f): f is File => !!f);
     if (files.length) {
@@ -129,15 +157,6 @@ export default function AssistantComposer({
     <form
       className={'assist-composer ' + className + (dragOver ? ' is-dragover' : '')}
       onSubmit={(e) => { e.preventDefault(); void submit(); }}
-      onDragOver={(e) => {
-        if (uploaderId && [...e.dataTransfer.items].some((it) => it.kind === 'file')) { e.preventDefault(); setDragOver(true); }
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        if (!uploaderId) return;
-        e.preventDefault(); setDragOver(false);
-        void addFiles([...e.dataTransfer.files]);
-      }}
     >
       {images.length > 0 && (
         <div className="assist-composer__shots">
@@ -154,7 +173,7 @@ export default function AssistantComposer({
         {uploaderId && (
           <label className={'assist-composer__btn' + (upBusy ? ' is-live' : '')} aria-label="Add a photo">
             <Icon name="image" size={17} />
-            <input type="file" accept="image/*" multiple hidden disabled={upBusy}
+            <input type="file" accept="image/*,.heic,.heif" multiple hidden disabled={upBusy}
               onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
           </label>
         )}

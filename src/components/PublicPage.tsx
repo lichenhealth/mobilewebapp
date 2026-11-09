@@ -386,7 +386,7 @@ function EPhoto(props: {
   const [drag, setDrag] = useState<{ startY: number; startPct: number; pct: number } | null>(null);
   const picker = (
     <input
-      ref={fileRef} type="file" accept="image/*" hidden
+      ref={fileRef} type="file" accept="image/*,.heic,.heif" hidden
       onChange={async (e) => {
         const f = e.target.files?.[0];
         e.target.value = '';
@@ -1500,7 +1500,7 @@ export default function PublicPage(props: PublicPageProps) {
           ))}
           {ed && (
             <>
-              <input ref={stripFileRef} type="file" accept="image/*" hidden
+              <input ref={stripFileRef} type="file" accept="image/*,.heic,.heif" hidden
                 onChange={async (e) => {
                   const f = e.target.files?.[0];
                   e.target.value = '';
@@ -1696,7 +1696,7 @@ export default function PublicPage(props: PublicPageProps) {
             );
           })()}
           {ed && (
-            <input ref={teamFileRef} type="file" accept="image/*" hidden
+            <input ref={teamFileRef} type="file" accept="image/*,.heic,.heif" hidden
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 const i = teamPickFor.current;

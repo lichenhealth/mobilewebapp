@@ -200,7 +200,7 @@ export default function CarePostComposer({ kind }: { kind: CareKind }) {
             <button className={'cedit__add' + (recording ? ' is-on' : '')} onClick={toggleRecord}><Icon name="mic" size={14} /> {recording ? 'Stop' : 'Audio'}</button>
             {uploading && <span className="cedit__hint">Uploading…</span>}
           </div>
-          <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, 'photo')} />
+          <input ref={photoRef} type="file" accept="image/*,.heic,.heif" hidden onChange={(e) => onFile(e, 'photo')} />
           <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => onFile(e, 'video')} />
           {pending.length > 0 && (
             <div className="cpost-compose__tray">

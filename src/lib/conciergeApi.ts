@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { webSafeImage } from './heic';
 import type { IconName } from '../components/Icon';
 import type { RadarAxis } from '../components/HexagonRadar';
 import type { Recurrence } from './recurrence';
@@ -431,7 +432,8 @@ export async function updateWowCarePost(
 }
 
 // ─── Media (private care-media bucket, paths signed at render) ────────────────
-export async function uploadCareMedia(patientId: string, file: Blob, ext: string): Promise<string> {
+export async function uploadCareMedia(patientId: string, rawFile: Blob, rawExt: string): Promise<string> {
+  const { file, ext } = await webSafeImage(rawFile, rawExt);
   const path = `${patientId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await supabase.storage.from('care-media').upload(path, file);
   if (error) throw error;
