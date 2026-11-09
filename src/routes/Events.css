@@ -123,3 +123,14 @@
   .evt__agenda-title { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .evt__agenda-time { font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
 }
+
+/* Draft events in My Events (2026-11-09) — quiet rows above the cards. */
+.evt__drafts { display: flex; flex-direction: column; gap: var(--s-2); grid-column: 1 / -1; }
+.evt__drafts-h { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); margin: 0; }
+.evt__draft { display: flex; align-items: center; gap: var(--s-3); width: 100%; text-align: left; font-family: inherit; cursor: pointer;
+  padding: var(--s-3); border: 1px dashed var(--bone-edge); border-radius: var(--r-md); background: var(--bone-warm); color: var(--ink-muted); }
+.evt__draft:hover { border-color: var(--peach); }
+.evt__draft-icon { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--bone-edge); display: grid; place-items: center; flex-shrink: 0; color: var(--peach-deep); background: #fff; }
+.evt__draft-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.evt__draft-title { font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evt__draft-meta { font-size: 12px; color: var(--ink-muted); }

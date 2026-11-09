@@ -1,3 +1,4 @@
+import { useTopBackFor } from '../lib/topBack';
 import { ContactShareAsk, SpaceContactsPanel } from '../components/ContactShares';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -575,6 +576,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
     return () => { live = false; };
   }, [tab, id]);
   const openTab = (t: string) => setSearchParams(t ? { tab: t } : {});
+  useTopBackFor(() => openTab(''), !!tab && !backstage);
   const adminTools = backstage;
   // CHAT ROOMS (founder 2026-10-21: "different chat threads for different
   // topics within the group or community" — and "each chat thread … should
@@ -2871,11 +2873,6 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
       )}
 
 
-      {tab && !backstage && (
-        <button className="cmp__back calp__backchip sprof__tabback" onClick={() => openTab('')}>
-          <Icon name="arrow-left" size={14} /> Back to {space.name}
-        </button>
-      )}
 
       {tab === 'events' && (
         <section className="prof__section">
