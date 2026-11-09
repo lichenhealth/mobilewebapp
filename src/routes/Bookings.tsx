@@ -10,7 +10,9 @@ import { formatDateShort, todayISO } from '../lib/conciergeApi';
 import {
   BookingRow, OpenSession, listMyBookings, listOpenSessions, respondBooking, cancelBooking,
   sendBookingMail, startBookingCheckout, usdLabel, payOpen, listMyBookingTypes,
+  zoneAbbr,
 } from '../lib/bookingApi';
+import { supabase } from '../lib/supabase';
 import { videoServiceOf } from '../lib/linkify';
 import './Bookings.css';
 
@@ -58,6 +60,16 @@ export default function Bookings() {
     setReady(true);
   }, [me]);
   useEffect(() => { load(); }, [load]);
+  // Every time says its zone (2026-11-09): the provider's wall clock.
+  const [zones, setZones] = useState<Record<string, string>>({});
+  useEffect(() => {
+    void supabase.rpc('my_booking_zones').then(({ data }) => {
+      const m: Record<string, string> = {};
+      for (const r of (data as { booking_id: string; tz: string | null }[] | null) ?? []) if (r.tz) m[r.booking_id] = r.tz;
+      setZones(m);
+    });
+  }, [ready]);
+  const zoneOf = (b: BookingRow) => { const z = zoneAbbr(zones[b.id], b.on_date, b.start_min); return z ? ' ' + z : ''; };
 
   // The book-from-here directory: every session offered to you, narrowed by name
   const openHits = useMemo(() => {
@@ -76,11 +88,11 @@ export default function Bookings() {
 
   const today = todayISO();
   const when = (b: BookingRow) =>
-    `${formatDateShort(b.on_date)} · ${minToLabel(b.start_min)} – ${minToLabel(b.end_min)}`;
+    `${formatDateShort(b.on_date)} · ${minToLabel(b.start_min)} – ${minToLabel(b.end_min)}${zoneOf(b)}`;
   // Sessions list BY DAY (founder 2026-11-02: "can the list have a bit of
   // calendar organization to it?") — day headers carry the date, rows keep
   // just their times.
-  const timeOnly = (b: BookingRow) => `${minToLabel(b.start_min)} – ${minToLabel(b.end_min)}`;
+  const timeOnly = (b: BookingRow) => `${minToLabel(b.start_min)} – ${minToLabel(b.end_min)}${zoneOf(b)}`;
   const byDay = (rows: BookingRow[]): Array<[string, BookingRow[]]> => {
     const m = new Map<string, BookingRow[]>();
     const sorted = [...rows].sort((a, z) =>

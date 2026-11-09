@@ -583,6 +583,14 @@ const POST_TOOLS = [
         links: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, url: { type: 'string' } }, required: ['url'] }, description: 'Registry / gift / info links worn on the card — a URL only if THEY wrote it in this conversation (https).' },
         backdrop: { type: 'string', enum: ['confetti', 'snow', 'petals', 'stars', 'bubbles', 'leaves'], description: 'An animated backdrop behind the envelope on the guest page, if they asked for one.' },
         time_zone: { type: 'string', description: 'IANA zone (e.g. "America/Denver") ONLY when they said the event runs in a zone other than their own; otherwise omit — the composer defaults to their calendar\'s zone.' },
+        poll_times: {
+          type: 'array', description: 'A TIME POLL: 2–12 candidate times guests vote on (each picks every time that works), when they want guests to choose. The best-supported time is chosen when votes are in.',
+          items: { type: 'object', properties: { date: { type: 'string', description: 'YYYY-MM-DD' }, start_min: { type: 'integer' }, end_min: { type: 'integer' } }, required: ['date'] },
+        },
+        poll_deadline: { type: 'string', description: 'Optional voting deadline, ISO date-time ("2026-11-20T18:00"), only if they gave one.' },
+        poll_wait_all: { type: 'boolean', description: 'Decide once every guest has answered (default true).' },
+        poll_auto: { type: 'boolean', description: 'true = book the winning time automatically; false (default) = ask them to confirm.' },
+        poll_rules: { type: 'string', description: 'Their rules for choosing, in their words ("Mom has to be there", "weekends only").' },
       },
       required: ['title'],
     },
@@ -596,7 +604,7 @@ const POST_TOOLS = [
     // field here; the member reviews it in the composer (Preview plays the
     // envelope) and posts — or asks for the next tweak.
     name: 'design_invite',
-    description: 'Change the INVITATION DESIGN of one of their events — a draft (by its title) or one of their own posted events. Every Studio choice is here: template, headline, the note, button words, typeface, accent / paper / envelope colours (hex), envelope liner, animated backdrop, and the TWO PHOTO SLOTS — envelope_photo (the outside, under the headline) and card_photo (on the card with the details), each a 1-based number from the event\'s photos in upload order, or 0 for none. Only the fields you pass change. Interpret their taste freely ("warmer", "more elegant", "like a garden party", "make the gold pop") into these choices, say plainly what you set, and offer the next tweak. A draft comes back with a Review button — Preview there plays the envelope; a posted event shows the new design to anyone who opens their link (emails already sent keep their card). Layouts beyond these knobs (moving text blocks, drawing) are not possible — say so, offer the nearest choice, and file_dev_report if they want it.',
+    description: 'Change the INVITATION DESIGN of one of their events — a draft (by its title) or one of their own posted events. Every Studio choice is here: template, headline, the note, button words, typeface, accent / paper / envelope colours (hex), envelope liner, animated backdrop, and the TWO PHOTO SLOTS — envelope_photo (the card\'s FRONT, seen as it slides out of the envelope) and card_photo (INSIDE the card, with the details), each a 1-based number from the event\'s photos in upload order, or 0 for none. Only the fields you pass change. Interpret their taste freely ("warmer", "more elegant", "like a garden party", "make the gold pop") into these choices, say plainly what you set, and offer the next tweak. A draft comes back with a Review button — Preview there plays the envelope; a posted event shows the new design to anyone who opens their link (emails already sent keep their card). Layouts beyond these knobs (moving text blocks, drawing) are not possible — say so, offer the nearest choice, and file_dev_report if they want it.',
     input_schema: {
       type: 'object',
       properties: {
@@ -611,8 +619,8 @@ const POST_TOOLS = [
         envelope: { type: 'string', description: 'Hex for the envelope.' },
         liner: { type: 'string', enum: ['none', 'dots', 'stripes', 'leaves', 'stars', 'confetti'] },
         backdrop: { type: 'string', enum: ['none', 'confetti', 'snow', 'petals', 'stars', 'bubbles', 'leaves'] },
-        envelope_photo: { type: 'integer', description: 'Which of the event\'s photos (1 = first uploaded) goes on the envelope\'s outside; 0 = none.' },
-        card_photo: { type: 'integer', description: 'Which photo goes on the card with the details; 0 = none.' },
+        envelope_photo: { type: 'integer', description: 'Which of the event\'s photos (1 = first uploaded) goes on the FRONT of the card (what guests see as it slides out of the envelope); 0 = none.' },
+        card_photo: { type: 'integer', description: 'Which photo goes INSIDE the card, with the details; 0 = none.' },
         reset_colours: { type: 'boolean', description: 'true = drop their custom colours/font and go back to the template\'s own.' },
       },
       required: ['event_title'],
@@ -1332,7 +1340,8 @@ Deno.serve(async (req) => {
       + '\n- Photos are added in the composer when they review — say so when the thing wants a picture.'
       + '\n- update_post changes a post that is ALREADY live, in place: read my_posts first, use the exact title, name every change and what it said before.'
       + '\n- EVENTS: draft_event fills the event composer as far as they have told you (date, time, place, guests, visibility, a guest list to save) — never tell them to go create it by hand. Anything not yet decided stays blank for them. Nothing is sent until their tap on Post.'
-      + '\n- INVITATION DESIGN BY CONVERSATION: design_invite changes any Studio choice on a draft or posted event — template, words, typeface, colours, liner, backdrop, and the two photo slots (envelope outside / card). When they describe a look ("more elegant", "gold on navy", "the group photo outside, the candle photo inside"), DO it, say what you set, and offer the next tweak — the review-and-refine loop. Never send them to the Studio for something you can set.'
+      + '\n- TIME POLLS: when they want guests to choose the time ("let them vote between Saturday and Sunday"), pass poll_times (2–12 options) to draft_event, plus a deadline, wait-for-everyone, auto-book vs confirm, and their rules for choosing if they said. Guests get one automatic reminder; the best-supported time (their rules first) is chosen and everyone is told.'
+      + '\n- INVITATION DESIGN BY CONVERSATION: design_invite changes any Studio choice on a draft or posted event — template, words, typeface, colours, liner, backdrop, and the two photo slots (card front / inside). When they describe a look ("more elegant", "gold on navy", "the group photo outside, the candle photo inside"), DO it, say what you set, and offer the next tweak — the review-and-refine loop. Never send them to the Studio for something you can set.'
       + '\n- my_post_drafts reads their unpublished drafts when they want help finishing one; delete_draft removes drafts they ask you to delete (several copies with one title → ask which, or keep the newest).'
       ;
   }
@@ -2839,6 +2848,20 @@ Deno.serve(async (req) => {
         evLichen: vis === 'lichen', evAnyone: vis === 'anyone',
         invitees, genLink: !!input.share_link,
         evMode, modes: [evMode], media: [],
+        // A TIME POLL (2026-11-09): candidate times guests vote on.
+        ...(() => {
+          const raw = Array.isArray(input.poll_times) ? input.poll_times as { date?: string; start_min?: number; end_min?: number }[] : [];
+          const ok = raw.filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(String(o?.date ?? ''))).slice(0, 12).map((o) => {
+            const st = Number.isInteger(o.start_min) && (o.start_min as number) >= 0 && (o.start_min as number) < 1440 ? o.start_min as number : (startMin ?? 18 * 60);
+            const en = Number.isInteger(o.end_min) && (o.end_min as number) > st && (o.end_min as number) <= 1440 ? o.end_min as number : Math.min(1440, st + 120);
+            return { date: String(o.date), start: st, end: en };
+          });
+          if (ok.length < 2) return {};
+          const dl = String(input.poll_deadline ?? '').trim();
+          return { evPoll: true, pollOpts: ok, pollDeadline: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(dl) ? dl.slice(0, 16) : '',
+            pollWaitAll: input.poll_wait_all !== false, pollAuto: input.poll_auto === true,
+            pollRules: String(input.poll_rules ?? '').slice(0, 500) };
+        })(),
         evAllDay: !!input.all_day,
         ...(date ? { evRange: { start: date, end: endDate && endDate >= date ? endDate : date } } : {}),
         ...(startMin != null ? { evStartMin: startMin, evEndMin: endMin } : {}),
@@ -2927,8 +2950,8 @@ Deno.serve(async (req) => {
         if (!Number.isInteger(n) || n < 1 || n > photos.length) { notes.push(`${label}: the event has ${photos.length} photo${photos.length === 1 ? '' : 's'} — ${photos.length ? `pick 1–${photos.length}` : 'they add photos in the composer first'}`); return; }
         next[key] = photos[n - 1]; if (key === 'cardPhoto') next.photo = true; changed.push(`${label}: photo ${n}`);
       };
-      slot(input.envelope_photo, 'envPhoto', 'envelope photo');
-      slot(input.card_photo, 'cardPhoto', 'card photo');
+      slot(input.envelope_photo, 'envPhoto', 'card-front photo');
+      slot(input.card_photo, 'cardPhoto', 'inside photo');
       if (!changed.length) return { ok: false, error: notes.length ? notes.join('; ') : 'Nothing to change — pass at least one design choice.' };
       for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
       if (!next.template) next.template = 'classic';

@@ -34,6 +34,15 @@ export interface EventRow {
   draft_id?: string | null;
   /** The event's own cap over calendar sharing: null = follow it. */
   share_level?: 'busy' | 'hidden' | null;
+  /** TIME POLL (2026-11-09): 'open' while guests vote; the row holds the
+   *  provisional (first) option until it's decided. */
+  poll_status?: 'open' | 'decided' | null;
+  poll_deadline?: string | null;
+  poll_wait_all?: boolean;
+  poll_auto?: boolean;
+  poll_rules?: string | null;
+  poll_suggested?: string | null;
+  poll_reason?: string | null;
   created_at: string;
   attendees?: EventAttendee[];
   /** Synthetic row imported from an external calendar (owner's view only). */
@@ -58,7 +67,7 @@ export interface EventRow {
 
 const EVENT_COLS =
   'id, creator_id, owner_profile_id, owner_space_id, title, description, location, lat, lng, ' +
-  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, is_draft, draft_id, share_level, created_at';
+  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, is_draft, draft_id, share_level, poll_status, poll_deadline, poll_wait_all, poll_auto, poll_rules, poll_suggested, poll_reason, created_at';
 // event_attendees has TWO FKs to profiles (profile_id + invited_by) — the
 // embed must name the one it means (house rule; see CLAUDE.md).
 const ATTENDEE_EMBED =
@@ -138,6 +147,8 @@ export interface EventInput {
   zoomUnique?: boolean;
   /** null/undefined = follow calendar sharing; 'busy' | 'hidden' narrow it. */
   shareLevel?: 'busy' | 'hidden' | null;
+  /** Open a time poll on this event (the row holds the first option). */
+  poll?: { deadline: string | null; waitAll: boolean; auto: boolean; rules: string } | null;
 }
 
 export async function createEvent(me: string, input: EventInput): Promise<string> {
@@ -160,6 +171,8 @@ export async function createEvent(me: string, input: EventInput): Promise<string
     ...(input.timezone ? { timezone: input.timezone } : {}),
     ...(input.zoomUnique ? { zoom_unique: true } : {}),
     share_level: input.shareLevel ?? null,
+    ...(input.poll ? { poll_status: 'open', poll_deadline: input.poll.deadline, poll_wait_all: input.poll.waitAll,
+      poll_auto: input.poll.auto, poll_rules: input.poll.rules.trim() || null } : {}),
   }).select('id').single();
   if (error) throw error;
   const id = (data as { id: string }).id;

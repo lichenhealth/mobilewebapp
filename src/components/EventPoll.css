@@ -1,0 +1,21 @@
+/* The time poll card (2026-11-09) — Lichen paper, peach for the lit pick. */
+.evpoll { border: 1px solid var(--bone-edge); border-radius: var(--r-md); background: #fff; padding: var(--s-4); margin: var(--s-4) 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.evpoll__eyebrow { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--peach-deep); margin: 0; }
+.evpoll__title { font-family: var(--font-display, serif); font-size: 20px; font-weight: 400; margin: 0; }
+.evpoll__sub { font-size: 13px; color: var(--ink-muted); margin: 0; }
+.evpoll__list { list-style: none; margin: var(--s-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.evpoll__opt { border: 1px solid var(--bone-edge); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.evpoll__opt.is-suggested { border-color: var(--peach); background: var(--peach-tint); }
+.evpoll__pick { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; }
+.evpoll__when { flex: 1; min-width: 0; }
+.evpoll__tag { font-size: 11px; color: var(--peach-deep); border: 1px solid var(--peach); border-radius: 999px; padding: 1px 8px; background: #fff; }
+.evpoll__tally { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--ink-muted); }
+.evpoll__bar { flex: 0 0 64px; height: 6px; border-radius: 3px; background: var(--bone-deep, #eee); overflow: hidden; }
+.evpoll__bar > span { display: block; height: 100%; background: var(--peach); }
+.evpoll__count { flex: 1; min-width: 0; }
+.evpoll__set { font: inherit; font-size: 12px; color: var(--peach-deep); border: 1px solid var(--peach); background: #fff; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.evpoll__set:disabled { opacity: 0.6; }
+.evpoll__reason { font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; text-wrap: pretty; }
+.evpoll__save { align-self: flex-start; margin-top: 4px; }
+.evpoll__fine { font-size: 12px; color: var(--ink-muted); margin: 4px 0 0; text-wrap: pretty; }
+.evpoll__err { font-size: 12px; color: var(--red-deep, #b4553a); margin: 0; }

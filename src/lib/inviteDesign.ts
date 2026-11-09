@@ -32,10 +32,11 @@ export interface InviteDesign {
   artwork?: string;
   /** An animated backdrop behind the envelope on the guest page. */
   backdrop?: InviteBackdrop;
-  /** TWO PHOTO SLOTS (founder 2026-11-09: a group photo on the OUTSIDE under
-   *  "You're invited", a different photo inside with the details). A URL from
-   *  our storage, 'none' to leave the slot empty, or unset = the smart
-   *  default (first photo on the card, second on the envelope). */
+  /** TWO PHOTO SLOTS (founder 2026-11-09): `envPhoto` = the card's FRONT,
+   *  seen as it slides out of the envelope (the family photo); `cardPhoto` =
+   *  INSIDE the card with the details. (The storage key keeps its first name.)
+   *  A URL from our storage, 'none' to empty the slot, or unset = the smart
+   *  default (first photo inside, second on the front). */
   cardPhoto?: string;
   envPhoto?: string;
 }

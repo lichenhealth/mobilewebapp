@@ -267,9 +267,9 @@ export function InviteStudio({ design, facts, onDone, onClose, uploaderId }: {
                 </>
               );
               return (<>
-                {row('envPhoto', now.env, 'Photo on the envelope — the outside')}
-                {row('cardPhoto', now.card, 'Photo on the card — with the details')}
-                <p className="invst__note">Preview plays the envelope so you can see both.</p>
+                {row('envPhoto', now.env, 'Photo on the front of the card — seen as it slides out')}
+                {row('cardPhoto', now.card, 'Photo inside the card — with the details')}
+                <p className="invst__note">Preview plays the whole opening: the envelope, the card’s front, then the inside.</p>
               </>);
             })()}
           </>)}
