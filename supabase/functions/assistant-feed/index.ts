@@ -619,6 +619,23 @@ const POST_TOOLS = [
     },
   },
   {
+    // DELETING A DRAFT (founder 2026-11-09, after three copies of one event:
+    // "you delete the other two - but i wanna make sure claude's brain can do
+    // it, too"). A private write (rung 1): their own unpublished drafts only,
+    // matched by title — and when several share a title, never a guess.
+    name: 'delete_draft',
+    description: 'Delete one or more of their OWN unpublished drafts (posts or events), matched by title. When several drafts share the title, pass which: "all_but_newest" (keeps the most recently saved — the usual answer for accidental copies), "all", or saved_on (YYYY-MM-DD) for one specific copy; without it a multi-match is refused with the list (saved dates, design, photo counts) so you can ask. Deleting an event draft also releases its hold on their calendar. Deleted drafts cannot be brought back — say exactly what you removed.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'The draft\'s title as they call it.' },
+        which: { type: 'string', enum: ['only', 'all_but_newest', 'all'], description: 'Default "only" = there must be exactly one match.' },
+        saved_on: { type: 'string', description: 'YYYY-MM-DD — delete only the copy last saved that day.' },
+      },
+      required: ['title'],
+    },
+  },
+  {
     name: 'update_post',
     description: 'Edit one of their OWN published posts, named by its EXACT title from my_posts. Only the fields you pass change; report what changed and what it said before. An empty price removes the price. Event posts are refused — those edits live on the event page so guests keep their RSVPs.',
     input_schema: {
@@ -1316,7 +1333,7 @@ Deno.serve(async (req) => {
       + '\n- update_post changes a post that is ALREADY live, in place: read my_posts first, use the exact title, name every change and what it said before.'
       + '\n- EVENTS: draft_event fills the event composer as far as they have told you (date, time, place, guests, visibility, a guest list to save) — never tell them to go create it by hand. Anything not yet decided stays blank for them. Nothing is sent until their tap on Post.'
       + '\n- INVITATION DESIGN BY CONVERSATION: design_invite changes any Studio choice on a draft or posted event — template, words, typeface, colours, liner, backdrop, and the two photo slots (envelope outside / card). When they describe a look ("more elegant", "gold on navy", "the group photo outside, the candle photo inside"), DO it, say what you set, and offer the next tweak — the review-and-refine loop. Never send them to the Studio for something you can set.'
-      + '\n- my_post_drafts reads their unpublished drafts when they want help finishing one.'
+      + '\n- my_post_drafts reads their unpublished drafts when they want help finishing one; delete_draft removes drafts they ask you to delete (several copies with one title → ask which, or keep the newest).'
       ;
   }
 
@@ -2930,6 +2947,36 @@ Deno.serve(async (req) => {
         note: 'Live now for anyone who opens their invitation link; emails already sent keep the card they were sent with. Offer the next tweak.' };
     }
 
+    if (name === 'delete_draft') {
+      const t = String(input.title ?? '').trim().slice(0, 120);
+      if (!t) return { ok: false, error: 'Which draft? Name it by its title.' };
+      const rows = await (await sb(`post_drafts?profile_id=eq.${profile_id}&draft->>title=ilike.${encodeURIComponent(t)}&select=id,draft,updated_at&order=updated_at.desc`)).json();
+      const list = (Array.isArray(rows) ? rows : []) as { id: string; draft: Record<string, unknown>; updated_at: string }[];
+      if (!list.length) return { ok: false, error: `No draft of theirs is titled "${t}" — read my_post_drafts for the exact titles.` };
+      const describe = (r: { draft: Record<string, unknown>; updated_at: string }) => {
+        const d = r.draft;
+        const photos = Array.isArray(d.media) ? (d.media as { type?: string }[]).filter((m) => m?.type === 'photo').length : 0;
+        const design = (d.inviteDesign as { template?: string } | undefined)?.template;
+        return `saved ${r.updated_at.slice(0, 16).replace('T', ' ')}${design ? `, ${design} design` : ''}, ${photos} photo${photos === 1 ? '' : 's'}`;
+      };
+      const which = String(input.which ?? 'only');
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(String(input.saved_on ?? '')) ? String(input.saved_on) : null;
+      let targets = list;
+      if (day) targets = list.filter((r) => r.updated_at.slice(0, 10) === day);
+      else if (which === 'all_but_newest') targets = list.slice(1);
+      else if (which !== 'all' && list.length > 1) {
+        return { ok: false, error: `They have ${list.length} drafts titled "${t}": ${list.map((r, i) => `(${i + 1}) ${describe(r)}`).join('; ')}. Ask which to delete — or use which="all_but_newest" to keep the most recent.` };
+      }
+      if (day && targets.length !== 1) return { ok: false, error: `${targets.length} drafts titled "${t}" were saved on ${day} — ask which one, using the list: ${list.map((r) => describe(r)).join('; ')}.` };
+      if (!targets.length) return { ok: false, error: 'Nothing to delete with that choice.' };
+      const ids = targets.map((r) => r.id);
+      const r = await sb(`post_drafts?profile_id=eq.${profile_id}&id=in.(${ids.join(',')})`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      if (!r.ok) return { ok: false, error: `The delete failed: ${(await r.text()).slice(0, 140)}` };
+      const kept = list.filter((x) => !ids.includes(x.id));
+      return { ok: true, change: `deleted ${ids.length} draft${ids.length === 1 ? '' : 's'} titled "${t}" (${targets.map(describe).join('; ')})${kept.length ? `; kept ${kept.length}: ${kept.map(describe).join('; ')}` : ''}`,
+        note: 'Gone for good — deleted drafts cannot be restored. An event draft\'s calendar hold went with it.' };
+    }
+
     if (name === 'update_post') {
       const t = String(input.title ?? '').trim();
       if (!t) return { ok: false, error: 'Which post? Give its exact title from my_posts.' };
@@ -3114,7 +3161,7 @@ Deno.serve(async (req) => {
     set_booking_type_active: 'calendar', add_task: 'calendar',
     calendar_feed_link: 'calendar',
     my_courses: 'courses', create_course: 'courses', update_course: 'courses',
-    my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace', draft_event: 'events', design_invite: 'events',
+    my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace', draft_event: 'events', design_invite: 'events', delete_draft: 'marketplace',
     my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
     save_post_to_drive: 'drive',
     ...LIFE_TOOL_SECTION,
