@@ -59,11 +59,14 @@ async function openShare(): Promise<{ video: HTMLVideoElement; fresh: boolean }>
 }
 if (typeof window !== 'undefined') window.addEventListener('pagehide', stopShare);
 
-export default function GrabPen({ thread, uploaderId }: {
+export default function GrabPen({ thread, uploaderId, context }: {
   /** The assistant thread the marked-up shot posts into (space:<id>, or
    *  'profile' for a member's own page). */
   thread: string;
   uploaderId: string;
+  /** A sentence naming WHAT was marked up, sent ahead of the member's note
+   *  (an invitation's grab tells the brain which event). */
+  context?: string;
 }) {
   const navigate = useNavigate();
   const [shot, setShot] = useState<HTMLImageElement | null>(null);
@@ -209,7 +212,7 @@ export default function GrabPen({ thread, uploaderId }: {
       // and "Open the conversation" opens THAT exchange (founder 2026-10-13:
       // a bare thread link now lands on the brief, not the words just sent).
       const row = await postToAssistantFeed(
-        note.trim() || 'A marked-up grab of the page — the pen shows what I mean.',
+        [context, note.trim() || 'A marked-up grab of the page — the pen shows what I mean.'].filter(Boolean).join('\n\n'),
         undefined, thread, [url],
         thread.startsWith('space:') ? null : undefined,
       );

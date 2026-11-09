@@ -72,7 +72,7 @@ export interface InviteTemplate {
 }
 
 export const INVITE_TEMPLATES: InviteTemplate[] = [
-  { id: 'classic', name: 'Classic', occasion: 'Simple', headline: 'You’re invited', rsvp: 'RSVP & see the details',
+  { id: 'classic', name: 'Classic', occasion: 'Simple', headline: 'You’re invited', rsvp: 'RSVP',
     font: 'serif', accent: '#C06B3E', paper: '#FFFDF8', ink: '#2B2B28', envelope: '#E8D9C4', liner: 'none', ornament: '', border: 'single' },
   { id: 'garden', name: 'Garden party', occasion: 'Gatherings', headline: 'Join us in the garden', rsvp: 'RSVP',
     font: 'serif', accent: '#5E7A4E', paper: '#F3F5EC', ink: '#2F3A2A', envelope: '#C9D3B7', liner: 'leaves', ornament: '❦', border: 'double' },

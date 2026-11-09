@@ -5,6 +5,7 @@ import {
   loadGuestBooking, guestCancelBooking, guestRescheduleBooking, sendBookingMail,
   publicBookingBoard, slotsForDay, startBookingCheckout, usdLabel, payOpen,
   type GuestBookingView, type BookingBoard,
+  slotInstant,
 } from '../lib/bookingApi';
 import { addDays, todayISO } from '../lib/conciergeApi';
 import AddToCal from '../components/AddToCal';
@@ -130,8 +131,28 @@ export default function GuestBooking() {
       location: row.meeting_url ? svc! : row.type_location,
       url: row.meeting_url || undefined,
       start_date: row.on_date, end_date: row.on_date, all_day: false,
-      start_min: row.start_min, end_min: row.end_min,
+      start_min: row.start_min, end_min: row.end_min, tz: row.provider_tz ?? null,
     };
+  }, [row]);
+  // THE GUEST'S OWN CLOCK FIRST (founder 2026-11-09: a PST client read an
+  // 11am MST session as 11am her time): the page leads with the time on the
+  // viewer's clock and names the provider's alongside when they differ.
+  const timeLine = useMemo(() => {
+    if (!row) return '';
+    const own = `${minLabel(row.start_min)} – ${minLabel(row.end_min)}`;
+    const ptz = row.provider_tz;
+    const first = row.provider_name.split(' ')[0];
+    const ab = (z: string, at: Date) => new Intl.DateTimeFormat('en-US', { timeZone: z, timeZoneName: 'short' })
+      .formatToParts(at).find((x) => x.type === 'timeZoneName')?.value ?? '';
+    if (!ptz) return own;
+    const a = slotInstant(row.on_date, row.start_min, ptz), b = slotInstant(row.on_date, row.end_min, ptz);
+    if (!a || !b) return own;
+    const vz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const fmt = (dt: Date) => new Intl.DateTimeFormat('en-US', { timeZone: vz, hour: 'numeric', minute: '2-digit' })
+      .format(dt).replace(':00', '').replace(' ', '').toLowerCase();
+    const provAb = ab(ptz, a);
+    if (!vz || ab(vz, a) === provAb) return `${own} ${provAb}`;
+    return `${fmt(a)} – ${fmt(b)} ${ab(vz, a)} your time (${own} ${provAb}, ${first}’s time)`;
   }, [row]);
 
   if (!ready) return <div className="gev"><p className="gev__muted">Loading…</p></div>;
@@ -155,7 +176,7 @@ export default function GuestBooking() {
         <p className="eyebrow">{s.head}</p>
         <h1 className="bkg__title display-italic">{row.type_title}</h1>
         <p className="bkg__sub">
-          with {row.provider_name} · {dow}, {MONTHS[m - 1]} {d}, {y} · {minLabel(row.start_min)} – {minLabel(row.end_min)}
+          with {row.provider_name} · {dow}, {MONTHS[m - 1]} {d}, {y} · {timeLine}
           {row.type_location ? ` · ${row.type_location}` : ''}
         </p>
         <p className="bkg__sub">{s.sub}</p>

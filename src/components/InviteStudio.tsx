@@ -1,6 +1,7 @@
 import { invitePhotos } from '../lib/inviteDesign';
 import { isHeic } from '../lib/heic';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import GrabPen from './GrabPen';
 import { InviteCard, InviteEnvelope, InviteBackdropLayer, type InviteFacts } from './InviteCard';
 import {
   INVITE_TEMPLATES, INVITE_FONTS, INVITE_ACCENTS, INVITE_PAPERS, INVITE_ENVELOPES, INVITE_LINERS, INVITE_BACKDROPS,
@@ -281,19 +282,35 @@ export function InviteStudio({ design, facts, onDone, onClose, uploaderId }: {
 
 /** THE PREVIEW — exactly what a guest sees: the envelope opens, the card
  *  settles in. "Play it again" re-seals it. */
-export function InvitePreview({ design, facts, onClose }: {
+export function InvitePreview({ design, facts, onClose, joinUrl, uploaderId }: {
   design: InviteDesign | null;
   facts: InviteFacts;
   onClose: () => void;
+  /** A pasted meeting link (a minted Zoom room doesn't exist until Post). */
+  joinUrl?: string | null;
+  /** The host — arms the mark-up pen (the grab posts into their Events brain). */
+  uploaderId?: string;
 }) {
   const r = resolveInvite(design);
   const [run, setRun] = useState(0);
+  const [rsvp, setRsvp] = useState<'' | 'going' | 'maybe' | 'no'>('');
+  const [note, setNote] = useState('');
+  const [flash, setFlash] = useState<'' | 'rsvp' | 'cal'>('');
+  const rsvpRef = useRef<HTMLDivElement | null>(null);
+  const calRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', k);
     document.body.style.overflow = 'hidden';
     return () => { window.removeEventListener('keydown', k); document.body.style.overflow = ''; };
   }, [onClose]);
+  // The card's doors walk to the same sections the guest page carries below
+  // the card — the RSVP and the calendar doors — so the flow can be felt here.
+  const go = (which: 'rsvp' | 'cal') => {
+    const el = which === 'rsvp' ? rsvpRef.current : calRef.current;
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setFlash(which); window.setTimeout(() => setFlash(''), 1400);
+  };
   return (
     <div className="invpv" role="dialog" aria-modal="true" aria-label="Invitation preview"
       style={{ background: `color-mix(in srgb, ${r.envelope} 45%, var(--bone))` }}>
@@ -304,10 +321,39 @@ export function InvitePreview({ design, facts, onClose }: {
       <InviteBackdropLayer kind={r.backdrop} accent={r.accent} />
       <div className="invpv__stage">
         <InviteEnvelope key={run} design={design} peek={facts.title} photos={facts.photos}>
-          <InviteCard design={design} facts={facts} />
+          <InviteCard design={design} facts={facts}
+            onRsvp={() => go('rsvp')} onCal={() => go('cal')}
+            joinUrl={joinUrl}
+            onJoin={() => setNote('Guests tap Join to go straight into the Zoom room — no RSVP needed. The room is created when you post.')} />
+          {note && <p className="invpv__note">{note}</p>}
+          <div className="invpv__after">
+            <div ref={rsvpRef} className={'invpv__sec' + (flash === 'rsvp' ? ' is-flash' : '')}>
+              <h3>Can you come?</h3>
+              <div className="invpv__rsvp">
+                <button className={rsvp === 'going' ? 'is-on' : ''} onClick={() => setRsvp('going')}>Going</button>
+                <button className={rsvp === 'maybe' ? 'is-on' : ''} onClick={() => setRsvp('maybe')}>Maybe</button>
+                <button className={rsvp === 'no' ? 'is-on' : ''} onClick={() => setRsvp('no')}>Can’t make it</button>
+              </div>
+            </div>
+            <div ref={calRef} className={'invpv__sec' + (flash === 'cal' ? ' is-flash' : '')}>
+              <h3>Add it to your calendar</h3>
+              <div className="invpv__rsvp">
+                {['Google', 'Apple', 'Outlook', 'Office 365'].map((c) => <button key={c} onClick={() => setNote(`Guests add it to ${c} Calendar from here.`)}>{c}</button>)}
+              </div>
+            </div>
+          </div>
         </InviteEnvelope>
       </div>
-      <button className="invpv__again" onClick={() => setRun((n) => n + 1)}>Play the envelope again</button>
+      <button className="invpv__again" onClick={() => { setRun((n) => n + 1); setRsvp(''); setNote(''); }}>Play the envelope again</button>
+      {/* MARK IT UP (founder 2026-11-09, "love that feature"): the profile/
+          page pen, here — the marked-up grab lands in the Events brain, where
+          design_invite can make the change. */}
+      {uploaderId && (
+        <div className="invpv__pen">
+          <GrabPen thread="events" uploaderId={uploaderId}
+            context={`My invitation for "${facts.title}" (an event draft) — please change its design to match the marks.`} />
+        </div>
+      )}
     </div>
   );
 }
