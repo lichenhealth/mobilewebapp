@@ -46,7 +46,7 @@ import {
 import TodoView from '../components/TodoView';
 import './Calendar.css';
 import AssistantDoor from '../components/AssistantDoor';
-import { listMyBookingTypes } from '../lib/bookingApi';
+import { listMyBookingTypes, zoneAbbr, viewerZone } from '../lib/bookingApi';
 
 const HOUR_PX = 32; // compact rows — more of the day on screen
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1254,7 +1254,7 @@ export default function Calendar() {
             <p className="calp__sheet-when">
               {formatDateShort(selected.start_date)}
               {selected.end_date !== selected.start_date && !selected.recurrence ? ` – ${formatDateShort(selected.end_date)}` : ''}
-              {!selected.all_day && selected.start_min != null && ` · ${minToLabel(selected.start_min)} – ${minToLabel(selected.end_min ?? selected.start_min)}`}
+              {!selected.all_day && selected.start_min != null && ` · ${minToLabel(selected.start_min)} – ${minToLabel(selected.end_min ?? selected.start_min)}${(() => { const z = zoneAbbr(selected.timezone || viewerZone(), selected.start_date, selected.start_min); return z ? ' ' + z : ''; })()}`}
               {selected.all_day && ' · All day'}
               {selected.recurrence && ` · ${recurrenceLabel(selected.recurrence, selected.start_date)}`}
             </p>

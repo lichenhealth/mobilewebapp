@@ -8,6 +8,7 @@ import FeedCard from '../components/FeedCard';
 import { LinkifiedText, CarePreview } from '../components/CarePostCard';
 import { SmartLocation } from './Calendar';
 import AddToCal from '../components/AddToCal';
+import EventPoll from '../components/EventPoll';
 import { useAuth } from '../auth/AuthProvider';
 import { loadEvent, deleteEvent, minToLabel, type EventRow } from '../lib/calendarApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
@@ -285,6 +286,7 @@ export default function EventPage(props: { postId?: string } = {}) {
 
   const whenLines = (() => {
     if (!calEvent) return ['Date to be announced'];
+    if (calEvent.poll_status === 'open') return ['Time being chosen', 'Guests are voting'];
     if (calEvent.recurrence) return [recurrenceLabel(calEvent.recurrence, calEvent.start_date)];
     const day = localDate(calEvent.start_date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const dates = calEvent.start_date === calEvent.end_date
@@ -376,6 +378,12 @@ export default function EventPage(props: { postId?: string } = {}) {
       {tab === 'About' && (
         <div className="evp__body">
           {hero && <img className="evp__hero" src={hero} alt="" />}
+
+          {calEvent?.poll_status === 'open' && me && (
+            <EventPoll ev={calEvent} me={me} isHost={isHost}
+              canVote={!!myStatus && !isHost}
+              onDecided={() => window.location.reload()} />
+          )}
 
           <div className="evp__cards">
             <button className="evp__infocard" onClick={toggleRsvp} disabled={!post.linked_event_id}>

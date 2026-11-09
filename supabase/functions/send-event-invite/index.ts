@@ -181,7 +181,7 @@ Deno.serve(async (req) => {
   if (!event_id || !name?.trim() || !email?.trim()) return json({ error: 'Missing name, email, or event' }, 400);
 
   // Verify the caller created (hosts) this event.
-  const evs = await (await sb(`events?id=eq.${event_id}&select=creator_id,title,description,location,start_date,end_date,all_day,start_min,end_min,timezone`)).json();
+  const evs = await (await sb(`events?id=eq.${event_id}&select=creator_id,title,description,location,start_date,end_date,all_day,start_min,end_min,timezone,poll_status`)).json();
   const ev = Array.isArray(evs) ? evs[0] : null;
   if (!ev) return json({ error: 'Event not found' }, 404);
   if (!(await isHost(sb, event_id, ev.creator_id, uid))) return json({ error: 'Only the hosts can invite guests' }, 403);
@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
   if (!guest?.token) return json({ error: 'Could not create the invite', detail: rows }, 502);
 
   const link = `${APP_URL}/e/${guest.token}`;
-  const when = whenLabel(ev);
+  const when = ev.poll_status === 'open' ? 'Help choose the time — pick every time that works' : whenLabel(ev);
   const where = (ev.location || '').trim();
   const subject = `${hostName} invited you to ${ev.title}`;
   const text = `${hostName} invited you to "${ev.title}" on Lichen.\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}\n\nSee the details, add it to your calendar, or RSVP — no account needed:\n${link}\n\n— Lichen`;

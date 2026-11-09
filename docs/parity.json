@@ -735,5 +735,20 @@
  },
  "calendarApi:syncDraftHold": {
   "exempt": "Plumbing of Compose's draft autosave — the hold follows the post_drafts row; draft_event writes the draft, and the hold is minted when the member opens it."
+ },
+ "pollApi:createPollOptions": {
+  "tool": "draft_event poll_times (Compose writes the options on the member's Post)"
+ },
+ "pollApi:memberPollVote": {
+  "gap": "1"
+ },
+ "pollApi:pollDecide": {
+  "gap": "2"
+ },
+ "pollApi:guestPoll": {
+  "exempt": "Off-Lichen guest page read by invitation token — no member, no assistant."
+ },
+ "pollApi:guestPollVote": {
+  "exempt": "Off-Lichen guest voting by invitation token — no member, no assistant."
  }
 }

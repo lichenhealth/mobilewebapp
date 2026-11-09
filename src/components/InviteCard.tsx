@@ -87,42 +87,64 @@ export function InviteEnvelope({ design, peek, children, play = true, photos }: 
   photos?: string[];     // the event's photos — the envelope wears its slot's
 }) {
   const r = resolveInvite(design);
-  const envPhoto = invitePhotos(design, photos ?? []).env;
+  // THE OPENING, IN THE FOUNDER'S ORDER (2026-11-09): (1) the envelope's
+  // FRONT with the pretty title, (2) it flips to its back, the flap lifts
+  // and the card slides out showing the card's FRONT — the front photo
+  // (envPhoto: "all 4 of us as a family"), (3) the card opens to its INSIDE
+  // (children: the photo + every detail), and the event details follow on
+  // the page, not as a card.
+  const frontPhoto = invitePhotos(design, photos ?? []).env;
   const reduce = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const [stage, setStage] = useState<'sealed' | 'opening' | 'open'>(reduce ? 'open' : 'sealed');
+  type Stage = 'front' | 'flipping' | 'sealed' | 'opening' | 'cover' | 'turning' | 'open';
+  const [stage, setStage] = useState<Stage>(reduce ? 'open' : 'front');
+  const next: Partial<Record<Stage, [Stage, number]>> = {
+    front: ['flipping', 1800], flipping: ['sealed', 900], sealed: ['opening', 700],
+    opening: ['cover', 3000], cover: ['turning', 2800], turning: ['open', 900],
+  };
   useEffect(() => {
-    if (!play || stage !== 'sealed') return;
-    const t = window.setTimeout(() => setStage('opening'), envPhoto ? 2600 : 1400);
+    if (!play) return;
+    const n = next[stage];
+    if (!n) return;
+    const t = window.setTimeout(() => setStage(n[0]), n[1]);
     return () => window.clearTimeout(t);
-  }, [play, stage]);
-  useEffect(() => {
-    if (stage !== 'opening') return;
-    const t = window.setTimeout(() => setStage('open'), 3400);
-    return () => window.clearTimeout(t);
-  }, [stage]);
+  }, [play, stage]); // eslint-disable-line react-hooks/exhaustive-deps
   if (stage === 'open') return <div className="invenv-done">{children}</div>;
+  const vars = { ['--env' as string]: r.envelope, ['--env-liner' as string]: linerCss(r.liner, r.accent),
+    ['--invc-paper' as string]: r.paper, ['--invc-ink' as string]: r.ink,
+    ['--invc-accent' as string]: r.accent, ['--invc-font' as string]: r.fontCss };
+  const eyebrow = <span className={'invenv__card-eyebrow' + (r.font === 'script' ? ' is-script' : '')}>{r.headline}</span>;
+  // (3) THE CARD'S FRONT, full size, then it turns open to the inside.
+  if (stage === 'cover' || stage === 'turning') return (
+    <button type="button" className={'invcover' + (stage === 'turning' ? ' is-turning' : '')} style={vars}
+      onClick={() => setStage('turning')} aria-label="Open the card">
+      {frontPhoto ? <img className="invcover__photo" src={frontPhoto} alt="" /> : <span className="invcover__orn" aria-hidden="true">{r.template.ornament || '✦'}</span>}
+      <span className="invcover__words">
+        {eyebrow}
+        <span className="invcover__title">{peek}</span>
+      </span>
+      <span className="invcover__hint">Tap to open</span>
+    </button>
+  );
+  const advance = () => setStage((s0) => (s0 === 'front' ? 'flipping' : s0 === 'sealed' ? 'opening' : s0 === 'opening' ? 'cover' : s0));
   return (
-    <button type="button" className={`invenv is-${stage}`} onClick={() => setStage('opening')}
-      aria-label="Open the invitation"
-      style={{ ['--env' as string]: r.envelope, ['--env-liner' as string]: linerCss(r.liner, r.accent),
-        ['--invc-paper' as string]: r.paper, ['--invc-ink' as string]: r.ink,
-        ['--invc-accent' as string]: r.accent, ['--invc-font' as string]: r.fontCss }}>
+    <button type="button" className={`invenv is-${stage}`} onClick={advance}
+      aria-label="Open the invitation" style={vars}>
+      {/* (1) THE ENVELOPE'S FRONT — the pretty title, like an addressed envelope. */}
+      <span className="invenv__addr" aria-hidden={stage !== 'front'}>
+        {eyebrow}
+        <span className="invenv__addr-title">{peek}</span>
+        <span className="invenv__stamp" aria-hidden="true">{r.template.ornament || '✦'}</span>
+      </span>
+      {/* (2) THE BACK — flap, liner, seal; the card rises wearing its front. */}
       <span className="invenv__back" />
       <span className="invenv__card">
-        <span className={'invenv__card-eyebrow' + (r.font === 'script' ? ' is-script' : '')}>{r.headline}</span>
-        <span className="invenv__card-title">{peek}</span>
+        {frontPhoto
+          ? <img className="invenv__card-photo" src={frontPhoto} alt="" />
+          : <>{eyebrow}<span className="invenv__card-title">{peek}</span></>}
       </span>
       <span className="invenv__front" />
       <span className="invenv__flap"><span className="invenv__liner" /></span>
       {stage === 'sealed' && <span className="invenv__seal" />}
-      {/* THE OUTSIDE (founder 2026-11-09): the envelope's own photo with the
-          headline over it — the first thing a guest sees, before the flap. */}
-      {envPhoto && (
-        <span className="invenv__face">
-          <span className={'invenv__face-eyebrow' + (r.font === 'script' ? ' is-script' : '')}>{r.headline}</span>
-          <img className="invenv__face-photo" src={envPhoto} alt="" />
-        </span>
-      )}
     </button>
   );
 }

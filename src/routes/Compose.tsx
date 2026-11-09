@@ -8,6 +8,7 @@ import { loadSpaceMembers } from '../lib/spacesApi';
 import { InviteCard } from '../components/InviteCard';
 import { InviteStudio, InvitePreview } from '../components/InviteStudio';
 import { readInvite, invitePhotos, type InviteDesign } from '../lib/inviteDesign';
+import { createPollOptions, type PollDraftOption } from '../lib/pollApi';
 import { postAssistantHandoff, renameConvo } from '../lib/assistantFeedApi';
 import AssistantDoor, { aiDoorOn } from '../components/AssistantDoor';
 import { colorFor, monogramFor } from '../lib/chatApi';
@@ -25,7 +26,7 @@ import {
 } from '../lib/postsApi';
 import { createEvent, deleteEvent, updateEventDetails, myTimezone, syncDraftHold } from '../lib/calendarApi';
 import TimeZonePick from '../components/TimeZonePick';
-import { allTimeZones, viewerZone, zoomMintAllowed } from '../lib/bookingApi';
+import { allTimeZones, viewerZone, zoomMintAllowed, zoneAbbr } from '../lib/bookingApi';
 import { slugify } from '../lib/bookingApi';
 import { classifyCareContact } from '../lib/careTeamApi';
 import { inviteEventGuest, inviteEventGuestByPhone, mintEventLink } from '../lib/eventGuestsApi';
@@ -102,14 +103,15 @@ function areasFromParam(raw: string | null): ServiceArea[] {
 /** The invitation's date line — a mirror of send-event-invite's whenLabel,
  *  so the composer's preview reads exactly like the mailed card. */
 const INV_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-function inviteWhen(startDate: string, allDay: boolean, startMin: number | null): string {
+function inviteWhen(startDate: string, allDay: boolean, startMin: number | null, tz?: string): string {
   const [y, m, d] = (startDate || '').split('-').map(Number);
   if (!y || !m || !d) return 'Pick a date';
   const date = `${INV_MONTHS[m - 1]} ${d}, ${y}`;
   if (allDay || startMin == null) return date;
   const h = Math.floor(startMin / 60), mm = startMin % 60;
   const ap = h < 12 ? 'am' : 'pm'; const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${date} · ${h12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${ap}`;
+  const z = zoneAbbr(tz || null, startDate, startMin);
+  return `${date} · ${h12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${ap}${z ? ' ' + z : ''}`;
 }
 
 export default function Compose() {
@@ -222,6 +224,13 @@ export default function Compose() {
   // member's Lichen calendar. evShare: the event's cap over calendar sharing.
   const [evHold, setEvHold] = useState(true);
   const [evShare, setEvShare] = useState<'' | 'busy' | 'hidden'>('');
+  // TIME POLL (founder 2026-11-09): guests vote on times; the brain picks.
+  const [evPoll, setEvPoll] = useState(false);
+  const [pollOpts, setPollOpts] = useState<PollDraftOption[]>([]);
+  const [pollDeadline, setPollDeadline] = useState('');   // datetime-local, optional
+  const [pollWaitAll, setPollWaitAll] = useState(true);
+  const [pollAuto, setPollAuto] = useState(false);
+  const [pollRules, setPollRules] = useState('');
   const [zoomOk, setZoomOk] = useState(false);
   useEffect(() => { void zoomMintAllowed(user?.id).then(setZoomOk); }, [user?.id]);
   const [studioOpen, setStudioOpen] = useState(false);
@@ -745,7 +754,7 @@ export default function Compose() {
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
       condition: [...condition], availFrom, availTo, fulfillment: [...fulfillment],
-      deliverRadius, paymentPlan, currentcyOnly, catTags, inviteDesign, invSendAt, evTz, evZoom, evHold, evShare,
+      deliverRadius, paymentPlan, currentcyOnly, catTags, inviteDesign, invSendAt, evTz, evZoom, evHold, evShare, evPoll, pollOpts, pollDeadline, pollWaitAll, pollAuto, pollRules,
       travelKind, routeFrom, routeTo, vehicle, seats, sleeps,
       evRange, evAllDay, evStartMin, evEndMin, bookingUrl,
       sliding, slideLow, slideHigh, unitSel, unitQty, unitText,
@@ -771,7 +780,7 @@ export default function Compose() {
       setDraftSavedAt(Date.now());
       // The draft's time-hold rides the same save (a personal event only —
       // a space's calendar isn't the member's to block).
-      const holdOn = areas.has('events') && evHold && !!evRange.start && actor.type !== 'space';
+      const holdOn = areas.has('events') && evHold && !evPoll && !!evRange.start && actor.type !== 'space';
       await syncDraftHold(user.id, draftIdRef.current, holdOn ? {
         title: title.trim() || body.trim().slice(0, 60) || 'Event',
         startDate: evRange.start!, endDate: evRange.end ?? evRange.start!,
@@ -844,6 +853,12 @@ export default function Compose() {
       if (d.evZoom === true) { setEvZoom(true); setOnline(true); }
       if (d.evHold === false) setEvHold(false);
       if (d.evShare === 'busy' || d.evShare === 'hidden') setEvShare(d.evShare);
+      if (d.evPoll === true) setEvPoll(true);
+      if (Array.isArray(d.pollOpts)) setPollOpts(d.pollOpts);
+      if (typeof d.pollDeadline === 'string') setPollDeadline(d.pollDeadline);
+      if (d.pollWaitAll === false) setPollWaitAll(false);
+      if (d.pollAuto === true) setPollAuto(true);
+      if (typeof d.pollRules === 'string') setPollRules(d.pollRules);
       if (Array.isArray(d.catTags)) setCatTags(d.catTags);
       s(d.travelKind, setTravelKind); s(d.routeFrom, setRouteFrom); s(d.routeTo, setRouteTo);
       s(d.vehicle, setVehicle); s(d.seats, setSeats); s(d.sleeps, setSleeps);
@@ -1334,7 +1349,10 @@ export default function Compose() {
     // Events: the Everyone checkboxes decide the legacy booleans + the tier.
     const effPublic = isEvent ? (evAnyone || evLichen) : isPublic;
     const evVisOut = isEvent ? (evAnyone ? 'anyone' as const : evLichen ? 'lichen' as const : 'invited' as const) : null;
-    if (isEvent && !evRange.start) { setError('Pick a date for your event.'); return; }
+    const pollList = pollOpts.filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(o.date));
+    const pollOn = isEvent && evPoll && !editing;
+    if (pollOn && pollList.length < 2) { setError('Add at least two times for guests to vote on.'); return; }
+    if (isEvent && !pollOn && !evRange.start) { setError('Pick a date for your event.'); return; }
     setBusy(true); setError('');
     try {
       // A post lives in the sections it was given; a PAID one also lists in
@@ -1513,7 +1531,10 @@ export default function Compose() {
       // Events first create their calendar event (the RSVP container); if the
       // post insert then fails, the orphan event is cleaned up below.
       let linkedEventId: string | null = null;
-      if (isEvent && evRange.start) {
+      // A TIME POLL holds its FIRST option as the provisional time; the
+      // event-poll chooser (or the host) moves it once guests have voted.
+      const first = pollOn ? pollList[0] : null;
+      if (isEvent && (evRange.start || first)) {
         linkedEventId = await createEvent(user!.id, {
           ownerProfileId: actor.type === 'space' ? undefined : user!.id,
           ownerSpaceId: actor.type === 'space' ? actor.id : undefined,
@@ -1522,18 +1543,23 @@ export default function Compose() {
           location: effLocation,
           lat: locGeo?.lat ?? null,
           lng: locGeo?.lng ?? null,
-          startDate: evRange.start,
-          endDate: evRange.end ?? evRange.start,
+          startDate: first ? first.date : evRange.start!,
+          endDate: first ? first.date : (evRange.end ?? evRange.start!),
           allDay: evAllDay,
-          startMin: evStartMin, endMin: evEndMin,
+          startMin: first ? first.start : evStartMin, endMin: first ? first.end : evEndMin,
           timezone: evTz || null,
           zoomUnique: evZoom && zoomOk,
           shareLevel: evShare || null,
+          poll: pollOn ? {
+            deadline: pollDeadline ? new Date(pollDeadline).toISOString() : null,
+            waitAll: pollWaitAll, auto: pollAuto, rules: pollRules,
+          } : null,
           recurrence: null,
           // Members picked in the invite box are seated + belled the
           // standing way (event_attendees invited rows).
           inviteeIds: invitees.flatMap((i) => (i.kind === 'member' ? [i.id] : [])),
         });
+        if (pollOn && linkedEventId) await createPollOptions(linkedEventId, pollList, evAllDay);
       }
       let createdId: string | null = null;
       try {
@@ -2136,7 +2162,7 @@ export default function Compose() {
                 : evZoom && zoomOk ? 'Zoom' : location.trim();
               const photo = media.find((m) => m.type === 'photo')?.url ?? null;
               const photos = media.filter((m) => m.type === 'photo').map((m) => m.url);
-              const when = inviteWhen(evRange.start ?? '', evAllDay, evStartMin);
+              const when = inviteWhen(evRange.start ?? '', evAllDay, evStartMin, evTz);
               const sendTest = async () => {
                 setInvTest({ state: 'sending' });
                 const { data, error } = await supabase.functions.invoke('send-event-invite', {
@@ -2909,7 +2935,68 @@ export default function Compose() {
                     onChange={(z) => { evTzTouched.current = true; setEvTz(z); }} />
                 </div>
               )}
+              {!editing && (
+                <label className="cmp__evrow cmp__pollon">
+                  <input type="checkbox" checked={evPoll} onChange={(e) => {
+                    setEvPoll(e.target.checked);
+                    if (e.target.checked && pollOpts.length === 0) {
+                      const d = evRange.start ?? '';
+                      setPollOpts([{ date: d, start: evStartMin, end: evEndMin }, { date: '', start: evStartMin, end: evEndMin }]);
+                    }
+                  }} />
+                  <span><strong>Let guests vote on the time</strong> — offer a few times, everyone picks the ones that work, and the best one is chosen</span>
+                </label>
+              )}
+              {evPoll && !editing ? (
+                <div className="cmp__poll">
+                  {pollOpts.map((o, i) => (
+                    <div className="cmp__pollopt" key={i}>
+                      <input type="date" className="cmp__input cmp__polldate" value={o.date} aria-label={`Option ${i + 1} date`}
+                        onChange={(e) => setPollOpts((cur) => cur.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)))} />
+                      {!evAllDay && (<>
+                        <TimeField value={o.start} ariaLabel={`Option ${i + 1} start`}
+                          onChange={(m) => setPollOpts((cur) => cur.map((x, j) => (j === i ? { ...x, start: m, end: x.end <= m ? Math.min(m + 60, 1440) : x.end } : x)))} />
+                        <span className="cmp__to">to</span>
+                        <TimeField value={o.end} min={o.start} ariaLabel={`Option ${i + 1} end`}
+                          onChange={(m) => setPollOpts((cur) => cur.map((x, j) => (j === i ? { ...x, end: m } : x)))} />
+                      </>)}
+                      {pollOpts.length > 2 && (
+                        <button type="button" className="cmp__pollx" aria-label={`Remove option ${i + 1}`}
+                          onClick={() => setPollOpts((cur) => cur.filter((_, j) => j !== i))}>×</button>
+                      )}
+                    </div>
+                  ))}
+                  {pollOpts.length < 12 && (
+                    <button type="button" className="cmp__polladd" onClick={() => setPollOpts((cur) => {
+                      const last = cur[cur.length - 1];
+                      return [...cur, { date: '', start: last?.start ?? evStartMin, end: last?.end ?? evEndMin }];
+                    })}>⊕ Add a time</button>
+                  )}
+                  <span className="cmp__evcal-lab">Deadline for votes (optional)</span>
+                  <input type="datetime-local" className="cmp__input cmp__polldl" value={pollDeadline}
+                    onChange={(e) => setPollDeadline(e.target.value)} />
+                  <label className="cmp__evrow">
+                    <input type="checkbox" checked={pollWaitAll} onChange={(e) => setPollWaitAll(e.target.checked)} />
+                    Wait for every guest to reply{pollDeadline ? ' (or the deadline, whichever comes first)' : ''}
+                  </label>
+                  <span className="cmp__evcal-lab">When the time is chosen</span>
+                  <div className="cmp__evshare" role="radiogroup" aria-label="When the time is chosen">
+                    {([[false, 'Ask me to confirm'], [true, 'Book it automatically']] as const).map(([v, label]) => (
+                      <button key={String(v)} type="button" role="radio" aria-checked={pollAuto === v}
+                        className={'cmp__evshare-pill' + (pollAuto === v ? ' is-on' : '')} onClick={() => setPollAuto(v)}>{label}</button>
+                    ))}
+                  </div>
+                  <span className="cmp__evcal-lab">Rules for choosing (optional)</span>
+                  <textarea className="cmp__input cmp__pollrules" rows={2} maxLength={500} value={pollRules}
+                    placeholder="e.g. Mom has to be there · only weekends · when the barn is free"
+                    onChange={(e) => setPollRules(e.target.value)} />
+                  <p className="cmp__hint-ev">
+                    Guests who haven&rsquo;t answered get one automatic reminder. The time that works for the most people wins — your rules come first — and everyone hears the final time{pollAuto ? ' the moment it’s booked' : ' once you confirm'}.
+                  </p>
+                </div>
+              ) : (
               <DateRangeCalendar value={evRange} onChange={setEvRange} />
+              )}
               <div className="cmp__evcal">
                 {!editing && actor.type !== 'space' && (
                   <label className="cmp__evrow">

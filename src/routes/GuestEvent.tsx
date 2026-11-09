@@ -12,6 +12,8 @@ import AddToCal from '../components/AddToCal';
 import { zoneAbbr } from '../lib/bookingApi';
 import { InviteCard, InviteEnvelope, InviteBackdropLayer } from '../components/InviteCard';
 import { readInvite, resolveInvite, formAsks } from '../lib/inviteDesign';
+import { guestPoll, guestPollVote, type GuestPollRow } from '../lib/pollApi';
+import { pollOptionLabel } from '../components/EventPoll';
 import './GuestEvent.css';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -58,6 +60,10 @@ export default function GuestEvent() {
   const [xErr, setXErr] = useState('');
   const [notes, setNotes] = useState<{ body: string; author_name: string; created_at: string }[]>([]);
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
+  // TIME POLL (2026-11-09): a guest checks every time that works.
+  const [poll, setPoll] = useState<GuestPollRow[]>([]);
+  const [pollPick, setPollPick] = useState<Set<string>>(new Set());
+  const [pollSaved, setPollSaved] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   useEffect(() => {
     let live = true;
@@ -72,6 +78,12 @@ export default function GuestEvent() {
         void markGuestOpened(token);
         void loadGuestMessages(token).then((m) => { if (live) setNotes(m); });
         void loadGuestMeetingUrl(token).then((u) => { if (live) setZoomUrl(u); });
+        void guestPoll(token).then((rows) => {
+          if (!live) return;
+          setPoll(rows);
+          setPollPick(new Set(rows.filter((r) => r.picked).map((r) => r.option_id)));
+          if (rows[0]?.voted) setPollSaved('saved');
+        });
         return;
       }
       const o = await loadOpenEvent(token);
@@ -204,6 +216,29 @@ export default function GuestEvent() {
           <div className="gev__cal">
             {cal && <AddToCal ev={cal} file={`${ev.title}.ics`} />}
           </div>
+        </div>
+      )}
+
+      {info && !requested && poll.length > 0 && poll[0].poll_status === 'open' && (
+        <div className="gev__section gev__poll">
+          <p className="gev__label">Which times work for you?</p>
+          <p className="gev__muted">Check every time you can make it — {info.host_name} will set the one that works best{poll[0].poll_deadline ? ` after ${new Date(poll[0].poll_deadline).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}.</p>
+          <div className="gev__pollopts">
+            {poll.map((o) => (
+              <label key={o.option_id} className={'gev__pollopt' + (pollPick.has(o.option_id) ? ' is-on' : '')}>
+                <input type="checkbox" checked={pollPick.has(o.option_id)} onChange={() => {
+                  setPollSaved('idle');
+                  setPollPick((cur) => { const n = new Set(cur); if (n.has(o.option_id)) n.delete(o.option_id); else n.add(o.option_id); return n; });
+                }} />
+                <span>{pollOptionLabel(o, info.event_tz)}</span>
+              </label>
+            ))}
+          </div>
+          <button className="btn btn-primary gev__btn" disabled={pollSaved === 'saving'} onClick={async () => {
+            setPollSaved('saving');
+            try { await guestPollVote(token, [...pollPick]); setPollSaved('saved'); } catch { setPollSaved('error'); }
+          }}>{pollSaved === 'saving' ? 'Saving…' : pollSaved === 'saved' ? 'Your times are in ✓' : pollPick.size ? 'Save my times' : 'None of these work'}</button>
+          {pollSaved === 'error' && <p className="gev__muted">That didn&rsquo;t save — try again in a moment.</p>}
         </div>
       )}
 

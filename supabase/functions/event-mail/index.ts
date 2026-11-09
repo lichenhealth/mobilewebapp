@@ -29,26 +29,43 @@ Deno.serve(async (req) => {
   let body: { kind?: string; guest_id?: string };
   try { body = await req.json(); } catch { return json({ error: 'Invalid body' }, 400); }
   const { kind, guest_id } = body;
-  if (!guest_id || (kind !== 'invite' && kind !== 'reminder')) return json({ error: 'Bad request' }, 400);
+  if (!guest_id || !['invite', 'reminder', 'decided', 'poll_reminder'].includes(kind ?? '')) return json({ error: 'Bad request' }, 400);
 
   const gs = await (await sb(`event_guests?id=eq.${guest_id}&select=id,event_id,name,email,token,status`)).json();
   const g = Array.isArray(gs) ? gs[0] : null;
   if (!g?.email?.trim()) return json({ ok: true, skipped: 'no_email' });
   if (kind === 'reminder' && !['going', 'tentative'].includes(g.status)) return json({ ok: true, skipped: 'status' });
-  if (kind === 'invite' && !['invited', 'going', 'tentative'].includes(g.status)) return json({ ok: true, skipped: 'status' });
+  if (kind !== 'reminder' && !['invited', 'going', 'tentative'].includes(g.status)) return json({ ok: true, skipped: 'status' });
 
-  const evs = await (await sb(`events?id=eq.${g.event_id}&select=id,creator_id,title,location,start_date,end_date,all_day,start_min,timezone`)).json();
+  const evs = await (await sb(`events?id=eq.${g.event_id}&select=id,creator_id,title,location,start_date,end_date,all_day,start_min,timezone,poll_status`)).json();
   const ev = Array.isArray(evs) ? evs[0] : null;
   if (!ev) return json({ ok: true, skipped: 'no_event' });
 
   const hostName = await hostLine(sb, ev.id, ev.creator_id);
   const look = await eventLook(sb, ev.id);
   const link = `${APP_URL}/e/${g.token}`;
-  const when = whenLabel(ev);
+  const when = ev.poll_status === 'open' && kind === 'invite' ? 'Help choose the time — pick every time that works' : whenLabel(ev);
   const where = (ev.location || '').trim();
 
   let subject: string, text: string, html: string;
-  if (kind === 'invite') {
+  if (kind === 'poll_reminder') {
+    // TIME POLL: a gentle nudge to a guest who hasn't picked times yet.
+    subject = `Which times work for ${ev.title}?`;
+    text = `${hostName} is choosing a time for "${ev.title}" and hasn't heard from you yet.\n\nPick every time you can make — it takes a few seconds, no account needed:\n${link}\n\n— Lichen`;
+    html = inviteCardHtml(look.design, {
+      title: ev.title, when: 'Help choose the time', where, hostName, link, photo: look.photo,
+      eyebrow: 'Which times work?', cta: 'Pick your times',
+      fine: `${hostName} will set the time once everyone's answered. No account needed.`,
+    });
+  } else if (kind === 'decided') {
+    subject = `${ev.title} is set for ${when}`;
+    text = `The time is set: "${ev.title}" — ${when}${where ? ` · ${where}` : ''}.\n\nAdd it to your calendar or change your RSVP:\n${link}\n\n— Lichen`;
+    html = inviteCardHtml(look.design, {
+      title: ev.title, when, where, hostName, link, photo: look.photo,
+      eyebrow: 'The time is set', cta: 'Add it to your calendar',
+      fine: `Thanks for voting — this is the time that worked best. Change your RSVP any time from your invitation.`,
+    });
+  } else if (kind === 'invite') {
     subject = `${hostName} invited you to ${ev.title}`;
     text = `${hostName} invited you to "${ev.title}" on Lichen.\n\nWhen: ${when}${where ? `\nWhere: ${where}` : ''}\n\nSee the details, add it to your calendar, or RSVP — no account needed:\n${link}\n\n— Lichen`;
     html = inviteCardHtml(look.design, {

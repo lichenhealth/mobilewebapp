@@ -523,3 +523,13 @@
 
 /* Event builder's manual | AI switch (2026-11-09) */
 .cmp__moderow { display: flex; justify-content: center; margin: 0 0 var(--s-4); }
+
+/* Time poll in the event builder (2026-11-09) */
+.cmp__pollon { align-items: flex-start; }
+.cmp__poll { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-3); border: 1px dashed var(--peach); border-radius: var(--r-md); background: #fff; }
+.cmp__pollopt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cmp__polldate { width: 9.2rem; flex: 0 0 auto; padding-inline: 10px; }
+.cmp__pollx { border: 0; background: none; color: var(--peach-deep); font-size: 18px; cursor: pointer; padding: 0 4px; }
+.cmp__polladd { align-self: flex-start; border: 0; background: none; color: var(--peach-deep); font: inherit; font-size: 13px; cursor: pointer; padding: 4px 0; }
+.cmp__polldl { width: auto; }
+.cmp__pollrules { width: 100%; resize: vertical; }
