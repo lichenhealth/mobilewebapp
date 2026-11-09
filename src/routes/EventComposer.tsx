@@ -70,6 +70,8 @@ export default function EventComposer() {
   // Coordinates from a picked LocationField suggestion (null = text-only).
   const [locGeo, setLocGeo] = useState<GeoPoint | null>(null);
   const [description, setDescription] = useState('');
+  // Who sees it on your calendar (2026-11-09) — the same cap Events carry.
+  const [shareLevel, setShareLevel] = useState<'' | 'busy' | 'hidden'>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -298,6 +300,7 @@ export default function EventComposer() {
       setLocation(ev.location);
       setLocGeo(ev.lat != null && ev.lng != null ? { lat: ev.lat, lng: ev.lng } : null);
       setDescription(ev.description);
+      setShareLevel(ev.share_level ?? '');
       setInvitees((ev.attendees ?? []).map((a) => ({ id: a.profile_id, full_name: a.profile?.full_name ?? null })));
     })();
   }, [eventId]);
@@ -380,6 +383,7 @@ export default function EventComposer() {
         startMin, endMin,
         recurrence,
         inviteeIds: invitees.map((i) => i.id),
+        shareLevel: calendar === 'me' ? (shareLevel || null) : null,
       };
       if (eventId) await updateEvent(me, eventId, input);
       else await createEvent(me, input);
@@ -875,6 +879,17 @@ export default function EventComposer() {
           <span className="cedit__label">Notes</span>
           <textarea className="cedit__textarea" rows={3} placeholder="Details (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
+        {calendar === 'me' && (
+          <div className="cedit__field">
+            <span className="cedit__label">On my calendar, other members see</span>
+            <div className="cmp__evshare" role="radiogroup" aria-label="Who sees this on your calendar">
+              {([['', 'What my calendar sharing allows'], ['busy', 'Only that I\u2019m busy'], ['hidden', 'Nothing']] as const).map(([v, label]) => (
+                <button key={v || 'rules'} type="button" role="radio" aria-checked={shareLevel === v}
+                  className={'cmp__evshare-pill' + (shareLevel === v ? ' is-on' : '')} onClick={() => setShareLevel(v)}>{label}</button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Right column (desktop): time controls + live invite preview */}

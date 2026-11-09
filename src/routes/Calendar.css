@@ -799,3 +799,6 @@
 .cset__rulewrap { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
 .cset__ruleinput { width: 64px; padding: 6px 8px; font-size: 12px; }
 .cset__ruleunit { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
+
+/* A draft event's time-hold (2026-11-09) — dashed, it isn't real yet. */
+.calp__draft { border-style: dashed !important; opacity: 0.85; }

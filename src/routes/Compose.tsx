@@ -21,7 +21,7 @@ import {
   SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
 } from '../lib/postsApi';
-import { createEvent, deleteEvent, updateEventDetails, myTimezone } from '../lib/calendarApi';
+import { createEvent, deleteEvent, updateEventDetails, myTimezone, syncDraftHold } from '../lib/calendarApi';
 import TimeZonePick from '../components/TimeZonePick';
 import { allTimeZones, viewerZone, zoomMintAllowed } from '../lib/bookingApi';
 import { slugify } from '../lib/bookingApi';
@@ -215,6 +215,11 @@ export default function Compose() {
   // A UNIQUE ZOOM ROOM PER EVENT (founder 2026-11-09): Lichen's Zoom mints the
   // meeting; only hosts and guests ever see the link. Gated like bookings.
   const [evZoom, setEvZoom] = useState(false);
+  // DRAFTS HOLD YOUR TIME + WHO SEES IT ON YOUR CALENDAR (founder 2026-11-09).
+  // evHold (default on): a draft event with a date holds that time on the
+  // member's Lichen calendar. evShare: the event's cap over calendar sharing.
+  const [evHold, setEvHold] = useState(true);
+  const [evShare, setEvShare] = useState<'' | 'busy' | 'hidden'>('');
   const [zoomOk, setZoomOk] = useState(false);
   useEffect(() => { void zoomMintAllowed(user?.id).then(setZoomOk); }, [user?.id]);
   const [studioOpen, setStudioOpen] = useState(false);
@@ -738,7 +743,7 @@ export default function Compose() {
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
       condition: [...condition], availFrom, availTo, fulfillment: [...fulfillment],
-      deliverRadius, paymentPlan, currentcyOnly, catTags, inviteDesign, invSendAt, evTz, evZoom,
+      deliverRadius, paymentPlan, currentcyOnly, catTags, inviteDesign, invSendAt, evTz, evZoom, evHold, evShare,
       travelKind, routeFrom, routeTo, vehicle, seats, sleeps,
       evRange, evAllDay, evStartMin, evEndMin, bookingUrl,
       sliding, slideLow, slideHigh, unitSel, unitQty, unitText,
@@ -762,6 +767,15 @@ export default function Compose() {
       await savePostDraft(draftIdRef.current, user.id, draftSnapshot());
       hadDraft.current = true;
       setDraftSavedAt(Date.now());
+      // The draft's time-hold rides the same save (a personal event only —
+      // a space's calendar isn't the member's to block).
+      const holdOn = areas.has('events') && evHold && !!evRange.start && actor.type !== 'space';
+      await syncDraftHold(user.id, draftIdRef.current, holdOn ? {
+        title: title.trim() || body.trim().slice(0, 60) || 'Event',
+        startDate: evRange.start!, endDate: evRange.end ?? evRange.start!,
+        allDay: evAllDay, startMin: evStartMin, endMin: evEndMin,
+        timezone: evTz || null, location: location.trim(), shareLevel: evShare || null,
+      } : null).catch((e) => console.error('draft hold:', e));
     } catch (e) { console.error('post draft:', e); }
   }
   const writeDraftRef = useRef<() => void>(() => {});
@@ -800,6 +814,8 @@ export default function Compose() {
       if (typeof d.invSendAt === 'string') setInvSendAt(d.invSendAt);
       if (typeof d.evTz === 'string' && d.evTz) { evTzTouched.current = true; setEvTz(d.evTz); }
       if (d.evZoom === true) { setEvZoom(true); setOnline(true); }
+      if (d.evHold === false) setEvHold(false);
+      if (d.evShare === 'busy' || d.evShare === 'hidden') setEvShare(d.evShare);
       if (Array.isArray(d.catTags)) setCatTags(d.catTags);
       s(d.travelKind, setTravelKind); s(d.routeFrom, setRouteFrom); s(d.routeTo, setRouteTo);
       s(d.vehicle, setVehicle); s(d.seats, setSeats); s(d.sleeps, setSleeps);
@@ -902,6 +918,7 @@ export default function Compose() {
         if (ev.end_min != null) setEvEndMin(ev.end_min);
         if (ev.timezone) { evTzTouched.current = true; setEvTz(ev.timezone); }
         if (ev.zoom_unique) { setEvZoom(true); setOnline(true); }
+        if (ev.share_level === 'busy' || ev.share_level === 'hidden') setEvShare(ev.share_level);
       }
       const d = p.details ?? {};
       setAiReadable(!d.aiExcluded);
@@ -1428,6 +1445,7 @@ export default function Compose() {
             // Only a known provider answer may change the room — never a
             // still-loading gate silently switching an existing meeting off.
             zoomUnique: zoomOk ? evZoom : undefined,
+            shareLevel: evShare || null,
           };
           if (linkedEventId) {
             await updateEventDetails(linkedEventId, evFields);
@@ -1473,6 +1491,7 @@ export default function Compose() {
           startMin: evStartMin, endMin: evEndMin,
           timezone: evTz || null,
           zoomUnique: evZoom && zoomOk,
+          shareLevel: evShare || null,
           recurrence: null,
           // Members picked in the invite box are seated + belled the
           // standing way (event_attendees invited rows).
@@ -2835,6 +2854,29 @@ export default function Compose() {
                 </div>
               )}
               <DateRangeCalendar value={evRange} onChange={setEvRange} />
+              <div className="cmp__evcal">
+                {!editing && actor.type !== 'space' && (
+                  <label className="cmp__evrow">
+                    <input type="checkbox" checked={evHold} onChange={(e) => setEvHold(e.target.checked)} />
+                    Hold this time on my Lichen calendar while it&rsquo;s a draft
+                  </label>
+                )}
+                <span className="cmp__evcal-lab">On my calendar, other members see</span>
+                <div className="cmp__evshare" role="radiogroup" aria-label="Who sees this on your calendar">
+                  {([['', 'What my calendar sharing allows'], ['busy', 'Only that I\u2019m busy'], ['hidden', 'Nothing']] as const).map(([v, label]) => (
+                    <button key={v || 'rules'} type="button" role="radio" aria-checked={evShare === v}
+                      className={'cmp__evshare-pill' + (evShare === v ? ' is-on' : '')} onClick={() => setEvShare(v)}>{label}</button>
+                  ))}
+                </div>
+                <p className="cmp__hint-ev">
+                  {evShare === 'hidden'
+                    ? 'Hidden from every calendar but yours — your bookable time still stays blocked.'
+                    : evShare === 'busy'
+                      ? 'Anyone who can see your calendar sees a busy block, never the details.'
+                      : 'Your calendar sharing decides who sees the details, who sees busy, and who sees nothing.'}
+                  {' '}A draft only ever shows as busy. Guests can add it to Google, Apple or Outlook from the event page.
+                </p>
+              </div>
               <p className="cmp__hint-ev">Booking a free or trade event RSVPs through Lichen and lands it on people's calendars. Paid events send people to your booking link.</p>
 
             </>

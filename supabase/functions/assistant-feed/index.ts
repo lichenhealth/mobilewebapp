@@ -713,6 +713,18 @@ Deno.serve(async (req) => {
   const { feed_post_id, profile_id } = body;
   if (!feed_post_id || !profile_id) return json({ error: 'Missing fields' }, 400);
 
+  // ONE REPLY PER MESSAGE (2026-11-09): claim the triggering row first; a
+  // second invocation for the same message stands down (it used to answer
+  // twice and run every tool twice — three Mom Birthday Zoom drafts).
+  const claim = await sb('assistant_reply_claims?on_conflict=feed_post_id', {
+    method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+    body: JSON.stringify({ feed_post_id }),
+  });
+  if (claim.ok) {
+    const got = await claim.json().catch(() => []);
+    if (Array.isArray(got) && got.length === 0) return json({ ok: true, skipped: 'already-claimed' });
+  }
+
   // One assistant identity exists today (Claude) — no per-entity fabric yet.
   const idents = await (await sb(`assistant_identities?active=eq.true&select=profile_id,label,persona&limit=1`)).json();
   const ident = Array.isArray(idents) ? idents[0] : null;
@@ -2652,11 +2664,36 @@ Deno.serve(async (req) => {
         ...(price ? { price } : {}),
         media: [],
       };
-      const draftId = crypto.randomUUID();
-      const r = await sb('post_drafts', {
-        method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ id: draftId, profile_id, draft }),
-      });
+      // ONE DRAFT PER EVENT NAME (2026-11-09): an existing draft of theirs
+      // with this title is UPDATED — only the fields this call actually
+      // carries replace what's there, so a design they already edited in the
+      // composer survives a follow-up ask. Never a second copy.
+      const existingRes = await sb(`post_drafts?profile_id=eq.${profile_id}&draft->>title=ilike.${encodeURIComponent(title)}&select=id,draft&order=updated_at.desc&limit=1`);
+      const existing = existingRes.ok ? (await existingRes.json())[0] : null;
+      let draftId: string;
+      let r: Response;
+      let updatedExisting = false;
+      if (existing?.id) {
+        const prev = (existing.draft ?? {}) as Record<string, unknown>;
+        const filled = (v: unknown) => !(v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0));
+        const merged: Record<string, unknown> = { ...prev };
+        for (const [k, v] of Object.entries(draft as Record<string, unknown>)) {
+          if (k === 'inviteDesign' && v && typeof v === 'object') merged[k] = { ...((prev[k] as object) ?? {}), ...(v as object) };
+          else if (filled(v)) merged[k] = v;
+        }
+        draftId = existing.id;
+        updatedExisting = true;
+        r = await sb(`post_drafts?id=eq.${draftId}&profile_id=eq.${profile_id}`, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ draft: merged, updated_at: new Date().toISOString() }),
+        });
+      } else {
+        draftId = crypto.randomUUID();
+        r = await sb('post_drafts', {
+          method: 'POST', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ id: draftId, profile_id, draft }),
+        });
+      }
       if (!r.ok) return { ok: false, error: `The draft would not save: ${(await r.text()).slice(0, 140)}` };
       postDraftDoors.push({ id: draftId, title });
       return {
@@ -2791,7 +2828,7 @@ Deno.serve(async (req) => {
       }
       return {
         ok: true,
-        change: `drafted the event "${title}"${date ? ` on ${date}` : ' (no date yet)'}${startMin != null ? ` at minute ${startMin}` : ''}, ${invitees.length} guest${invitees.length === 1 ? '' : 's'} ready, visible to ${vis}${listLine}`,
+        change: `${updatedExisting ? 'UPDATED their existing draft' : 'drafted the event'} "${title}"${date ? ` on ${date}` : ' (no date yet)'}${startMin != null ? ` at minute ${startMin}` : ''}, ${invitees.length} guest${invitees.length === 1 ? '' : 's'} ready, visible to ${vis}${listLine}`,
         ...(unplaced.length ? { unplaced: `couldn't place: ${unplaced.join(', ')} — ask for an email or phone` } : {}),
         ...(notes.length ? { notes } : {}),
         note: 'A "Review & post" button rides under this reply and the draft waits in Drive → Drafts. Nothing is sent and nobody is invited until THEY tap Post. Photos/slides are added in the composer. A unique Zoom room (unique_zoom) is made when THEY post, and only hosts and guests see its link. RSVP questions, plus-ones, meal choices, registry links, backdrop and time zone, when passed, are in the design already — they can change any of it with Edit design before posting.',

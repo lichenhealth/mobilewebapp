@@ -582,6 +582,7 @@ export default function Calendar() {
     ev.tint ?? (ev.owner_space_id ? colorFor(ev.owner_space_id) : null);
   const blockClass = (ev: EventRow, base: string) => {
     if (ev.external) return `${base} ${base}--external`;
+    if (ev.is_draft) return `${base} ${base}--pending calp__draft`;
     const st = ev.creator_id !== me ? myAttend(ev)?.status : undefined;
     return base + (st === 'invited' || st === 'tentative' ? ` ${base}--pending` : st === 'declined' ? ` ${base}--declined` : '');
   };
@@ -1024,7 +1025,7 @@ export default function Calendar() {
                   );
                 })}
                 {allDayOn(iso).map((e) => (
-                  <button className={blockClass(e, 'calp__chip')} key={e.id} onClick={() => setSelected(e)}>{e.title}</button>
+                  <button className={blockClass(e, 'calp__chip')} key={e.id} onClick={() => setSelected(e)}>{e.is_draft ? "Draft · " : ""}{e.title}</button>
                 ))}
               </div>
             ))}
@@ -1099,7 +1100,7 @@ export default function Calendar() {
                         <span className="calp__sched-when">
                           {e.all_day ? 'All day' : `${minToLabel(e.start_min ?? 0)} – ${minToLabel(e.end_min ?? e.start_min ?? 0)}`}
                         </span>
-                        <span className="calp__sched-title">{e.title}</span>
+                        <span className="calp__sched-title">{e.is_draft ? "Draft · " : ""}{e.title}</span>
                       </button>
                     );
                   })}
@@ -1232,7 +1233,7 @@ export default function Calendar() {
                         }}
                         onClick={(ev) => { ev.stopPropagation(); setSelected(e); }}
                       >
-                        {e.title}
+                        {e.is_draft ? "Draft · " : ""}{e.title}
                       </button>
                     );
                   }); })()}
@@ -1257,6 +1258,16 @@ export default function Calendar() {
               {selected.all_day && ' · All day'}
               {selected.recurrence && ` · ${recurrenceLabel(selected.recurrence, selected.start_date)}`}
             </p>
+            {selected.is_draft && (
+              <>
+                <p className="calp__sheet-ext">A draft event, holding this time on your calendar. Others see at most that you&rsquo;re busy. It turns into the real event when you post it.</p>
+                {selected.draft_id && (
+                  <button className="calp__sheet-extlink" onClick={() => navigate(`/compose?draft=${selected.draft_id}`)}>
+                    <Icon name="arrow-right" size={13} /> Open the draft
+                  </button>
+                )}
+              </>
+            )}
             {selected.carePlan && (
               <>
                 <p className="calp__sheet-ext">From your care plan.</p>
@@ -1365,7 +1376,7 @@ export default function Calendar() {
                   </button>
                 </>
               )}
-              {selected.creator_id === me && (
+              {selected.creator_id === me && !selected.is_draft && (
                 <>
                   <button className="btn btn-primary calp__sheet-btn" onClick={() => navigate(`/calendar/edit/${selected.id}`)}>Edit</button>
                   <button className="btn calp__sheet-btn calp__sheet-btn--del" onClick={() => onDelete(selected)}>Delete</button>
