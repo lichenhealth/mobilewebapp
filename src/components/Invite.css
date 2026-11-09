@@ -62,7 +62,7 @@
 .invenv__card-title { font-family: var(--invc-font); font-size: 20px; margin-top: 6px; padding: 0 10px; line-height: 1.15; }
 .invenv__front {
   inset: 0; z-index: 2; background: var(--env); border-radius: 6px;
-  clip-path: polygon(0 32%, 50% 68%, 100% 32%, 100% 100%, 0 100%);
+  clip-path: polygon(0 0, 50% 64%, 100% 0, 100% 100%, 0 100%);
 }
 .invenv__flap {
   left: 0; right: 0; top: 0; height: 64%; z-index: 3;
@@ -217,10 +217,15 @@
 .invenv__addr-title { font-family: var(--invc-font); font-size: 24px; line-height: 1.15; color: var(--invc-ink); text-align: center; }
 .invenv__stamp { position: absolute; top: 12px; right: 14px; width: 30px; height: 36px; border: 1px dashed var(--invc-accent); border-radius: 3px; display: grid; place-items: center; color: var(--invc-accent); font-size: 14px; }
 .invenv:not(.is-front) .invenv__addr { transform: rotateY(180deg); opacity: 0; pointer-events: none; }
-.invenv.is-front .invenv__back, .invenv.is-front .invenv__front, .invenv.is-front .invenv__flap { opacity: 0; }
-.invenv.is-flipping .invenv__back, .invenv.is-flipping .invenv__front, .invenv.is-flipping .invenv__flap { animation: invenv-turnin 0.9s ease both; }
+.invenv.is-front .invenv__back, .invenv.is-front .invenv__front, .invenv.is-front .invenv__flap, .invenv.is-front .invenv__seams { opacity: 0; }
+.invenv.is-flipping .invenv__back, .invenv.is-flipping .invenv__front, .invenv.is-flipping .invenv__flap, .invenv.is-flipping .invenv__seams { animation: invenv-turnin 0.9s ease both; }
 @keyframes invenv-turnin { 0% { opacity: 0; transform: rotateY(-90deg); } 50% { opacity: 0; } 100% { opacity: 1; transform: none; } }
-.invenv__card-photo { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+.invenv__card-photo { width: 100%; height: 64%; object-fit: cover; border-radius: 4px 4px 0 0; flex-shrink: 0; display: block; }
+/* A card with a photo is a CARD with its words beneath (founder 2026-11-09:
+   "the text under the photo, just like you would on a real card that you're
+   pulling out") — the same anatomy as the full-size front that follows. */
+.invenv__card-words { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 10px 0; }
+.invenv__card-words .invenv__card-title { font-size: 17px; margin-top: 2px; }
 .invenv__card:has(.invenv__card-photo) { padding: 0; overflow: hidden; }
 
 /* (3) The card's front, full size — then it turns open to the inside. */
@@ -260,3 +265,17 @@ button.invc__cta { border: 0; cursor: pointer; font: inherit; }
 /* The mark-up pen rides above the full-screen preview. */
 .invpv__pen .grabpen__fab { z-index: 1300; }
 .invpv__pen .grabpen__overlay { z-index: 1310; }
+/* The card's drop-downs. */
+.invc__dd { position: relative; }
+.invc__caret { margin-left: 6px; font-size: 11px; opacity: 0.8; }
+.invc__menu { position: absolute; z-index: 20; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); min-width: 170px;
+  background: #fff; border-radius: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.05); padding: 6px; display: flex; flex-direction: column; text-align: left; }
+.invc__menuitem { display: block; padding: 9px 12px; border-radius: 8px; border: 0; background: none; font: inherit; font-size: 15px; color: var(--ink, #222); text-decoration: none; cursor: pointer; text-align: left; white-space: nowrap; }
+.invc__menuitem:hover { background: color-mix(in srgb, var(--invc-accent) 10%, transparent); }
+.invc__menuitem.is-on { color: var(--invc-accent); font-weight: 600; }
+
+/* Closed means closed (founder 2026-11-09: "it looks like this is a cut out,
+   not the card going all the way to the seam"): the pocket is the whole
+   envelope but the flap's own opening, so the card sits right up to the seam
+   and only shows once the flap lifts. Faint folds from the bottom corners. */
+.invenv__seams { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
