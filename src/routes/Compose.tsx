@@ -24,7 +24,7 @@ import {
   SERVICE_AREAS, EVENT_CATEGORIES, EVENT_MODES,
   type ContentType, type ServiceArea, type EventCategory, type EventMode,
 } from '../lib/postsApi';
-import { createEvent, deleteEvent, updateEventDetails, myTimezone, syncDraftHold } from '../lib/calendarApi';
+import { createEvent, deleteEvent, updateEventDetails, myTimezone, syncDraftHold, loadDraftMeetingUrl, carryDraftZoom } from '../lib/calendarApi';
 import TimeZonePick from '../components/TimeZonePick';
 import { allTimeZones, viewerZone, zoomMintAllowed, zoneAbbr } from '../lib/bookingApi';
 import { slugify } from '../lib/bookingApi';
@@ -235,6 +235,17 @@ export default function Compose() {
   useEffect(() => { void zoomMintAllowed(user?.id).then(setZoomOk); }, [user?.id]);
   const [studioOpen, setStudioOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  // THE DRAFT'S OWN ZOOM ROOM (founder 2026-11-09): the hold mints it; the
+  // Preview's Join door opens it, and Post carries the same room over.
+  const [draftZoomUrl, setDraftZoomUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!previewOpen) return;
+    let live = true;
+    const read = () => loadDraftMeetingUrl(draftIdRef.current).then((u) => { if (live) setDraftZoomUrl(u); }).catch(() => {});
+    void read();
+    const t = window.setInterval(read, 4000);
+    return () => { live = false; window.clearInterval(t); };
+  }, [previewOpen]);
   // Category tags — the real 63-category taxonomy, loaded when opened.
   const [tagsOpen, setTagsOpen] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
@@ -785,7 +796,8 @@ export default function Compose() {
         title: title.trim() || body.trim().slice(0, 60) || 'Event',
         startDate: evRange.start!, endDate: evRange.end ?? evRange.start!,
         allDay: evAllDay, startMin: evStartMin, endMin: evEndMin,
-        timezone: evTz || null, location: location.trim(), shareLevel: evShare || null,
+        timezone: evTz || null, location: (evZoom && zoomOk) ? 'Zoom' : location.trim(), shareLevel: evShare || null,
+        zoomUnique: evZoom && zoomOk,
       } : null).catch((e) => console.error('draft hold:', e));
     } catch (e) { console.error('post draft:', e); }
   }
@@ -1548,7 +1560,9 @@ export default function Compose() {
           allDay: evAllDay,
           startMin: first ? first.start : evStartMin, endMin: first ? first.end : evEndMin,
           timezone: evTz || null,
-          zoomUnique: evZoom && zoomOk,
+          // Zoom switches on AFTER the draft's room has moved over (carryDraftZoom
+          // below) — creating with it on would race a second room into being.
+          zoomUnique: false,
           shareLevel: evShare || null,
           poll: pollOn ? {
             deadline: pollDeadline ? new Date(pollDeadline).toISOString() : null,
@@ -1560,6 +1574,9 @@ export default function Compose() {
           inviteeIds: invitees.flatMap((i) => (i.kind === 'member' ? [i.id] : [])),
         });
         if (pollOn && linkedEventId) await createPollOptions(linkedEventId, pollList, evAllDay);
+        if (linkedEventId && evZoom && zoomOk) {
+          await carryDraftZoom(draftIdRef.current, linkedEventId).catch((e) => console.error('zoom carry:', e));
+        }
       }
       let createdId: string | null = null;
       try {
@@ -2201,8 +2218,14 @@ export default function Compose() {
                   )}
                   {previewOpen && (
                     <InvitePreview design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos }}
-                      joinUrl={online && /^https:\/\//i.test(meetingUrl.trim()) ? meetingUrl.trim() : null}
+                      joinUrl={online && /^https:\/\//i.test(meetingUrl.trim()) ? meetingUrl.trim() : draftZoomUrl}
                       uploaderId={user?.id}
+                      cal={evRange.start ? {
+                        title: evTitle, location: where || undefined,
+                        start_date: evRange.start, end_date: evRange.end ?? evRange.start, all_day: evAllDay,
+                        start_min: evAllDay ? null : evStartMin ?? null, end_min: evAllDay ? null : evEndMin ?? null,
+                        tz: evTz || null,
+                      } : null}
                       onClose={() => setPreviewOpen(false)} />
                   )}
                   {!editing && invitees.some((i) => i.kind === 'email') && (

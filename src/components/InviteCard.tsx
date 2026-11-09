@@ -1,4 +1,5 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { googleCalUrl, icsDataUri, outlookCalUrl, office365CalUrl, type EventForCal } from '../lib/ics';
 import { LichenMark } from './LichenMark';
 import { Icon } from './Icon';
 import { videoServiceOf } from '../lib/linkify';
@@ -31,7 +32,64 @@ export function videoWhere(where?: string): string | null {
   return m ? (m[1].toLowerCase() === 'meet' ? 'Google Meet' : m[1].replace(/\b\w/g, (c) => c.toUpperCase())) : null;
 }
 
-export function InviteCard({ design, facts, cta, footer, onRsvp, onCal, rsvpLabel, joinUrl, onJoin }: {
+export interface RsvpChoice { key: string; label: string; on?: boolean }
+
+/** THE CARD'S TWO DROP-DOWNS (founder 2026-11-09: "Can we just have RSVP and
+ *  Add to cal be drop downs with the RSVP options and cal add options? this
+ *  feels redundant"): the answer and the calendar live on the card itself. */
+function CardDoors({ label, rsvp, onPick, onRsvp, cal }: {
+  label: string;
+  rsvp?: RsvpChoice[];
+  onPick?: (key: string) => void;
+  onRsvp?: () => void;
+  cal?: EventForCal | null;
+}) {
+  const [open, setOpen] = useState<'' | 'rsvp' | 'cal'>('');
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const off = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(''); };
+    document.addEventListener('mousedown', off);
+    return () => document.removeEventListener('mousedown', off);
+  }, [open]);
+  const chosen = rsvp?.find((c) => c.on);
+  return (
+    <div className="invc__actions" ref={ref}>
+      <div className="invc__dd">
+        <button type="button" className="invc__cta" aria-expanded={open === 'rsvp'}
+          onClick={() => (rsvp ? setOpen(open === 'rsvp' ? '' : 'rsvp') : onRsvp?.())}>
+          {chosen ? `${chosen.label} ✓` : label}{rsvp && <span className="invc__caret" aria-hidden="true">▾</span>}
+        </button>
+        {open === 'rsvp' && rsvp && (
+          <div className="invc__menu" role="menu">
+            {rsvp.map((c) => (
+              <button key={c.key} type="button" role="menuitem" className={'invc__menuitem' + (c.on ? ' is-on' : '')}
+                onClick={() => { onPick?.(c.key); setOpen(''); }}>{c.label}{c.on ? ' ✓' : ''}</button>
+            ))}
+          </div>
+        )}
+      </div>
+      {cal && (
+        <div className="invc__dd">
+          <button type="button" className="invc__cta invc__cta--ghost" aria-expanded={open === 'cal'}
+            onClick={() => setOpen(open === 'cal' ? '' : 'cal')}>
+            Add to cal<span className="invc__caret" aria-hidden="true">▾</span>
+          </button>
+          {open === 'cal' && (
+            <div className="invc__menu" role="menu">
+              <a role="menuitem" className="invc__menuitem" href={googleCalUrl(cal)} target="_blank" rel="noopener noreferrer" onClick={() => setOpen('')}>Google</a>
+              <a role="menuitem" className="invc__menuitem" href={icsDataUri(cal)} download={`${cal.title}.ics`} onClick={() => setOpen('')}>Apple</a>
+              <a role="menuitem" className="invc__menuitem" href={outlookCalUrl(cal)} target="_blank" rel="noopener noreferrer" onClick={() => setOpen('')}>Outlook</a>
+              <a role="menuitem" className="invc__menuitem" href={office365CalUrl(cal)} target="_blank" rel="noopener noreferrer" onClick={() => setOpen('')}>Office 365</a>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function InviteCard({ design, facts, cta, footer, onRsvp, rsvp, onPick, cal, rsvpLabel, joinUrl, onJoin }: {
   design?: Partial<InviteDesign> | null;
   facts: InviteFacts;
   cta?: ReactNode;       // replaces the whole action row (e.g. "your request is with the host")
@@ -40,7 +98,11 @@ export function InviteCard({ design, facts, cta, footer, onRsvp, onCal, rsvpLabe
    *  cal on the right"): given handlers, they render as real buttons; with
    *  neither, the row is a still picture (the Studio thumbnail). */
   onRsvp?: () => void;
-  onCal?: () => void;
+  /** RSVP as a drop-down: the choices, and what picking one does. */
+  rsvp?: RsvpChoice[];
+  onPick?: (key: string) => void;
+  /** Add to cal as a drop-down (Google · Apple · Outlook · Office 365). */
+  cal?: EventForCal | null;
   rsvpLabel?: string;
   /** A video event's room — the camera chip grows a Join door (no RSVP needed). */
   joinUrl?: string | null;
@@ -59,12 +121,9 @@ export function InviteCard({ design, facts, cta, footer, onRsvp, onCal, rsvpLabe
     </p>
   ) : <p className="invc__where">{facts.where}</p>);
   const label = rsvpLabel ?? (r.rsvp === 'RSVP & see the details' ? 'RSVP' : r.rsvp);
-  const actions = cta ?? (onRsvp || onCal ? (
-    <div className="invc__actions">
-      <button type="button" className="invc__cta" onClick={onRsvp}>{label}</button>
-      {onCal && <button type="button" className="invc__cta invc__cta--ghost" onClick={onCal}>Add to cal</button>}
-    </div>
-  ) : (
+  const actions = cta ?? (onRsvp || rsvp || cal
+    ? <CardDoors label={label} rsvp={rsvp} onPick={onPick} onRsvp={onRsvp} cal={cal} />
+    : (
     <div className="invc__actions">
       <span className="invc__cta">{label}</span>
       <span className="invc__cta invc__cta--ghost">Add to cal</span>
@@ -183,10 +242,14 @@ export function InviteEnvelope({ design, peek, children, play = true, photos }: 
       <span className="invenv__back" />
       <span className="invenv__card">
         {frontPhoto
-          ? <img className="invenv__card-photo" src={frontPhoto} alt="" />
+          ? <><img className="invenv__card-photo" src={frontPhoto} alt="" /><span className="invenv__card-words">{eyebrow}<span className="invenv__card-title">{peek}</span></span></>
           : <>{eyebrow}<span className="invenv__card-title">{peek}</span></>}
       </span>
       <span className="invenv__frontwrap"><span className="invenv__front" /></span>
+      <svg className="invenv__seams" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 100 L50 74 L100 100" fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth="0.6" vectorEffect="non-scaling-stroke" />
+        <path d="M0 99.4 L50 74.6 L100 99.4" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.6" vectorEffect="non-scaling-stroke" />
+      </svg>
       <span className="invenv__flapwrap"><span className="invenv__flap"><span className="invenv__liner" /></span></span>
       {stage === 'sealed' && <WaxSeal />}
     </button>

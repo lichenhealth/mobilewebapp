@@ -168,8 +168,11 @@ export default function GuestEvent() {
           facts={{ title: ev.title, when: whenText(ev), where: ev.location || undefined, host: ev.host_name, photo: ev.photo_url }}
           cta={requested ? <span className="gev__cardnote">Your request is with <span className="nobr">{ev.host_name}</span></span> : undefined}
           rsvpLabel={info ? undefined : 'Ask to come'}
-          onRsvp={() => document.getElementById('gev-act')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-          onCal={info && cal ? () => document.getElementById('gev-cal')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : undefined}
+          onRsvp={info ? undefined : () => document.getElementById('gev-act')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          rsvp={info ? [{ key: 'going', label: 'Going' }, { key: 'tentative', label: 'Maybe' }, { key: 'declined', label: 'Can’t make it' }]
+            .map((c) => ({ ...c, on: status === c.key })) : undefined}
+          onPick={(k) => void rsvp(k as GuestStatus)}
+          cal={info && cal ? { ...cal, url: zoomUrl ?? undefined } : null}
           joinUrl={info && !requested ? zoomUrl : null} />
       </InviteEnvelope>
       {ev.description && <p className="gev__desc gev__desc--below">{ev.description}</p>}
@@ -209,14 +212,6 @@ export default function GuestEvent() {
         </div>
       )}
 
-      {info && !requested && (
-        <div className="gev__section" id="gev-cal">
-          <p className="gev__label">Add it to your calendar</p>
-          <div className="gev__cal">
-            {cal && <AddToCal ev={cal} file={`${ev.title}.ics`} />}
-          </div>
-        </div>
-      )}
 
       {info && !requested && poll.length > 0 && poll[0].poll_status === 'open' && (
         <div className="gev__section gev__poll">
@@ -241,14 +236,11 @@ export default function GuestEvent() {
         </div>
       )}
 
-      {info && !requested && (
+      {/* The answer lives on the card's RSVP drop-down now; this section only
+          asks the host's follow-ups once someone says yes or maybe. */}
+      {info && !requested && asks && (status === 'going' || status === 'tentative') && (
         <div className="gev__section" id="gev-act">
-          <p className="gev__label">Can you come? {status !== 'invited' && <em className="gev__status">— you said {status === 'going' ? "you're going" : status === 'tentative' ? 'maybe' : "you can't make it"}</em>}</p>
-          <div className="gev__rsvp">
-            <button className={'btn gev__btn' + (status === 'going' ? ' is-on' : '')} onClick={() => rsvp('going')} disabled={busy}>Going</button>
-            <button className={'btn gev__btn' + (status === 'tentative' ? ' is-on' : '')} onClick={() => rsvp('tentative')} disabled={busy}>Maybe</button>
-            <button className={'btn gev__btn' + (status === 'declined' ? ' is-on' : '')} onClick={() => rsvp('declined')} disabled={busy}>Can’t make it</button>
-          </div>
+          <p className="gev__label">A few details for <span className="nobr">{info.host_name}</span></p>
           {asks && (status === 'going' || status === 'tentative') && (
             <div className="gev__extras">
               {form.plusOnes > 0 && (

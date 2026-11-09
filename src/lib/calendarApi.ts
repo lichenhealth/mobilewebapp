@@ -607,7 +607,7 @@ export async function loadEventMeetingUrl(eventId: string): Promise<string | nul
  *  release the hold. */
 export async function syncDraftHold(
   me: string, draftId: string,
-  hold: { title: string; startDate: string; endDate: string; allDay: boolean; startMin?: number; endMin?: number; timezone?: string | null; location: string; shareLevel: 'busy' | 'hidden' | null } | null,
+  hold: { title: string; startDate: string; endDate: string; allDay: boolean; startMin?: number; endMin?: number; timezone?: string | null; location: string; shareLevel: 'busy' | 'hidden' | null; zoomUnique?: boolean } | null,
 ): Promise<void> {
   const { data: cur } = await supabase.from('events').select('id').eq('draft_id', draftId).maybeSingle();
   const curId = (cur as { id: string } | null)?.id ?? null;
@@ -621,6 +621,9 @@ export async function syncDraftHold(
     start_min: hold.allDay ? null : hold.startMin ?? null,
     end_min: hold.allDay ? null : hold.endMin ?? null,
     share_level: hold.shareLevel,
+    // The draft holds its own Zoom room (minted by the standing poke; deleted
+    // in Zoom when the draft — and so this hold — goes).
+    zoom_unique: !!hold.zoomUnique,
     ...(hold.timezone ? { timezone: hold.timezone } : {}),
   };
   if (curId) {
@@ -632,4 +635,22 @@ export async function syncDraftHold(
     });
     if (error) throw error;
   }
+}
+
+/** The Zoom room a draft event's hold already carries (null until minted). */
+export async function loadDraftMeetingUrl(draftId: string): Promise<string | null> {
+  const { data: ev } = await supabase.from('events').select('id').eq('draft_id', draftId).maybeSingle();
+  const id = (ev as { id: string } | null)?.id;
+  if (!id) return null;
+  const { data } = await supabase.from('event_meetings').select('join_url').eq('event_id', id).maybeSingle();
+  return (data as { join_url: string } | null)?.join_url ?? null;
+}
+
+/** On Post: move the draft's Zoom room onto the live event, then switch the
+ *  event's zoom on — the reconcile finds the room and only re-times it (no
+ *  room existed? switching on mints one, the standing path). */
+export async function carryDraftZoom(draftId: string, eventId: string): Promise<void> {
+  await supabase.rpc('adopt_draft_meeting', { p_draft: draftId, p_event: eventId });
+  const { error } = await supabase.from('events').update({ zoom_unique: true }).eq('id', eventId);
+  if (error) throw error;
 }
