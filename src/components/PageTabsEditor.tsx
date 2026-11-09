@@ -106,7 +106,7 @@ function SectionPhoto({ sec, patch, uploaderId, upBusy, setUpBusy }: {
             {uploaderId && (
               <label className="ptabs__linkbtn">
                 {upBusy ? 'Adding…' : '↻ Change photo'}
-                <input type="file" accept="image/*" hidden disabled={upBusy}
+                <input type="file" accept="image/*,.heic,.heif" hidden disabled={upBusy}
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     e.target.value = '';
@@ -143,7 +143,7 @@ function SectionPhoto({ sec, patch, uploaderId, upBusy, setUpBusy }: {
       {!sec?.image && uploaderId && (
         <label className="ptabs__linkbtn">
           {upBusy ? 'Adding…' : '+ Add a photo'}
-          <input type="file" accept="image/*" hidden disabled={upBusy}
+          <input type="file" accept="image/*,.heic,.heif" hidden disabled={upBusy}
             onChange={async (e) => {
               const file = e.target.files?.[0];
               e.target.value = '';
@@ -534,7 +534,7 @@ export default function PageTabsEditor({
                 </div>
                 <label className="btn ptabs__upload">
                   {upBusy ? 'Adding…' : 'Add photos'}
-                  <input type="file" accept="image/*" multiple hidden disabled={upBusy}
+                  <input type="file" accept="image/*,.heic,.heif" multiple hidden disabled={upBusy}
                     onChange={async (e) => {
                       const files = [...(e.target.files ?? [])];
                       e.target.value = '';
@@ -743,7 +743,7 @@ export default function PageTabsEditor({
                   ? <img src={person.photo} alt="" />
                   : <span className="ptabs__person-photo-empty"><Icon name="image" size={16} /></span>}
                 <input
-                  type="file" accept="image/*" hidden
+                  type="file" accept="image/*,.heic,.heif" hidden
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file || !uploaderId) return;

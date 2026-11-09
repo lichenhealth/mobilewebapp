@@ -1553,7 +1553,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           <input
             ref={avatarInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             hidden
             onChange={(e) => { onAvatarFile(e.target.files?.[0]); e.target.value = ''; }}
           />
@@ -2361,7 +2361,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                   <label className="prof__addline">
                     {storyImgBusy ? 'Adding…' : '+ Add a photo to the story'}
                     <input
-                      type="file" accept="image/*" hidden disabled={storyImgBusy}
+                      type="file" accept="image/*,.heic,.heif" hidden disabled={storyImgBusy}
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         e.target.value = '';

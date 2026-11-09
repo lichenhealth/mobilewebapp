@@ -1,3 +1,5 @@
+import { invitePhotos } from '../lib/inviteDesign';
+import { isHeic } from '../lib/heic';
 import { useEffect, useState } from 'react';
 import { InviteCard, InviteEnvelope, InviteBackdropLayer, type InviteFacts } from './InviteCard';
 import {
@@ -34,7 +36,7 @@ export function InviteStudio({ design, facts, onDone, onClose, uploaderId }: {
   const [artErr, setArtErr] = useState('');
   async function uploadArt(f: File | undefined) {
     if (!f || !uploaderId) return;
-    if (!f.type.startsWith('image/')) { setArtErr('That isn’t an image.'); return; }
+    if (!f.type.startsWith('image/') && !isHeic(f)) { setArtErr('That isn’t an image.'); return; }
     setArtBusy(true); setArtErr('');
     try { const url = await uploadPageImage(uploaderId, f); set({ artwork: url }); }
     catch (e) { setArtErr((e as Error).message || 'Upload failed.'); }
@@ -54,6 +56,7 @@ export function InviteStudio({ design, facts, onDone, onClose, uploaderId }: {
   // Picking a template starts fresh from IT — the words the host typed stay.
   const pick = (id: string) => setD((cur) => ({
     template: id, message: cur.message, photo: cur.photo, form: cur.form, links: cur.links, backdrop: cur.backdrop,
+    cardPhoto: cur.cardPhoto, envPhoto: cur.envPhoto,
   }));
 
   return (
@@ -93,7 +96,7 @@ export function InviteStudio({ design, facts, onDone, onClose, uploaderId }: {
                 </>
               ) : uploaderId ? (
                 <label className="invst__own-up">
-                  <input type="file" accept="image/*" hidden onChange={(e) => { void uploadArt(e.target.files?.[0]); e.target.value = ''; }} />
+                  <input type="file" accept="image/*,.heic,.heif" hidden onChange={(e) => { void uploadArt(e.target.files?.[0]); e.target.value = ''; }} />
                   {artBusy ? 'Uploading…' : '⊕ Upload your own card'}
                   <span className="invst__own-sub">A finished design from Canva, a painting, a photo — it becomes the whole card.</span>
                 </label>
@@ -211,7 +214,7 @@ export function InviteStudio({ design, facts, onDone, onClose, uploaderId }: {
                   aria-label={`Paper ${c}`} onClick={() => set({ paper: c })} />
               ))}
             </div>
-            <button className="invst__reset" onClick={() => setD((cur) => ({ template: cur.template, headline: cur.headline, message: cur.message, rsvp: cur.rsvp, photo: cur.photo }))}>
+            <button className="invst__reset" onClick={() => setD((cur) => ({ template: cur.template, headline: cur.headline, message: cur.message, rsvp: cur.rsvp, photo: cur.photo, cardPhoto: cur.cardPhoto, envPhoto: cur.envPhoto, form: cur.form, links: cur.links, backdrop: cur.backdrop }))}>
               Back to the template&rsquo;s own colours
             </button>
           </>)}
@@ -241,10 +244,34 @@ export function InviteStudio({ design, facts, onDone, onClose, uploaderId }: {
                   onClick={() => set({ backdrop: b.id === 'none' ? undefined : b.id })}>{b.label}</button>
               ))}
             </div>
-            <label className="invst__check">
-              <input type="checkbox" checked={r.photo} onChange={(e) => set({ photo: e.target.checked })} />
-              Wear the event&rsquo;s cover photo{facts.photo ? '' : ' (add one in the composer)'}
-            </label>
+            {/* THE TWO PHOTO SLOTS (founder 2026-11-09): one on the
+                envelope's outside, one on the card with the details. */}
+            {(() => {
+              const photos = facts.photos ?? (facts.photo ? [facts.photo] : []);
+              const now = invitePhotos(d, photos);
+              if (!photos.length) return <p className="invst__note">Add photos to the event in the composer and you can place them on the envelope and the card here.</p>;
+              const row = (slot: 'envPhoto' | 'cardPhoto', cur: string | null, label: string) => (
+                <>
+                  <span className="invst__label">{label}</span>
+                  <div className="invst__photos" style={{ marginBottom: 18 }}>
+                    <button className={'invst__ph invst__ph--none' + (!cur ? ' is-on' : '')}
+                      onClick={() => set(slot === 'cardPhoto' ? { cardPhoto: 'none', photo: true } : { envPhoto: 'none' })}>None</button>
+                    {photos.map((u) => (
+                      <button key={u} className={'invst__ph' + (cur === u ? ' is-on' : '')}
+                        aria-label={`Use this photo — ${label}`}
+                        onClick={() => set(slot === 'cardPhoto' ? { cardPhoto: u, photo: true } : { envPhoto: u })}>
+                        <img src={u} alt="" />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              );
+              return (<>
+                {row('envPhoto', now.env, 'Photo on the envelope — the outside')}
+                {row('cardPhoto', now.card, 'Photo on the card — with the details')}
+                <p className="invst__note">Preview plays the envelope so you can see both.</p>
+              </>);
+            })()}
           </>)}
         </div>
       </div>
@@ -276,7 +303,7 @@ export function InvitePreview({ design, facts, onClose }: {
       </div>
       <InviteBackdropLayer kind={r.backdrop} accent={r.accent} />
       <div className="invpv__stage">
-        <InviteEnvelope key={run} design={design} peek={facts.title}>
+        <InviteEnvelope key={run} design={design} peek={facts.title} photos={facts.photos}>
           <InviteCard design={design} facts={facts} />
         </InviteEnvelope>
       </div>

@@ -78,7 +78,7 @@ export default function GrabPen({ thread, uploaderId }: {
   const live = useRef<{ x: number; y: number }[] | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const fileInput = (
-    <input ref={fileRef} type="file" accept="image/*" hidden
+    <input ref={fileRef} type="file" accept="image/*,.heic,.heif" hidden
       onChange={(e) => { void takeFile(e.target.files?.[0]); e.target.value = ''; }} />
   );
 

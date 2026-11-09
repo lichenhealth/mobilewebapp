@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { webSafeImage } from './heic';
 import { loadMyHidden } from './hiddenApi';
 import type { IconName } from '../components/Icon';
 
@@ -83,7 +84,8 @@ export type NewPost = {
 };
 
 // Upload a file (or recorded blob) into the post-media bucket; returns a public URL.
-export async function uploadMedia(file: Blob, ext: string): Promise<string> {
+export async function uploadMedia(rawFile: Blob, rawExt: string): Promise<string> {
+  const { file, ext } = await webSafeImage(rawFile, rawExt);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;

@@ -351,7 +351,7 @@ function UrgentCare({ subjectId, me }: { subjectId: string; me: string }) {
               </button>
             </div>
           </div>
-          <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, 'photo')} />
+          <input ref={photoRef} type="file" accept="image/*,.heic,.heif" hidden onChange={(e) => onFile(e, 'photo')} />
           <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => onFile(e, 'video')} />
 
           <button

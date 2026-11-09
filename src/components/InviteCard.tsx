@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { linerCss, resolveInvite, type InviteDesign, type InviteBackdrop } from '../lib/inviteDesign';
+import { linerCss, resolveInvite, invitePhotos, type InviteDesign, type InviteBackdrop } from '../lib/inviteDesign';
 import './Invite.css';
 
 // THE INVITATION CARD — one renderer for the composer's preview, the studio,
@@ -12,6 +12,9 @@ export interface InviteFacts {
   where?: string;
   host: string;
   photo?: string | null;
+  /** Every photo the event carries, in order — the two photo slots choose
+   *  from these (smart default: first on the card, second on the envelope). */
+  photos?: string[];
 }
 
 export function InviteCard({ design, facts, cta, footer }: {
@@ -22,6 +25,7 @@ export function InviteCard({ design, facts, cta, footer }: {
 }) {
   const r = resolveInvite(design);
   const t = r.template;
+  const cardPhoto = invitePhotos(design, facts.photos ?? (facts.photo ? [facts.photo] : [])).card;
   const linkRow = r.links.length > 0 && (
     <p className="invc__links">
       {r.links.map((l) => (
@@ -52,7 +56,7 @@ export function InviteCard({ design, facts, cta, footer }: {
       style={{ ['--invc-paper' as string]: r.paper, ['--invc-ink' as string]: r.ink,
         ['--invc-soft' as string]: r.inkSoft, ['--invc-accent' as string]: r.accent,
         ['--invc-font' as string]: r.fontCss }}>
-      {r.photo && facts.photo && <img className="invc__photo" src={facts.photo} alt="" />}
+      {cardPhoto && <img className="invc__photo" src={cardPhoto} alt="" />}
       {t.id === 'celebration' && <div className="invc__confetti" aria-hidden="true" style={{ background: linerCss('confetti', r.accent) }} />}
       <div className="invc__body">
         {t.ornament && <p className="invc__orn" aria-hidden="true">{t.ornament}</p>}
@@ -75,23 +79,25 @@ export function InviteCard({ design, facts, cta, footer }: {
  *  in the host's envelope — colour + liner are design choices — the flap
  *  lifts, the card rises out, then the full card settles in. A tap on the
  *  sealed envelope opens it; reduced-motion skips straight to the card. */
-export function InviteEnvelope({ design, peek, children, play = true }: {
+export function InviteEnvelope({ design, peek, children, play = true, photos }: {
   design?: Partial<InviteDesign> | null;
   peek: string;          // the title the rising card shows
   children: ReactNode;   // the full card, shown once open
   play?: boolean;
+  photos?: string[];     // the event's photos — the envelope wears its slot's
 }) {
   const r = resolveInvite(design);
+  const envPhoto = invitePhotos(design, photos ?? []).env;
   const reduce = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const [stage, setStage] = useState<'sealed' | 'opening' | 'open'>(reduce ? 'open' : 'sealed');
   useEffect(() => {
     if (!play || stage !== 'sealed') return;
-    const t = window.setTimeout(() => setStage('opening'), 700);
+    const t = window.setTimeout(() => setStage('opening'), envPhoto ? 2600 : 1400);
     return () => window.clearTimeout(t);
   }, [play, stage]);
   useEffect(() => {
     if (stage !== 'opening') return;
-    const t = window.setTimeout(() => setStage('open'), 1700);
+    const t = window.setTimeout(() => setStage('open'), 3400);
     return () => window.clearTimeout(t);
   }, [stage]);
   if (stage === 'open') return <div className="invenv-done">{children}</div>;
@@ -109,6 +115,14 @@ export function InviteEnvelope({ design, peek, children, play = true }: {
       <span className="invenv__front" />
       <span className="invenv__flap"><span className="invenv__liner" /></span>
       {stage === 'sealed' && <span className="invenv__seal" />}
+      {/* THE OUTSIDE (founder 2026-11-09): the envelope's own photo with the
+          headline over it — the first thing a guest sees, before the flap. */}
+      {envPhoto && (
+        <span className="invenv__face">
+          <span className={'invenv__face-eyebrow' + (r.font === 'script' ? ' is-script' : '')}>{r.headline}</span>
+          <img className="invenv__face-photo" src={envPhoto} alt="" />
+        </span>
+      )}
     </button>
   );
 }

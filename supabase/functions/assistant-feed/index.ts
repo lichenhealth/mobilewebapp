@@ -588,6 +588,37 @@ const POST_TOOLS = [
     },
   },
   {
+    // THE INVITATION, DESIGNED BY CONVERSATION (founder 2026-11-09: "the
+    // ability to chat directly with claude about custom design changes and
+    // have claude try to do what the person wants, then they can review it,
+    // and tweak/approve. That's how I build my website… why not provide
+    // users with that feature on Lichen Events?"). Every Studio knob is a
+    // field here; the member reviews it in the composer (Preview plays the
+    // envelope) and posts — or asks for the next tweak.
+    name: 'design_invite',
+    description: 'Change the INVITATION DESIGN of one of their events — a draft (by its title) or one of their own posted events. Every Studio choice is here: template, headline, the note, button words, typeface, accent / paper / envelope colours (hex), envelope liner, animated backdrop, and the TWO PHOTO SLOTS — envelope_photo (the outside, under the headline) and card_photo (on the card with the details), each a 1-based number from the event\'s photos in upload order, or 0 for none. Only the fields you pass change. Interpret their taste freely ("warmer", "more elegant", "like a garden party", "make the gold pop") into these choices, say plainly what you set, and offer the next tweak. A draft comes back with a Review button — Preview there plays the envelope; a posted event shows the new design to anyone who opens their link (emails already sent keep their card). Layouts beyond these knobs (moving text blocks, drawing) are not possible — say so, offer the nearest choice, and file_dev_report if they want it.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_title: { type: 'string', description: 'The event\'s title as they call it (a draft or one of their posted events).' },
+        template: { type: 'string', enum: ['classic', 'garden', 'celebration', 'birthday', 'evening', 'minimal', 'earth', 'blush', 'harvest', 'winter'] },
+        headline: { type: 'string', description: 'The top line ("You\'re invited"). Empty string = the template\'s own.' },
+        message: { type: 'string', description: 'A short note from the host on the card. Empty string removes it.' },
+        rsvp_words: { type: 'string', description: 'The button\'s words ("Count me in").' },
+        font: { type: 'string', enum: ['serif', 'classic', 'script', 'modern'] },
+        accent: { type: 'string', description: 'Hex like #C06B3E — headline, ornaments, button.' },
+        paper: { type: 'string', description: 'Hex for the card paper. Dark paper reads light ink automatically.' },
+        envelope: { type: 'string', description: 'Hex for the envelope.' },
+        liner: { type: 'string', enum: ['none', 'dots', 'stripes', 'leaves', 'stars', 'confetti'] },
+        backdrop: { type: 'string', enum: ['none', 'confetti', 'snow', 'petals', 'stars', 'bubbles', 'leaves'] },
+        envelope_photo: { type: 'integer', description: 'Which of the event\'s photos (1 = first uploaded) goes on the envelope\'s outside; 0 = none.' },
+        card_photo: { type: 'integer', description: 'Which photo goes on the card with the details; 0 = none.' },
+        reset_colours: { type: 'boolean', description: 'true = drop their custom colours/font and go back to the template\'s own.' },
+      },
+      required: ['event_title'],
+    },
+  },
+  {
     name: 'update_post',
     description: 'Edit one of their OWN published posts, named by its EXACT title from my_posts. Only the fields you pass change; report what changed and what it said before. An empty price removes the price. Event posts are refused — those edits live on the event page so guests keep their RSVPs.',
     input_schema: {
@@ -1284,6 +1315,7 @@ Deno.serve(async (req) => {
       + '\n- Photos are added in the composer when they review — say so when the thing wants a picture.'
       + '\n- update_post changes a post that is ALREADY live, in place: read my_posts first, use the exact title, name every change and what it said before.'
       + '\n- EVENTS: draft_event fills the event composer as far as they have told you (date, time, place, guests, visibility, a guest list to save) — never tell them to go create it by hand. Anything not yet decided stays blank for them. Nothing is sent until their tap on Post.'
+      + '\n- INVITATION DESIGN BY CONVERSATION: design_invite changes any Studio choice on a draft or posted event — template, words, typeface, colours, liner, backdrop, and the two photo slots (envelope outside / card). When they describe a look ("more elegant", "gold on navy", "the group photo outside, the candle photo inside"), DO it, say what you set, and offer the next tweak — the review-and-refine loop. Never send them to the Studio for something you can set.'
       + '\n- my_post_drafts reads their unpublished drafts when they want help finishing one.'
       ;
   }
@@ -2835,6 +2867,69 @@ Deno.serve(async (req) => {
       };
     }
 
+    if (name === 'design_invite') {
+      const et = String(input.event_title ?? '').trim().slice(0, 120);
+      if (!et) return { ok: false, error: 'Which event? Name it by its title.' };
+      // A draft first (the composer's own snapshot), else a posted event of theirs.
+      const dr = await (await sb(`post_drafts?profile_id=eq.${profile_id}&draft->>title=ilike.${encodeURIComponent(et)}&select=id,draft&order=updated_at.desc&limit=1`)).json();
+      const draftRow = Array.isArray(dr) && dr[0] ? dr[0] : null;
+      let postRow: { id: string; title: string; details: Record<string, unknown> } | null = null;
+      if (!draftRow) {
+        const pr = await (await sb(`posts?author_id=eq.${profile_id}&title=ilike.${encodeURIComponent(et)}&linked_event_id=not.is.null&select=id,title,details&order=created_at.desc&limit=1`)).json();
+        postRow = Array.isArray(pr) && pr[0] ? pr[0] : null;
+      }
+      if (!draftRow && !postRow) return { ok: false, error: `No draft or posted event of theirs is called "${et}". Ask which one, or check the exact title.` };
+      const prevDesign = ((draftRow ? (draftRow.draft as Record<string, unknown>).inviteDesign : postRow!.details?.invite) ?? {}) as Record<string, unknown>;
+      const media = (draftRow ? (draftRow.draft as Record<string, unknown>).media : postRow!.details?.media) as { url?: string; type?: string }[] | undefined;
+      const photos = (Array.isArray(media) ? media : []).filter((m) => m?.type === 'photo' && typeof m.url === 'string').map((m) => m.url as string);
+      const hexOk = (v: unknown) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v.trim());
+      const next: Record<string, unknown> = input.reset_colours
+        ? { template: prevDesign.template ?? 'classic', headline: prevDesign.headline, message: prevDesign.message, rsvp: prevDesign.rsvp, photo: prevDesign.photo, form: prevDesign.form, links: prevDesign.links, backdrop: prevDesign.backdrop, artwork: prevDesign.artwork, cardPhoto: prevDesign.cardPhoto, envPhoto: prevDesign.envPhoto }
+        : { ...prevDesign };
+      const changed: string[] = []; const notes: string[] = [];
+      if (input.template && INVITE_TEMPLATE_IDS.includes(String(input.template))) {
+        // A new template starts from ITS colours — the host's words stay.
+        for (const k of ['font', 'accent', 'paper', 'envelope', 'liner']) delete next[k];
+        next.template = String(input.template); delete next.artwork; changed.push(`template ${input.template}`);
+      }
+      if (typeof input.headline === 'string') { if (input.headline.trim()) next.headline = input.headline.trim().slice(0, 80); else delete next.headline; changed.push('headline'); }
+      if (typeof input.message === 'string') { if (input.message.trim()) next.message = input.message.trim().slice(0, 600); else delete next.message; changed.push('note'); }
+      if (typeof input.rsvp_words === 'string' && input.rsvp_words.trim()) { next.rsvp = input.rsvp_words.trim().slice(0, 40); changed.push('button words'); }
+      if (['serif', 'classic', 'script', 'modern'].includes(String(input.font))) { next.font = input.font; changed.push(`typeface ${input.font}`); }
+      for (const k of ['accent', 'paper', 'envelope'] as const) {
+        if (input[k] === undefined) continue;
+        if (hexOk(input[k])) { next[k] = String(input[k]).trim().toUpperCase(); changed.push(`${k} ${next[k]}`); }
+        else notes.push(`${k} needs a hex colour like #C06B3E — left as it was`);
+      }
+      if (['none', 'dots', 'stripes', 'leaves', 'stars', 'confetti'].includes(String(input.liner))) { next.liner = input.liner; changed.push(`liner ${input.liner}`); }
+      if (typeof input.backdrop === 'string') { if (input.backdrop === 'none') delete next.backdrop; else next.backdrop = input.backdrop; changed.push(`backdrop ${input.backdrop}`); }
+      const slot = (v: unknown, key: 'envPhoto' | 'cardPhoto', label: string) => {
+        if (v === undefined) return;
+        const n = Number(v);
+        if (n === 0) { next[key] = 'none'; if (key === 'cardPhoto') next.photo = true; changed.push(`${label}: none`); return; }
+        if (!Number.isInteger(n) || n < 1 || n > photos.length) { notes.push(`${label}: the event has ${photos.length} photo${photos.length === 1 ? '' : 's'} — ${photos.length ? `pick 1–${photos.length}` : 'they add photos in the composer first'}`); return; }
+        next[key] = photos[n - 1]; if (key === 'cardPhoto') next.photo = true; changed.push(`${label}: photo ${n}`);
+      };
+      slot(input.envelope_photo, 'envPhoto', 'envelope photo');
+      slot(input.card_photo, 'cardPhoto', 'card photo');
+      if (!changed.length) return { ok: false, error: notes.length ? notes.join('; ') : 'Nothing to change — pass at least one design choice.' };
+      for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+      if (!next.template) next.template = 'classic';
+      if (draftRow) {
+        const d = { ...(draftRow.draft as Record<string, unknown>), inviteDesign: next };
+        const r = await sb(`post_drafts?id=eq.${draftRow.id}&profile_id=eq.${profile_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ draft: d, updated_at: new Date().toISOString() }) });
+        if (!r.ok) return { ok: false, error: `The design would not save: ${(await r.text()).slice(0, 140)}` };
+        postDraftDoors.push({ id: draftRow.id, title: String((draftRow.draft as Record<string, unknown>).title ?? et) });
+        return { ok: true, change: `redesigned the invitation on their draft "${et}": ${changed.join(', ')}`, photos_available: photos.length, ...(notes.length ? { notes } : {}),
+          note: 'A Review button rides under this reply — Edit design → Preview plays the envelope. Nothing is sent until they Post. Offer the next tweak.' };
+      }
+      const det = { ...(postRow!.details ?? {}), invite: next };
+      const r = await sb(`posts?id=eq.${postRow!.id}&author_id=eq.${profile_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ details: det }) });
+      if (!r.ok) return { ok: false, error: `The design would not save: ${(await r.text()).slice(0, 140)}` };
+      return { ok: true, change: `redesigned the invitation on their posted event "${postRow!.title}": ${changed.join(', ')}`, photos_available: photos.length, ...(notes.length ? { notes } : {}),
+        note: 'Live now for anyone who opens their invitation link; emails already sent keep the card they were sent with. Offer the next tweak.' };
+    }
+
     if (name === 'update_post') {
       const t = String(input.title ?? '').trim();
       if (!t) return { ok: false, error: 'Which post? Give its exact title from my_posts.' };
@@ -3019,7 +3114,7 @@ Deno.serve(async (req) => {
     set_booking_type_active: 'calendar', add_task: 'calendar',
     calendar_feed_link: 'calendar',
     my_courses: 'courses', create_course: 'courses', update_course: 'courses',
-    my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace', draft_event: 'events',
+    my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace', draft_event: 'events', design_invite: 'events',
     my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
     save_post_to_drive: 'drive',
     ...LIFE_TOOL_SECTION,

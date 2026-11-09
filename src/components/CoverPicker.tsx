@@ -91,7 +91,7 @@ export default function CoverPicker({ value, onChange, uploaderId, authorId, spa
       <label className="btn coverp__upload">
         {busy ? 'Uploading…' : value ? 'Upload a different photo' : 'Upload a photo'}
         <input
-          type="file" accept="image/*" hidden disabled={busy}
+          type="file" accept="image/*,.heic,.heif" hidden disabled={busy}
           onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = ''; }}
         />
       </label>

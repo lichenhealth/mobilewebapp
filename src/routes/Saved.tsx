@@ -758,7 +758,7 @@ export default function Saved() {
                 </button>
               </div>
             )}
-            <input ref={filePhotoRef} type="file" accept="image/*" hidden
+            <input ref={filePhotoRef} type="file" accept="image/*,.heic,.heif" hidden
               onChange={(e) => { void addFile('photo', e.target.files?.[0]); e.target.value = ''; }} />
             <input ref={fileVideoRef} type="file" accept="video/*" hidden
               onChange={(e) => { void addFile('video', e.target.files?.[0]); e.target.value = ''; }} />

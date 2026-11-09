@@ -7,7 +7,9 @@ import { supabase } from '../lib/supabase';
 import { loadSpaceMembers } from '../lib/spacesApi';
 import { InviteCard } from '../components/InviteCard';
 import { InviteStudio, InvitePreview } from '../components/InviteStudio';
-import { readInvite, type InviteDesign } from '../lib/inviteDesign';
+import { readInvite, invitePhotos, type InviteDesign } from '../lib/inviteDesign';
+import { postAssistantHandoff, renameConvo } from '../lib/assistantFeedApi';
+import AssistantDoor, { aiDoorOn } from '../components/AssistantDoor';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { Icon } from '../components/Icon';
 import {
@@ -778,6 +780,32 @@ export default function Compose() {
       } : null).catch((e) => console.error('draft hold:', e));
     } catch (e) { console.error('post draft:', e); }
   }
+  // Edit-with-AI for events: save the draft NOW (so the brain's tools find
+  // it by title), then deliver the hand-off note into a fresh events
+  // conversation and land the member on it.
+  async function editEventWithAi() {
+    touchedRef.current = true;
+    await writeDraft();
+    const t = title.trim();
+    const photosN = media.filter((m) => m.type === 'photo').length;
+    const parts: string[] = [];
+    parts.push(t ? `The event is “${t}”, saved as a draft.` : 'An untitled event draft is open — give it a name first so I can find it.');
+    if (evRange.start) parts.push(`Date: ${evRange.start}${evRange.end && evRange.end !== evRange.start ? ` to ${evRange.end}` : ''}${evAllDay ? ', all day' : `, ${inviteWhen(evRange.start, false, evStartMin)}`}.`);
+    if (location.trim()) parts.push(`Place: ${location.trim()}.`);
+    else if (evZoom) parts.push('Online — a unique Zoom room.');
+    if (invitees.length) parts.push(`${invitees.length} people on the guest list.`);
+    if (body.trim()) parts.push(`Description so far: “${body.trim().slice(0, 300)}”.`);
+    parts.push(`Invitation: the ${inviteDesign?.template ?? 'classic'} design${photosN ? `, ${photosN} photo${photosN === 1 ? '' : 's'} uploaded` : ', no photos yet'}.`);
+    const note = `Hand-off from manual mode — ${parts.join(' ')} Tell me what you’d like to change — the details, the guests, or the invitation’s look — and I’ll do it on this draft.`;
+    try {
+      const { convoId } = await postAssistantHandoff('events', note.slice(0, 1500));
+      renameConvo(convoId, t ? `Event hand-off · ${t}`.slice(0, 80) : 'Event hand-off').catch(() => undefined);
+      navigate(`/assistant/feed?thread=events&convo=${convoId}`);
+    } catch {
+      navigate(`/assistant/feed?thread=events&convo=new&ask=${encodeURIComponent(note.slice(0, 1500))}`);
+    }
+  }
+
   const writeDraftRef = useRef<() => void>(() => {});
   writeDraftRef.current = () => {
     if (touchedRef.current || hadDraft.current) void writeDraft();
@@ -1317,7 +1345,16 @@ export default function Compose() {
       // Invite-only event (2026-11-04): the label the bridge trigger and
       // honest copy read; the enforcement is RLS (the attendee arm).
       if (isEvent && !evAnyone && !evLichen) details.inviteOnly = true;
-      if (isEvent && inviteDesign) details.invite = readInvite(inviteDesign);
+      if (isEvent) {
+        // The photo slots are locked in at Post — the guest page and the
+        // emails read the design, not the composer's photo list.
+        const evPhotos = media.filter((m) => m.type === 'photo').map((m) => m.url);
+        const slots = invitePhotos(inviteDesign, evPhotos);
+        const base = inviteDesign ? readInvite(inviteDesign) : null;
+        if (base || slots.env || slots.card) {
+          details.invite = { ...(base ?? { template: 'classic' }), cardPhoto: slots.card ?? 'none', envPhoto: slots.env ?? 'none' };
+        }
+      }
       if (!aiReadable) details.aiExcluded = true;
       if (quiet) details.quiet = true;
       if (!downloadable) details.noDownload = true;
@@ -1627,6 +1664,24 @@ export default function Compose() {
               : 'Share with the whole network, or just your My-celium.'}
         </p>
       </header>
+
+      {/* THE BRAIN AT THE TOP OF THE EVENT BUILDER (founder 2026-11-09:
+          "the brain should be at the top of manual event building so you can
+          switch to ai to give instructions mid build"): the Calendar-settings
+          toggle — Edit with AI saves the draft and hands Claude a summary of
+          everything built so far (the Claude-to-Claude hand-off note). */}
+      {isEvent && !editing && actor.type !== 'space' && (
+        aiDoorOn('events') ? (
+          <div className="view-toggle-row cset__moderow cmp__moderow">
+            <span className="view-toggle" role="group" aria-label="How to build this event">
+              <button type="button" className="view-toggle__side is-on">Build manually</button>
+              <button type="button" className="view-toggle__side" onClick={() => void editEventWithAi()}>Edit with AI</button>
+            </span>
+          </div>
+        ) : (
+          <div className="cmp__moderow cmp__moderow--off"><AssistantDoor section="events" /></div>
+        )
+      )}
 
       {error && <p className="cmp__error">{error}</p>}
 
@@ -2080,11 +2135,12 @@ export default function Compose() {
                 : online && meetingUrl.trim() ? meetingUrl.trim()
                 : evZoom && zoomOk ? 'Zoom' : location.trim();
               const photo = media.find((m) => m.type === 'photo')?.url ?? null;
+              const photos = media.filter((m) => m.type === 'photo').map((m) => m.url);
               const when = inviteWhen(evRange.start ?? '', evAllDay, evStartMin);
               const sendTest = async () => {
                 setInvTest({ state: 'sending' });
                 const { data, error } = await supabase.functions.invoke('send-event-invite', {
-                  body: { test: { title: evTitle, start_date: evRange.start, all_day: evAllDay, start_min: evAllDay ? null : evStartMin, location: where, photo, invite: inviteDesign } },
+                  body: { test: { title: evTitle, start_date: evRange.start, all_day: evAllDay, start_min: evAllDay ? null : evStartMin, location: where, photo, invite: { ...(inviteDesign ?? { template: 'classic' }), cardPhoto: invitePhotos(inviteDesign, photos).card ?? 'none' } } },
                 });
                 const d = data as { ok?: boolean; to?: string; error?: string } | null;
                 if (error || !d?.ok) setInvTest({ state: 'error', msg: d?.error ?? 'The test didn’t send — try again in a moment.' });
@@ -2095,7 +2151,7 @@ export default function Compose() {
                   <label className="cmp__label">The invitation</label>
                   <p className="cmp__hint-ev">What your guests receive — by email, and on their invitation link, where it arrives in an envelope. <strong>Edit design</strong> picks a template, the words, colours and envelope.</p>
                   <div className="cmp__invstage">
-                    <InviteCard design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo }} />
+                    <InviteCard design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos }} />
                   </div>
                   <div className="cmp__invtest">
                     <button type="button" className="cmp__invtest-btn" onClick={() => setPreviewOpen(true)}>
@@ -2112,13 +2168,13 @@ export default function Compose() {
                     {invTest.state === 'error' && <span className="cmp__invtest-note cmp__invtest-note--err">{invTest.msg}</span>}
                   </div>
                   {studioOpen && (
-                    <InviteStudio design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo }}
+                    <InviteStudio design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos }}
                       uploaderId={user?.id}
                       onClose={() => setStudioOpen(false)}
                       onDone={(dz) => { setInviteDesign(dz); setStudioOpen(false); setInvTest({ state: 'idle' }); }} />
                   )}
                   {previewOpen && (
-                    <InvitePreview design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo }}
+                    <InvitePreview design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos }}
                       onClose={() => setPreviewOpen(false)} />
                   )}
                   {!editing && invitees.some((i) => i.kind === 'email') && (
@@ -2335,7 +2391,7 @@ export default function Compose() {
         </div>
       )}
 
-      <input ref={photoRef} type="file" accept="image/*" multiple hidden onChange={(e) => void onFile(e, 'photo')} />
+      <input ref={photoRef} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => void onFile(e, 'photo')} />
       <input ref={videoRef} type="file" accept="video/*" hidden onChange={(e) => void onFile(e, 'video')} />
 
       {uploading && <p className="cmp__uploading">Uploading…</p>}
@@ -2935,16 +2991,16 @@ export default function Compose() {
         <p className="cmp__draftnote">
           {draftNote || 'Autosaved to your drafts ✓'}
           {(draftNote.startsWith('Saved') || (!draftNote && draftSavedAt !== null)) && (
-            <> · <button className="cmp__draftlink" onClick={() => navigate('/drive')}>
-              <span className="link-cue">Open your drafts</span> ›
+            <> · <button className="cmp__draftlink" onClick={() => navigate(isEvent ? '/events/mine' : '/drive')}>
+              <span className="link-cue">{isEvent ? 'Your event drafts' : 'Open your drafts'}</span> ›
             </button></>
           )}
         </p>
       )}
       {!editing && draftCount > 0 && (
         <p className="cmp__draftnote">
-          {draftCount === 1 ? 'One earlier draft is waiting' : `${draftCount} earlier drafts are waiting`} in your Drive ·{' '}
-          <button className="cmp__draftlink" onClick={() => navigate('/drive')}>
+          {draftCount === 1 ? 'One earlier draft is waiting' : `${draftCount} earlier drafts are waiting`} in your {isEvent ? 'events' : 'Drive'} ·{' '}
+          <button className="cmp__draftlink" onClick={() => navigate(isEvent ? '/events/mine' : '/drive')}>
             <span className="link-cue">Open drafts</span> ›
           </button>
         </p>

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { webSafeImage } from './heic';
 
 /** PERSONAL FILES (founder 2026-10-21: Drive's + carries the paperclip's
  *  options): photos, videos and audio uploaded straight into your own Drive —
@@ -15,10 +16,14 @@ export interface DriveFileRow {
   created_at: string;
 }
 
-export async function uploadDriveFile(file: File, kind: DriveFileKind): Promise<DriveFileRow> {
+export async function uploadDriveFile(raw: File, kind: DriveFileKind): Promise<DriveFileRow> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
-  const ext = (file.name.split('.').pop() ?? 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+  const rawExt = (raw.name.split('.').pop() ?? 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+  // AirDropped iPhone photos arrive as HEIC — stored as JPG so they open anywhere.
+  const safe = await webSafeImage(raw, rawExt);
+  const ext = safe.ext;
+  const file = safe.file === raw ? raw : new File([safe.file], raw.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
   const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error: upErr } = await supabase.storage.from('drive')
     .upload(path, file, { contentType: file.type || undefined });

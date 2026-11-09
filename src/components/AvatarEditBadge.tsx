@@ -35,7 +35,7 @@ export function AvatarEditBadge({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         hidden
         onChange={(e) => {
           const f = e.target.files?.[0];

@@ -520,3 +520,6 @@
 /* Calendar hold (2026-11-09); the who-sees pills live in global.css */
 .cmp__evcal { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-3); }
 .cmp__evcal-lab { font-size: 12px; color: var(--ink-muted); }
+
+/* Event builder's manual | AI switch (2026-11-09) */
+.cmp__moderow { display: flex; justify-content: center; margin: 0 0 var(--s-4); }

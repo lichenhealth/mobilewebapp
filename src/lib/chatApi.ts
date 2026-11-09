@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { webSafeImage } from './heic';
 import { possessive } from './names';
 
 /** Claude the member — a real Lichen profile, not a bot account. Every
@@ -474,7 +475,8 @@ export async function loadCareClients(me: string): Promise<CareClient[]> {
 // ─── Chat media (private bucket — paths stored, signed at render) ────────────
 
 /** Upload a chat attachment into `chat-media/<chatId>/…`; returns the storage PATH. */
-export async function uploadChatMedia(chatId: string, file: Blob, ext: string): Promise<string> {
+export async function uploadChatMedia(chatId: string, rawFile: Blob, rawExt: string): Promise<string> {
+  const { file, ext } = await webSafeImage(rawFile, rawExt);
   const path = `${chatId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await supabase.storage.from('chat-media').upload(path, file);
   if (error) throw error;

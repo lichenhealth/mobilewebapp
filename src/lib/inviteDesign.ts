@@ -32,6 +32,12 @@ export interface InviteDesign {
   artwork?: string;
   /** An animated backdrop behind the envelope on the guest page. */
   backdrop?: InviteBackdrop;
+  /** TWO PHOTO SLOTS (founder 2026-11-09: a group photo on the OUTSIDE under
+   *  "You're invited", a different photo inside with the details). A URL from
+   *  our storage, 'none' to leave the slot empty, or unset = the smart
+   *  default (first photo on the card, second on the envelope). */
+  cardPhoto?: string;
+  envPhoto?: string;
 }
 
 export interface RsvpForm {
@@ -200,7 +206,21 @@ export function readInvite(raw: unknown): InviteDesign | null {
     links: (() => { const l = cleanLinks(r.links); return l.length ? l : undefined; })(),
     artwork: isOurImage(r.artwork) ? r.artwork : undefined,
     backdrop: INVITE_BACKDROPS.some((b) => b.id === r.backdrop) && r.backdrop !== 'none' ? (r.backdrop as InviteBackdrop) : undefined,
+    cardPhoto: r.cardPhoto === 'none' || isOurImage(r.cardPhoto) ? (r.cardPhoto as string) : undefined,
+    envPhoto: r.envPhoto === 'none' || isOurImage(r.envPhoto) ? (r.envPhoto as string) : undefined,
   };
+}
+
+/** WHERE THE PHOTOS GO — one answer for every surface. An explicit choice
+ *  wins ('none' empties the slot); otherwise the smart default: the first
+ *  photo dresses the card, a second one dresses the envelope's outside. */
+export function invitePhotos(d: Partial<InviteDesign> | null | undefined, photos: string[]): { card: string | null; env: string | null } {
+  const pick = (v: string | undefined) => (v === 'none' ? null : isOurImage(v) ? v : undefined);
+  const cardSet = pick(d?.cardPhoto);
+  const card = d?.photo === false ? null : cardSet !== undefined ? cardSet : photos[0] ?? null;
+  const envSet = pick(d?.envPhoto);
+  const env = envSet !== undefined ? envSet : photos.find((p) => p !== card) && photos.length > 1 ? photos.find((p) => p !== card)! : null;
+  return { card, env };
 }
 
 function readForm(v: unknown): RsvpForm | undefined {
