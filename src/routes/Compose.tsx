@@ -2201,6 +2201,8 @@ export default function Compose() {
                   )}
                   {previewOpen && (
                     <InvitePreview design={inviteDesign} facts={{ title: evTitle, when, where, host: hostName || 'you', photo, photos }}
+                      joinUrl={online && /^https:\/\//i.test(meetingUrl.trim()) ? meetingUrl.trim() : null}
+                      uploaderId={user?.id}
                       onClose={() => setPreviewOpen(false)} />
                   )}
                   {!editing && invitees.some((i) => i.kind === 'email') && (

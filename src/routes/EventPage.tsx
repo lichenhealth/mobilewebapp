@@ -433,6 +433,7 @@ export default function EventPage(props: { postId?: string } = {}) {
                 location: location || (calEvent.zoom_unique ? 'Zoom' : ''),
                 start_date: calEvent.start_date, end_date: calEvent.end_date, all_day: calEvent.all_day,
                 start_min: calEvent.start_min, end_min: calEvent.end_min,
+                tz: calEvent.timezone ?? null,
                 url: zoomUrl ?? undefined,
               }} />
             </div>

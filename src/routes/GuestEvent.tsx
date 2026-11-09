@@ -115,7 +115,7 @@ export default function GuestEvent() {
   const cal = useMemo(() => evSrc && ({
     title: evSrc.title, description: evSrc.description, location: evSrc.location,
     start_date: evSrc.start_date, end_date: evSrc.end_date, all_day: evSrc.all_day,
-    start_min: evSrc.start_min, end_min: evSrc.end_min,
+    start_min: evSrc.start_min, end_min: evSrc.end_min, tz: evSrc.event_tz ?? null,
   }), [evSrc]);
 
   async function saveExtras() {
@@ -166,12 +166,11 @@ export default function GuestEvent() {
       <InviteEnvelope design={design} peek={ev.title}>
         <InviteCard design={design}
           facts={{ title: ev.title, when: whenText(ev), where: ev.location || undefined, host: ev.host_name, photo: ev.photo_url }}
-          cta={requested ? <span className="gev__cardnote">Your request is with <span className="nobr">{ev.host_name}</span></span> : (
-            <button type="button" className="invc__cta gev__cardcta"
-              onClick={() => document.getElementById('gev-act')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
-              {info ? rd.rsvp : 'Ask to come'}
-            </button>
-          )} />
+          cta={requested ? <span className="gev__cardnote">Your request is with <span className="nobr">{ev.host_name}</span></span> : undefined}
+          rsvpLabel={info ? undefined : 'Ask to come'}
+          onRsvp={() => document.getElementById('gev-act')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          onCal={info && cal ? () => document.getElementById('gev-cal')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : undefined}
+          joinUrl={info && !requested ? zoomUrl : null} />
       </InviteEnvelope>
       {ev.description && <p className="gev__desc gev__desc--below">{ev.description}</p>}
 
@@ -211,7 +210,7 @@ export default function GuestEvent() {
       )}
 
       {info && !requested && (
-        <div className="gev__section">
+        <div className="gev__section" id="gev-cal">
           <p className="gev__label">Add it to your calendar</p>
           <div className="gev__cal">
             {cal && <AddToCal ev={cal} file={`${ev.title}.ics`} />}

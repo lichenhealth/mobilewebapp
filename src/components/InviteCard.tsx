@@ -1,4 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { LichenMark } from './LichenMark';
+import { Icon } from './Icon';
+import { videoServiceOf } from '../lib/linkify';
 import { linerCss, resolveInvite, invitePhotos, type InviteDesign, type InviteBackdrop } from '../lib/inviteDesign';
 import './Invite.css';
 
@@ -17,15 +20,56 @@ export interface InviteFacts {
   photos?: string[];
 }
 
-export function InviteCard({ design, facts, cta, footer }: {
+/** "Zoom" / a Meet link / "Teams" → the service's name, so the card can wear
+ *  a camera and a Join door instead of a bare word. */
+export function videoWhere(where?: string): string | null {
+  const w = (where || '').trim();
+  if (!w) return null;
+  const svc = videoServiceOf(w);
+  if (svc) return svc;
+  const m = w.length <= 32 && w.match(/^(zoom|google meet|meet|microsoft teams|teams|webex|whereby|jitsi|facetime)\b/i);
+  return m ? (m[1].toLowerCase() === 'meet' ? 'Google Meet' : m[1].replace(/\b\w/g, (c) => c.toUpperCase())) : null;
+}
+
+export function InviteCard({ design, facts, cta, footer, onRsvp, onCal, rsvpLabel, joinUrl, onJoin }: {
   design?: Partial<InviteDesign> | null;
   facts: InviteFacts;
-  cta?: ReactNode;       // replaces the RSVP pill (the guest page puts real buttons here)
+  cta?: ReactNode;       // replaces the whole action row (e.g. "your request is with the host")
   footer?: ReactNode;
+  /** THE CARD'S TWO DOORS (founder 2026-11-09: "RSVP on the left and add to
+   *  cal on the right"): given handlers, they render as real buttons; with
+   *  neither, the row is a still picture (the Studio thumbnail). */
+  onRsvp?: () => void;
+  onCal?: () => void;
+  rsvpLabel?: string;
+  /** A video event's room — the camera chip grows a Join door (no RSVP needed). */
+  joinUrl?: string | null;
+  onJoin?: () => void;
 }) {
   const r = resolveInvite(design);
   const t = r.template;
   const cardPhoto = invitePhotos(design, facts.photos ?? (facts.photo ? [facts.photo] : [])).card;
+  const video = videoWhere(facts.where);
+  const whereEl = facts.where && (video ? (
+    <p className="invc__where invc__where--video">
+      <span className="invc__video"><Icon name="video" size={15} /> {video}</span>
+      {joinUrl
+        ? <a className="invc__join" href={joinUrl} target="_blank" rel="noopener noreferrer">Join {video} ›</a>
+        : onJoin ? <button type="button" className="invc__join" onClick={onJoin}>Join {video} ›</button> : null}
+    </p>
+  ) : <p className="invc__where">{facts.where}</p>);
+  const label = rsvpLabel ?? (r.rsvp === 'RSVP & see the details' ? 'RSVP' : r.rsvp);
+  const actions = cta ?? (onRsvp || onCal ? (
+    <div className="invc__actions">
+      <button type="button" className="invc__cta" onClick={onRsvp}>{label}</button>
+      {onCal && <button type="button" className="invc__cta invc__cta--ghost" onClick={onCal}>Add to cal</button>}
+    </div>
+  ) : (
+    <div className="invc__actions">
+      <span className="invc__cta">{label}</span>
+      <span className="invc__cta invc__cta--ghost">Add to cal</span>
+    </div>
+  ));
   const linkRow = r.links.length > 0 && (
     <p className="invc__links">
       {r.links.map((l) => (
@@ -42,11 +86,11 @@ export function InviteCard({ design, facts, cta, footer }: {
       <div className="invc__artfacts">
         <p className="invc__arttitle">{facts.title}</p>
         <p className="invc__artline">{facts.when}</p>
-        {facts.where && <p className="invc__artline">{facts.where}</p>}
+        {whereEl}
         {r.message && <p className="invc__artline invc__artline--msg">{r.message}</p>}
         <p className="invc__artline">Hosted by <strong>{facts.host}</strong></p>
         {linkRow}
-        {cta ?? <span className="invc__cta">{r.rsvp}</span>}
+        {actions}
         {footer}
       </div>
     </div>
@@ -64,11 +108,11 @@ export function InviteCard({ design, facts, cta, footer }: {
         <h2 className="invc__title">{facts.title}</h2>
         {t.ornament && <p className="invc__orn invc__orn--low" aria-hidden="true">{t.ornament}</p>}
         <p className="invc__when">{facts.when}</p>
-        {facts.where && <p className="invc__where">{facts.where}</p>}
+        {whereEl}
         {r.message && <p className="invc__msg">{r.message}</p>}
         <p className="invc__host">Hosted by <strong>{facts.host}</strong></p>
         {linkRow}
-        {cta ?? <span className="invc__cta">{r.rsvp}</span>}
+        {actions}
         {footer}
       </div>
     </div>
@@ -99,7 +143,7 @@ export function InviteEnvelope({ design, peek, children, play = true, photos }: 
   const [stage, setStage] = useState<Stage>(reduce ? 'open' : 'front');
   const next: Partial<Record<Stage, [Stage, number]>> = {
     front: ['flipping', 1800], flipping: ['sealed', 900], sealed: ['opening', 700],
-    opening: ['cover', 3000], cover: ['turning', 2800], turning: ['open', 900],
+    opening: ['cover', 3000], cover: ['turning', 5000], turning: ['open', 900],
   };
   useEffect(() => {
     if (!play) return;
@@ -116,7 +160,7 @@ export function InviteEnvelope({ design, peek, children, play = true, photos }: 
   // (3) THE CARD'S FRONT, full size, then it turns open to the inside.
   if (stage === 'cover' || stage === 'turning') return (
     <button type="button" className={'invcover' + (stage === 'turning' ? ' is-turning' : '')} style={vars}
-      onClick={() => setStage('turning')} aria-label="Open the card">
+      onClick={() => setStage('turning')} aria-label="Open the card (it opens by itself in a moment)">
       {frontPhoto ? <img className="invcover__photo" src={frontPhoto} alt="" /> : <span className="invcover__orn" aria-hidden="true">{r.template.ornament || '✦'}</span>}
       <span className="invcover__words">
         {eyebrow}
@@ -142,9 +186,9 @@ export function InviteEnvelope({ design, peek, children, play = true, photos }: 
           ? <img className="invenv__card-photo" src={frontPhoto} alt="" />
           : <>{eyebrow}<span className="invenv__card-title">{peek}</span></>}
       </span>
-      <span className="invenv__front" />
-      <span className="invenv__flap"><span className="invenv__liner" /></span>
-      {stage === 'sealed' && <span className="invenv__seal" />}
+      <span className="invenv__frontwrap"><span className="invenv__front" /></span>
+      <span className="invenv__flapwrap"><span className="invenv__flap"><span className="invenv__liner" /></span></span>
+      {stage === 'sealed' && <WaxSeal />}
     </button>
   );
 }
@@ -182,5 +226,31 @@ export function InviteBackdropLayer({ kind, accent }: { kind: InviteBackdrop; ac
         );
       })}
     </div>
+  );
+}
+
+// A pressed wax seal in the design's accent: an uneven poured edge, a raised
+// rim, a soft sheen, and the Lichen mark stamped into the middle.
+const SEAL_EDGE = 'M92.7 45.3 Q94.0 50.0 93.6 54.9 Q93.2 59.9 90.6 64.1 Q87.9 68.3 85.7 72.4 Q83.4 76.6 80.3 80.4 Q77.3 84.2 73.2 86.9 Q69.1 89.7 64.2 90.3 Q59.3 90.8 54.7 93.4 Q50.0 95.9 45.1 94.6 Q40.1 93.3 35.6 91.3 Q31.1 89.2 27.2 86.4 Q23.2 83.6 18.9 80.9 Q14.5 78.3 12.1 73.9 Q9.6 69.4 9.4 64.4 Q9.2 59.3 7.6 54.7 Q6.0 50.0 7.2 45.3 Q8.4 40.5 9.0 35.5 Q9.6 30.5 13.3 27.1 Q16.9 23.6 19.7 19.5 Q22.4 15.4 26.7 12.9 Q30.9 10.4 35.8 9.5 Q40.6 8.7 45.3 8.5 Q50.0 8.2 55.1 6.6 Q60.3 5.0 65.2 6.6 Q70.1 8.2 73.2 12.7 Q76.3 17.1 80.2 19.9 Q84.2 22.7 87.9 26.3 Q91.7 29.9 91.5 35.2 Q91.4 40.6 92.7 45.3Z';
+function WaxSeal() {
+  const id = useId().replace(/[^a-zA-Z0-9]/g, '');
+  return (
+    <span className="invenv__seal" aria-hidden="true">
+      <svg viewBox="0 0 100 100" className="invenv__seal-wax">
+        <defs>
+          <radialGradient id={`ws${id}`} cx="36%" cy="30%" r="75%">
+            <stop offset="0" stopColor="#fff" stopOpacity="0.38" />
+            <stop offset="0.45" stopColor="#fff" stopOpacity="0" />
+            <stop offset="1" stopColor="#000" stopOpacity="0.32" />
+          </radialGradient>
+        </defs>
+        <path d={SEAL_EDGE} style={{ fill: 'var(--invc-accent)' }} />
+        <path d={SEAL_EDGE} fill={`url(#ws${id})`} />
+        <circle cx="50" cy="50" r="31" fill="none" stroke="rgba(0,0,0,0.22)" strokeWidth="3.2" />
+        <circle cx="49.2" cy="49.2" r="33" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="1.6" />
+        <circle cx="50" cy="50" r="29" style={{ fill: 'var(--invc-accent)' }} opacity="0.55" />
+      </svg>
+      <span className="invenv__seal-mark"><LichenMark size={30} label="" fill="rgba(0,0,0,0.3)" /></span>
+    </span>
   );
 }

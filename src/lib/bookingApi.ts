@@ -883,6 +883,8 @@ export interface GuestBookingView {
   /** The provider's handle — the way FORWARD from a cancelled/declined
    *  booking (founder 2026-11-02: the CTA to /book/<handle>). */
   provider_handle?: string | null;
+  /** The provider's IANA zone — the stored minutes are on this clock. */
+  provider_tz?: string | null;
 }
 
 export async function loadGuestBooking(token: string): Promise<GuestBookingView | null> {

@@ -36,6 +36,25 @@ const minToLabel = (m: number) => {
   return `${hh}${mm ? ':' + String(mm).padStart(2, '0') : ''}${ap}`;
 };
 
+// Wall-clock minutes on `tz`'s clock → the real instant (two-pass Intl
+// correction, the bookingApi slotInstant twin).
+function instant(date: string, min: number, tz: string): Date | null {
+  try {
+    const target = Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10), Math.floor(min / 60), min % 60);
+    let guess = target;
+    for (let i = 0; i < 2; i++) {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(guess));
+      const get = (t: string) => +(parts.find((x) => x.type === t)?.value ?? '0');
+      guess += target - Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'));
+    }
+    return new Date(guess);
+  } catch { return null; }
+}
+const zab = (tz: string, at: Date) => new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' })
+  .formatToParts(at).find((x) => x.type === 'timeZoneName')?.value ?? '';
+const p2 = (n: number) => String(n).padStart(2, '0');
+const utc = (d: Date) => `${d.getUTCFullYear()}${p2(d.getUTCMonth() + 1)}${p2(d.getUTCDate())}T${p2(d.getUTCHours())}${p2(d.getUTCMinutes())}00Z`;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   try {
@@ -44,7 +63,7 @@ Deno.serve(async (req) => {
 
     const svc = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,price_cents,paid_at,pay_choice,payment_pending_at,booking_types(title,location,duration_min,approval,pay_methods),provider:profiles!bookings_provider_id_fkey(full_name,handle)`,
+      `${SUPABASE_URL}/rest/v1/bookings?guest_token=eq.${encodeURIComponent(token)}&select=id,status,on_date,start_min,end_min,note,guest_name,guest_email,meeting_url,price_cents,paid_at,pay_choice,payment_pending_at,booking_types(title,location,duration_min,approval,pay_methods),provider:profiles!bookings_provider_id_fkey(full_name,handle,timezone)`,
       { headers: svc },
     );
     const row = (r.ok ? await r.json() : [])?.[0];
@@ -62,7 +81,16 @@ Deno.serve(async (req) => {
 
     const t = row.booking_types ?? {};
     const provider = row.provider?.full_name ?? 'a Lichen member';
-    const when = `${new Date(row.on_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · ${minToLabel(row.start_min)} – ${minToLabel(row.end_min)} (${provider}'s local time)`;
+    // TIMES SAY THEIR ZONE, AND THE CALENDAR DOORS CARRY THE INSTANT (founder
+    // 2026-11-09: a PST client read "11am" as her own 11am). The mail names the
+    // provider's zone; the calendar links + .ics are UTC, so every calendar
+    // shows the session on the guest's own clock.
+    const ptz: string | null = row.provider?.timezone ?? null;
+    const tA = ptz ? instant(row.on_date, row.start_min, ptz) : null;
+    const tB = ptz ? instant(row.on_date, row.end_min, ptz) : null;
+    const zone = ptz && tA ? zab(ptz, tA) : '';
+    const firstName = provider.split(' ')[0];
+    const when = `${new Date(row.on_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · ${minToLabel(row.start_min)} – ${minToLabel(row.end_min)} ${zone ? `${zone} (${firstName}'s time zone)` : `(${provider}'s local time)`}`;
     const link = `${APP_URL}/b/${token}`;
     // THE WAY FORWARD on a cancelled/declined booking (founder 2026-11-02:
     // "a CTA to book a different time/meeting type with Galyn, and take
@@ -153,6 +181,21 @@ Deno.serve(async (req) => {
       ? `${row.price_cents ? 'Or pay directly' : 'Ways to pay'}: ${methodWords.join(' · ')}`
       : '';
 
+    const calOn = row.status === 'confirmed' && tA && tB;
+    const calTitle = `${t.title ?? 'Session'} with ${provider}`;
+    const calDesc = [meet ? `${meetLabel}: ${meet}` : '', `Your booking: ${link}`].filter(Boolean).join('\n\n');
+    const calLoc = meet ? (videoServiceOf(meet) ?? 'Video call') : (t.location ?? '');
+    const gcal = calOn ? `https://calendar.google.com/calendar/render?${new URLSearchParams({ action: 'TEMPLATE', text: calTitle, dates: `${utc(tA!)}/${utc(tB!)}`, details: calDesc, location: calLoc })}` : '';
+    const ocal = calOn ? `https://outlook.live.com/calendar/0/deeplink/compose?${new URLSearchParams({ path: '/calendar/action/compose', rru: 'addevent', subject: calTitle, startdt: tA!.toISOString().replace(/\.\d{3}Z$/, 'Z'), enddt: tB!.toISOString().replace(/\.\d{3}Z$/, 'Z'), body: calDesc, location: calLoc })}` : '';
+    const icsEsc = (x: string) => x.replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
+    const ics = calOn ? ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Lichen//EN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
+      `UID:booking-${row.id}@lichen.health`, `DTSTAMP:${utc(new Date())}`, `DTSTART:${utc(tA!)}`, `DTEND:${utc(tB!)}`,
+      `SUMMARY:${icsEsc(calTitle)}`, `DESCRIPTION:${icsEsc(calDesc)}`, calLoc ? `LOCATION:${icsEsc(calLoc)}` : '', meet ? `URL:${meet}` : '',
+      'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n') : '';
+    const calText = calOn ? `\n\nAdd it to your calendar (it shows in your own time zone):\nGoogle: ${gcal}\nOutlook: ${ocal}\nApple / other: open the attached .ics file` : '';
+    const calHtml = calOn ? `<p style="margin:14px 0 0;font-size:13px;color:#6b6b66">Add it to your calendar — it shows in your own time zone:</p>
+      <p style="margin:6px 0 0;font-size:13px"><a href="${esc(gcal)}" style="color:#c5704a;font-weight:600">Google</a> &nbsp;·&nbsp; <a href="${esc(ocal)}" style="color:#c5704a;font-weight:600">Outlook</a> &nbsp;·&nbsp; <span style="color:#6b6b66">Apple &amp; others: the attached .ics</span></p>` : '';
+
     // GMAIL FOLDS REPEATED TAILS (founder 2026-11-02, from her screenshot of
     // the "…" pill hiding the See-your-booking button): successive mails
     // about ONE booking (confirmed → rescheduled → reminder) used to share a
@@ -163,7 +206,7 @@ Deno.serve(async (req) => {
       month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', timeZone: 'UTC',
     }) + ' UTC';
 
-    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${payLine ? `\n${payLine}` : ''}${methodsLine ? `\n${methodsLine}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}\n\n${bookAgain ? `Book another time with ${first}: ${bookAgain}\n` : ''}${link}\n\nSent ${sentStamp}`;
+    const text = `${c.lead}\n\n${t.title} — ${when}${t.location ? `\n${t.location}` : ''}${payLine ? `\n${payLine}` : ''}${methodsLine ? `\n${methodsLine}` : ''}${meet ? `\n\n${meetLabel}: ${meet}` : ''}${calText}\n\n${bookAgain ? `Book another time with ${first}: ${bookAgain}\n` : ''}${link}\n\nSent ${sentStamp}`;
     const html = `
 <div style="background:#f3efe9;padding:32px 16px;font-family:Archivo,Helvetica,Arial,sans-serif;color:#2b2b28">
   <div style="max-width:520px;margin:0 auto">
@@ -184,6 +227,7 @@ Deno.serve(async (req) => {
         // EMAIL-ONLY use: in-app the blue is retired (2026-10-06) and join
         // links keep the peach link-cue.
         meet ? `<p style="margin:14px 0 0;font-size:15px"><a href="${esc(meet)}" style="color:#5E89AD;font-weight:600;text-decoration:underline">${esc(meetLabel)}</a></p>` : ''}
+      ${calHtml}
     </div>
     ${bookAgain
       ? `<p style="margin:22px 0"><a href="${bookAgain}" style="background:#e8956b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-size:14px">Book another time with ${esc(first)}</a></p>
@@ -200,6 +244,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: FROM, to: [row.guest_email], reply_to: REPLY_TO,
         subject: c.subject, text, html,
+        ...(ics ? { attachments: [{ filename: 'session.ics', content: btoa(unescape(encodeURIComponent(ics))) }] } : {}),
         headers: { 'List-Unsubscribe': `<mailto:${REPLY_TO}?subject=unsubscribe>` },
       }),
     });
