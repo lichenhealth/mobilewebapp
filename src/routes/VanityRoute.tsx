@@ -87,8 +87,15 @@ export default function VanityRoute({ area, scoped }: { area: string; scoped?: R
           // Signed out, an event's shareable /e/ page is the honest landing
           // when the host minted one (RSVP works there; the approval gate
           // covers anyone off the invite list).
-          if (!user && row.open_link) navigate(`/e/${row.open_link}`, { replace: true });
-          else setPost({ id: row.post_id, event: true });
+          if (!user && row.open_link) { navigate(`/e/${row.open_link}`, { replace: true }); return; }
+          // Signed in but not on an invite-only event's list: its shareable
+          // link is still the door (ask to come), never a dead page.
+          if (user && row.open_link) {
+            const { data: can } = await supabase.from('posts').select('id').eq('id', row.post_id).maybeSingle();
+            if (!live) return;
+            if (!can) { navigate(`/e/${row.open_link}`, { replace: true }); return; }
+          }
+          setPost({ id: row.post_id, event: true });
         } else {
           setPost({ id: row.post_id, event: false });
         }

@@ -543,3 +543,4 @@
   .cmp__sidecard { padding: 14px 4px 8px; }
   .cmp__sidecard .cmp__invstage .invc { max-width: none; }
 }
+.cmp__copylink { margin-left: 6px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--peach); background: #fff; color: var(--peach-deep); font: inherit; font-size: 12px; cursor: pointer; }

@@ -348,6 +348,7 @@ export default function Compose() {
   // owner, shareable at lichen.health/<section>/<handle>/<link-name>.
   const [linkName, setLinkName] = useState('');
   const [ownHandle, setOwnHandle] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   // The address the link name rides on follows the hat: a space's listing
   // shares at the SPACE's handle, a being's at its own, else yours.
   useEffect(() => {
@@ -2408,7 +2409,13 @@ export default function Compose() {
             <p className="cmp__hint-ev">
               {linkName
                 ? (ownHandle
-                  ? <>Shareable at <strong>lichen.health/{word}/{ownHandle}/{linkName}</strong></>
+                  ? <>Shareable at <strong>lichen.health/{word}/{ownHandle}/{linkName}</strong>{' '}
+                      <button type="button" className="cmp__copylink" onClick={() => {
+                        const u = `https://lichen.health/${word}/${ownHandle}/${linkName}`;
+                        void navigator.clipboard?.writeText(u).then(() => { setLinkCopied(true); window.setTimeout(() => setLinkCopied(false), 2000); })
+                          .catch(() => window.prompt('Copy this link', u));
+                      }}>{linkCopied ? 'Copied ✓' : 'Copy'}</button>
+                      {isEvent && !evAnyone && <><br />Off Lichen, it opens once you make the event’s shareable link — then anyone you send it to can ask to come.</>}</>
                   : <>Needs an address first — set your handle in Profile → Public page (or just ask the brain).</>)
                 : <>A sendable address — lichen.health/{word}/«your-handle»/«link-name».</>}
             </p>
