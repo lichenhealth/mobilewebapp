@@ -34,6 +34,9 @@ export interface EventRow {
   draft_id?: string | null;
   /** The event's own cap over calendar sharing: null = follow it. */
   share_level?: 'busy' | 'hidden' | null;
+  /** The shareable link's own permission (null = follow the event's visibility). */
+  link_access?: 'anyone' | 'invited' | 'members' | 'circles' | null;
+  link_space_ids?: string[] | null;
   /** TIME POLL (2026-11-09): 'open' while guests vote; the row holds the
    *  provisional (first) option until it's decided. */
   poll_status?: 'open' | 'decided' | null;
@@ -67,7 +70,7 @@ export interface EventRow {
 
 const EVENT_COLS =
   'id, creator_id, owner_profile_id, owner_space_id, title, description, location, lat, lng, ' +
-  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, is_draft, draft_id, share_level, poll_status, poll_deadline, poll_wait_all, poll_auto, poll_rules, poll_suggested, poll_reason, created_at';
+  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, is_draft, draft_id, share_level, link_access, link_space_ids, poll_status, poll_deadline, poll_wait_all, poll_auto, poll_rules, poll_suggested, poll_reason, created_at';
 // event_attendees has TWO FKs to profiles (profile_id + invited_by) — the
 // embed must name the one it means (house rule; see CLAUDE.md).
 const ATTENDEE_EMBED =
@@ -652,5 +655,11 @@ export async function loadDraftMeetingUrl(draftId: string): Promise<string | nul
 export async function carryDraftZoom(draftId: string, eventId: string): Promise<void> {
   await supabase.rpc('adopt_draft_meeting', { p_draft: draftId, p_event: eventId });
   const { error } = await supabase.from('events').update({ zoom_unique: true }).eq('id', eventId);
+  if (error) throw error;
+}
+
+/** Who the event's shareable link lets in (host/co-host only). */
+export async function setEventLinkAccess(eventId: string, access: 'anyone' | 'invited' | 'members' | 'circles', spaces?: string[]): Promise<void> {
+  const { error } = await supabase.rpc('set_event_link_access', { p_event: eventId, p_access: access, p_spaces: access === 'circles' ? spaces ?? [] : null });
   if (error) throw error;
 }

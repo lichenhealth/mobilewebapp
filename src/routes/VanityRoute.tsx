@@ -134,7 +134,12 @@ export default function VanityRoute({ area, scoped }: { area: string; scoped?: R
   if (miss) {
     return (
       <div className="vanity-miss">
-        <p>Nothing lives at this address{param ? <> — <strong>{param}{slug ? `/${slug}` : ''}</strong></> : ''}.</p>
+        {/* HONEST, NOT "NOTHING HERE" (founder 2026-11-09: "it could also be
+            that the person doesn't have access"): a private piece reads the
+            same as a missing one, so say both. */}
+        <p>We couldn’t open {param ? <strong>{param}{slug ? `/${slug}` : ''}</strong> : 'this address'} — it may be private, it may have moved, or the link may be mistyped.</p>
+        {slug && !user && <p>If someone invited you, <Link className="link-cue" to={`/login?next=${encodeURIComponent(realLoc.pathname)}`}>sign in</Link> to see it, or ask them for their shareable link.</p>}
+        {slug && user && <p>If it’s a private event, ask the host to invite you or send their shareable link.</p>}
         <Link className="link-cue" to={root}>Browse {label} ›</Link>
       </div>
     );

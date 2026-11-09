@@ -48,7 +48,17 @@ export async function loadGuestEvent(token: string): Promise<GuestEventInfo | nu
 
 /** The same event shape, minus the guest fields, by the event's own
  *  shareable LINK token. */
-export type OpenEventInfo = Omit<GuestEventInfo, 'guest_name' | 'guest_status' | 'guest_plus_ones' | 'guest_meal' | 'guest_answers'>;
+export type OpenEventInfo = Omit<GuestEventInfo, 'guest_name' | 'guest_status' | 'guest_plus_ones' | 'guest_meal' | 'guest_answers'> & {
+  /** Who this link lets in: anyone · invited (others ask) · members (sign in). */
+  link_tier?: 'anyone' | 'invited' | 'members' | 'circles';
+};
+
+/** A signed-in member comes as themselves through a members/anyone link. */
+export async function joinEventByLink(linkToken: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('join_event_by_link', { p_link: linkToken });
+  if (error) throw error;
+  return (data as string | null) ?? null;
+}
 
 /** Open-link landing: the event by its shareable token (anon-callable). */
 export async function loadOpenEvent(linkToken: string): Promise<OpenEventInfo | null> {
