@@ -254,3 +254,4 @@
    or post be at the top and dictate how you see all of them?"). */
 .drive__lensrow { display: flex; align-items: center; gap: 8px; padding-right: var(--s-5); }
 .drive__lensrow .filter-row { flex: 1; min-width: 0; }
+.drive__trashdoor { margin: var(--s-6) 0 0; text-align: center; font-size: 13px; color: var(--ink-muted); }

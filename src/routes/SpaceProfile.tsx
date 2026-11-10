@@ -2789,8 +2789,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           {/* EACH KNOCK IS A THREAD (founder 2026-11-10): waiting ones first in
               peach, then let-in (green) and not-a-fit/spam (red), each one
               expandable to what they wrote and every reply sent back. */}
+          {knocks.some((k) => k.status === 'spam') && (
+            <p className="sprof__hint"><Link className="link-cue" to="/trash?section=door">Spam waits in the trash ›</Link></p>
+          )}
           <ul className="kcard__list">
-          {[...knocks.filter((k) => k.status === 'new'), ...knocks.filter((k) => k.status !== 'new')].map((k) => (
+          {[...knocks.filter((k) => k.status === 'new'), ...knocks.filter((k) => k.status !== 'new' && k.status !== 'spam')].map((k) => (
             <KnockCard key={k.id} knock={k} sentNonce={knockSent[k.id] ?? 0}
               sub={<em className="sprof__req-tag">knocked from the public page · not on Lichen yet</em>}>
               <div className="sprof__knock-acts">

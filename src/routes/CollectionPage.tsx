@@ -1,3 +1,4 @@
+import { trashPost, trashFolder } from '../lib/trashApi';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageHead } from '../components/PageHead';
@@ -1192,7 +1193,7 @@ export default function CollectionPage() {
                   <button
                     className="btn colp__btn colp__btn--danger"
                     disabled={busy}
-                    onClick={() => void act(async () => { await deleteCollection(id); navigate('/saved'); })}
+                    onClick={() => void act(async () => { await trashFolder(id); navigate('/saved'); })}
                   >
                     Yes, delete
                   </button>
@@ -1450,7 +1451,7 @@ export default function CollectionPage() {
               viewerIsAuthor={p.author_id === me}
               onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
               onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
-              onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+              onDelete={!p.linked_event_id ? () => { void trashPost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
               onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
               onMessage={me ? () => messageAbout(p) : undefined}
               onOpen={() => navigate(postOpenPath(p))}

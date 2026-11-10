@@ -1,0 +1,25 @@
+/* THE TRASH (founder 2026-11-10). Drive's row grammar on its own page. */
+.trash { display: flex; flex-direction: column; gap: var(--s-4); padding-bottom: var(--s-8); }
+.trash__msg { margin: 0; font-size: 13px; color: var(--green-deep); text-wrap: pretty; }
+.trash__empty { margin: var(--s-6) 0; text-align: center; color: var(--ink-muted); font-size: var(--t-sm); }
+.trash__bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap;
+  padding-bottom: var(--s-2); border-bottom: 1px solid var(--bone-edge); }
+.trash__count { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-muted); }
+.trash__empty-btn { background: none; border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  padding: 6px 14px; font-size: 13px; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+.trash__empty-btn:hover { color: var(--red-deep); border-color: var(--red-deep); }
+.trash__empty-btn.is-sure { background: var(--red-deep); border-color: var(--red-deep); color: #fff; }
+.trash__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.trash__row { display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3) 0; border-bottom: 1px solid var(--bone-edge); }
+.trash__icon { flex: 0 0 34px; height: 34px; border-radius: 50%; background: var(--bone-warm, #fff);
+  border: 1px solid var(--bone-edge); display: grid; place-items: center; color: var(--ink-soft); }
+.trash__main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.trash__title { font-size: 15px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash__meta { font-size: 12px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.trash__story { font-size: 13px; color: var(--ink-soft); font-style: italic; text-wrap: pretty; }
+.trash__acts { flex: 0 0 auto; display: flex; gap: var(--s-2); align-items: center; }
+.trash__act { background: none; border: none; padding: 4px 2px; font-size: 13px; color: var(--peach-deep); cursor: pointer; white-space: nowrap; }
+.trash__act:hover { text-decoration: underline; }
+.trash__act--del { color: var(--ink-muted); }
+.trash__act--del.is-sure, .trash__act--del:hover { color: var(--red-deep); }
+.trash__fine { margin: 0; font-size: 12px; color: var(--ink-muted); text-wrap: pretty; }

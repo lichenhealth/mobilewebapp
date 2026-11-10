@@ -23,6 +23,7 @@ import Donate from './routes/Donate';
 import DonateHow from './routes/DonateHow';
 import Giving from './routes/Giving';
 import Saved from './routes/Saved';
+import Trash from './routes/Trash';
 import BookPublic from './routes/BookPublic';
 import GuestBooking from './routes/GuestBooking';
 import Organize from './routes/Organize';
@@ -385,6 +386,7 @@ export default function App() {
               links and muscle memory. */}
           <Route path="/drive"     element={<Saved />} />
           <Route path="/saved"     element={<Saved />} />
+          <Route path="/trash"     element={<Trash />} />
           <Route path="/assistant" element={<AssistantBrief />} />
           <Route path="/assistant/feed" element={<AssistantFeed />} />
           <Route path="/snapshot" element={<Snapshot />} />

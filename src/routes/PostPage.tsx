@@ -1,3 +1,4 @@
+import { trashPost } from '../lib/trashApi';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PageHead } from '../components/PageHead';
@@ -273,7 +274,7 @@ export default function PostPage(props: { postId?: string } = {}) {
         extraMenuItems={me ? [{ label: 'Add to collection…', onClick: () => openPicker(p.id) }] : undefined}
         viewerIsAuthor={p.author_id === me}
         onEdit={() => navigate(`/compose?post=${p.id}`)}
-        onDelete={() => { void deletePost(p.id).then(back).catch(console.error); }}
+        onDelete={() => { void trashPost(p.id).then(back).catch(console.error); }}
         onHide={me ? () => { void setHidden(p.id, true).then(back).catch(console.error); } : undefined}
         onMessage={me ? async () => {
           try { navigate(await chatPathForPost(p)); } catch (e) { console.error(e); }

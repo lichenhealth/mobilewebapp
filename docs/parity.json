@@ -762,5 +762,32 @@
  },
  "eventGuestsApi:joinEventByLink": {
   "exempt": "A member coming to an event through its shareable link — the person's own tap on the guest page."
+ },
+ "trashApi:trashPostDraft": {
+  "tool": "delete_draft"
+ },
+ "trashApi:trashPost": {
+  "gap": "1"
+ },
+ "trashApi:trashDoc": {
+  "gap": "1"
+ },
+ "trashApi:trashDriveFile": {
+  "gap": "1"
+ },
+ "trashApi:trashFolder": {
+  "gap": "1"
+ },
+ "trashApi:restoreTrash": {
+  "gap": "1"
+ },
+ "trashApi:emptyTrash": {
+  "gap": "1"
+ },
+ "trashApi:restoreSpamKnock": {
+  "gap": "1"
+ },
+ "trashApi:emptySpamKnocks": {
+  "gap": "1"
  }
 }

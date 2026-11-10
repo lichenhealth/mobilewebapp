@@ -1,3 +1,4 @@
+import { trashPost } from '../lib/trashApi';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FeedCard from './FeedCard';
@@ -330,7 +331,7 @@ export default function ContributionsFeed({ profileId, spaceId, handle, me, lead
             viewerIsAuthor={interactive && p.author_id === me}
             onManage={interactive && p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onEdit={interactive && !p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
-            onDelete={interactive && !p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+            onDelete={interactive && !p.linked_event_id ? () => { void trashPost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onHide={interactive && me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onMessage={interactive && me ? () => messageAbout(p) : undefined}
           />
