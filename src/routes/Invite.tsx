@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 /** The invitation's standard paragraph — kept in step with send-invite's
@@ -207,7 +207,9 @@ export default function Invite() {
   // EACH KNOCK IS A THREAD (founder 2026-11-10): the door now keeps everyone
   // who knocked — waiting ones first (peach), then those let in (green) and
   // those declined or marked spam (red) — each one expandable.
-  const doorKnocks = [...waitingKnocks, ...knocks.filter((k) => k.status !== 'new')];
+  // Spam goes to the TRASH (founder 2026-11-10) — it waits there, not here.
+  const doorKnocks = [...waitingKnocks, ...knocks.filter((k) => k.status !== 'new' && k.status !== 'spam')];
+  const spamCount = knocks.filter((k) => k.status === 'spam').length;
   const [knockSent, setKnockSent] = useState<Record<string, number>>({});
   const [error, setError] = useState('');
 
@@ -760,6 +762,9 @@ export default function Invite() {
               {waitingKnocks.length > 0 && <span className="invite__tally">{waitingKnocks.length} waiting</span>}
             </h2>
             {waitingKnocks.length === 0 && <p className="invite__muted">Nobody knocking right now.</p>}
+            {spamCount > 0 && (
+              <p className="invite__muted"><Link className="link-cue" to="/trash?section=door">Spam waits in the trash ›</Link></p>
+            )}
             {doorKnocks.length > 0 && (
               <ul className="invite__list kcard__list">
                 {/* Who they are on one full-width line, the answers on their

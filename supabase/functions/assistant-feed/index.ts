@@ -3014,11 +3014,20 @@ Deno.serve(async (req) => {
       if (day && targets.length !== 1) return { ok: false, error: `${targets.length} drafts titled "${t}" were saved on ${day} — ask which one, using the list: ${list.map((r) => describe(r)).join('; ')}.` };
       if (!targets.length) return { ok: false, error: 'Nothing to delete with that choice.' };
       const ids = targets.map((r) => r.id);
+      // THE TRASH (founder 2026-11-10): a deleted draft waits there until they empty it.
+      const full = await (await sb(`post_drafts?profile_id=eq.${profile_id}&id=in.(${ids.join(',')})&select=*`)).json();
+      if (Array.isArray(full) && full.length) {
+        const tr = await sb('trash_items', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(full.map((row: Record<string, unknown>) => ({
+          owner_id: profile_id, kind: 'draft', section: 'drive', ref_id: row.id, payload: row,
+          label: String((row.draft as Record<string, unknown> | null)?.title ?? '').slice(0, 200) || 'Untitled draft',
+        }))) });
+        if (!tr.ok) return { ok: false, error: `Couldn't move them to the trash: ${(await tr.text()).slice(0, 140)}` };
+      }
       const r = await sb(`post_drafts?profile_id=eq.${profile_id}&id=in.(${ids.join(',')})`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
       if (!r.ok) return { ok: false, error: `The delete failed: ${(await r.text()).slice(0, 140)}` };
       const kept = list.filter((x) => !ids.includes(x.id));
       return { ok: true, change: `deleted ${ids.length} draft${ids.length === 1 ? '' : 's'} titled "${t}" (${targets.map(describe).join('; ')})${kept.length ? `; kept ${kept.length}: ${kept.map(describe).join('; ')}` : ''}`,
-        note: 'Gone for good — deleted drafts cannot be restored. An event draft\'s calendar hold went with it.' };
+        note: 'Moved to their trash (Drive → Drive trash, or /trash) — they can restore it until they empty it. An event draft\'s calendar hold went with it.' };
     }
 
     if (name === 'update_post') {

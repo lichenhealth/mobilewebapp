@@ -1,5 +1,6 @@
+import { trashPost, trashFolder, trashPostDraft, trashDoc, trashDriveFile } from '../lib/trashApi';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
 import FeedCard from '../components/FeedCard';
 import FilterRow from '../components/FilterRow';
@@ -604,8 +605,8 @@ export default function Saved() {
               if (folderDel !== c.id) { setFolderDel(c.id); return; }
               setFolderMenuFor(null); setFolderDel(null);
               setCollections((cur) => cur.filter((x) => x.id !== c.id));
-              void deleteCollection(c.id).catch(console.error);
-            }}>{folderDel === c.id ? 'Really delete?' : 'Delete'}</button>
+              void trashFolder(c.id).catch(console.error);
+            }}>{folderDel === c.id ? 'Move to trash?' : 'Delete'}</button>
           </span>
         )}
       </span>
@@ -679,7 +680,7 @@ export default function Saved() {
                 <button className="drive__menu-danger" onClick={() => {
                   setMenuFor(null);
                   if (!window.confirm('Delete this post everywhere on Lichen? This can’t be undone.')) return;
-                  void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error);
+                  void trashPost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error);
                 }}>Delete</button>
               )}
             </span>
@@ -1001,14 +1002,14 @@ export default function Saved() {
                     className="drive__draft-del"
                     onClick={() => {
                       if (draftDel !== d.id) { setDraftDel(d.id); return; }
-                      void deletePostDraft(d.id).then(() => {
+                      void trashPostDraft(d.id, draftLabel(d.draft)).then(() => {
                         setDrafts((cur) => cur.filter((x) => x.id !== d.id));
                         setDraftDel(null);
                       });
                     }}
                     onBlur={() => setDraftDel((cur) => (cur === d.id ? null : cur))}
                   >
-                    {draftDel === d.id ? 'Really delete?' : 'Delete'}
+                    {draftDel === d.id ? 'Move to trash?' : 'Delete'}
                   </button>
                 </span>
               </div>
@@ -1047,12 +1048,12 @@ export default function Saved() {
                   className="drive__draft-del"
                   onClick={() => {
                     if (fileDel !== d.id) { setFileDel(d.id); return; }
-                    void deleteChatDoc(d.id).then(() => setPdocs((cur) => cur.filter((x) => x.id !== d.id)));
+                    void trashDoc(d.id).then(() => setPdocs((cur) => cur.filter((x) => x.id !== d.id)));
                     setFileDel(null);
                   }}
                   onBlur={() => setFileDel((cur) => (cur === d.id ? null : cur))}
                 >
-                  {fileDel === d.id ? 'Really delete?' : 'Delete'}
+                  {fileDel === d.id ? 'Move to trash?' : 'Delete'}
                 </button>
               </span>
             </div>
@@ -1073,12 +1074,12 @@ export default function Saved() {
                   className="drive__draft-del"
                   onClick={() => {
                     if (fileDel !== f.id) { setFileDel(f.id); return; }
-                    void deleteDriveFile(f).then(() => setFiles((cur) => cur.filter((x) => x.id !== f.id)));
+                    void trashDriveFile(f).then(() => setFiles((cur) => cur.filter((x) => x.id !== f.id)));
                     setFileDel(null);
                   }}
                   onBlur={() => setFileDel((cur) => (cur === f.id ? null : cur))}
                 >
-                  {fileDel === f.id ? 'Really delete?' : 'Delete'}
+                  {fileDel === f.id ? 'Move to trash?' : 'Delete'}
                 </button>
               </span>
             </div>
@@ -1173,7 +1174,7 @@ export default function Saved() {
             viewerIsAuthor={p.author_id === me}
             onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
             onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
-            onDelete={!p.linked_event_id ? () => { void deletePost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+            onDelete={!p.linked_event_id ? () => { void trashPost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
             onSave={(on) => {
               setUnsaved((cur) => { const n = new Set(cur); on ? n.delete(p.id) : n.add(p.id); return n; });
@@ -1192,6 +1193,11 @@ export default function Saved() {
         ))}
       </section>
 
+      {/* THE TRASH (founder 2026-11-10): what you delete in Drive waits there
+          until you empty it. */}
+      <p className="drive__trashdoor">
+        <Link className="link-cue" to="/trash?section=drive">Drive trash ›</Link>
+      </p>
     </div>
   );
 }

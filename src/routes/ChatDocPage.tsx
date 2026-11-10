@@ -1,3 +1,4 @@
+import { trashDoc } from '../lib/trashApi';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
@@ -189,7 +190,7 @@ export default function ChatDocPage() {
         {confirmDel ? (
           <button className="cdocp__del is-sure" onClick={async () => {
             try {
-              await deleteChatDoc(doc.id);
+              await (doc.chat_id ? deleteChatDoc(doc.id) : trashDoc(doc.id));
               navigate(doc.chat_id ? `/chat/${doc.chat_id}/drive` : '/drive');
             }
             catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t work.'); setConfirmDel(false); }

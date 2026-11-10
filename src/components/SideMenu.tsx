@@ -55,6 +55,7 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/maps',      label: 'Maps',      icon: 'maps' },
   { to: '/profile',   label: 'Profile',   icon: 'profile' },
   { to: '/invite',    label: 'Invite to Lichen', icon: 'user-multiple' },
+  { to: '/trash',     label: 'Trash',     icon: 'trash' },
   { to: '/help',      label: 'Help',      icon: 'info' },
   { to: '/membership', label: 'Membership', icon: 'dollar' },
 ];
