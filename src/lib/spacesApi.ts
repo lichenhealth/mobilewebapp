@@ -688,15 +688,16 @@ export async function cohortInfo(spaceId: string): Promise<{ term: string | null
 
 // ─── Knocks at a space's door (founder 2026-08-17: public pages are gateways) ─
 export interface SpaceKnock {
-  id: string; name: string; email: string; story: string | null; status: 'new' | 'invited' | 'declined'; created_at: string; replied_at?: string | null; reply_count?: number | null;
+  id: string; name: string; email: string; story: string | null; status: 'new' | 'invited' | 'declined' | 'spam'; created_at: string; replied_at?: string | null; reply_count?: number | null; last_reply?: string | null;
 }
 /** Strangers who asked to join THIS space from its public page. RLS: the
- *  space's admins (and platform admins). Only the still-asking ones. */
+ *  space's admins (and platform admins). Every knock, newest first — each one
+ *  a thread (founder 2026-11-10); callers put the still-asking ones first. */
 export async function listSpaceKnocks(spaceId: string): Promise<SpaceKnock[]> {
   const { data, error } = await supabase.from('join_requests')
-    .select('id, name, email, story, status, created_at, replied_at, reply_count')
-    .eq('space_id', spaceId).eq('status', 'new')
-    .order('created_at', { ascending: false });
+    .select('id, name, email, story, status, created_at, replied_at, reply_count, last_reply')
+    .eq('space_id', spaceId)
+    .order('created_at', { ascending: false }).limit(40);
   if (error) { console.warn('listSpaceKnocks:', error.message); return []; }
   return (data as SpaceKnock[] | null) ?? [];
 }

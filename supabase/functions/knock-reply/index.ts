@@ -102,6 +102,9 @@ Deno.serve(async (req) => {
       from: `${sender.replace(/[<>"]/g, '')} via Lichen <${FROM_ADDR}>`,
       to: [k.email],
       reply_to: user.email ?? 'connect@lichen.health',
+      // A hidden copy to the steward so the whole conversation lives in one
+      // inbox thread (founder 2026-11-10) — the knocker never sees it.
+      ...(user.email ? { bcc: [user.email] } : {}),
       subject, html, text,
     }),
   });
@@ -113,6 +116,12 @@ Deno.serve(async (req) => {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ replied_at: repliedAt, reply_count: (k.reply_count ?? 0) + 1, last_reply: message.slice(0, 4000), replied_by: user.id }),
+  });
+  // The thread (founder 2026-11-10: each knock is a thread) — every reply kept.
+  await svc('knock_replies', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ knock_id: knockId, body: message.slice(0, 4000), sent_by: user.id, sent_at: repliedAt }),
   });
   return json({ ok: true, replied_at: repliedAt, to: k.email });
 });

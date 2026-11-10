@@ -1,0 +1,29 @@
+.kcard { list-style: none; border: 1px solid var(--bone-edge); border-left-width: 4px; border-radius: 12px; background: var(--paper, #fff); overflow: hidden; }
+.kcard + .kcard { margin-top: var(--s-3); }
+.kcard--open { border-left-color: var(--peach); }
+.kcard--in { border-left-color: var(--green-deep, #5E8C5A); }
+.kcard--out { border-left-color: var(--red-deep, #A0442B); }
+.kcard.is-called { box-shadow: 0 0 0 2px var(--peach-tint); }
+.kcard__head { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: var(--s-3); width: 100%; padding: 12px 14px; cursor: pointer; }
+.kcard__head:focus-visible { outline: 2px solid var(--peach); outline-offset: -2px; }
+.kcard__who { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.kcard__name { overflow-wrap: anywhere; }
+.kcard__email { color: var(--ink-muted); font-size: 13px; }
+.kcard__status { font-size: 12px; letter-spacing: .02em; }
+.kcard--open .kcard__status { color: var(--peach-deep); }
+.kcard--in .kcard__status { color: var(--green-deep, #5E8C5A); }
+.kcard--out .kcard__status { color: var(--red-deep, #A0442B); }
+.kcard__fold { width: 8px; height: 8px; border-right: 1.5px solid var(--ink-muted); border-bottom: 1.5px solid var(--ink-muted); transform: rotate(45deg); flex-shrink: 0; margin-right: 4px; transition: transform .15s; }
+.kcard.is-open .kcard__fold { transform: rotate(-135deg); }
+.kcard__body { padding: 0 14px 14px; display: flex; flex-direction: column; gap: var(--s-3); }
+.kcard__meta { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 12px; color: var(--ink-muted); }
+.kcard__thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.kcard__msg { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 12px; max-width: 92%; }
+.kcard__msg--them { background: var(--bone-warm, #FBF7F0); border: 1px solid var(--bone-edge); align-self: flex-start; border-top-left-radius: 4px; }
+.kcard__msg--you { background: var(--peach-tint); align-self: flex-end; border-top-right-radius: 4px; }
+.kcard__msg-by { font-size: 11px; color: var(--ink-muted); letter-spacing: .02em; }
+.kcard__msg-text { white-space: pre-wrap; font-size: 14px; line-height: 1.5; color: var(--ink-soft); overflow-wrap: anywhere; text-wrap: pretty; }
+.kcard__none { font-size: 12px; color: var(--ink-muted); align-self: flex-end; }
+.kcard__acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: var(--s-3); border-top: 1px solid var(--bone-edge); }
+.kcard__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+.kcard__list > .kcard + .kcard { margin-top: 0; }

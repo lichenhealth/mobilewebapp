@@ -17,6 +17,7 @@ const DEFAULT_MISSION =
   + "suggestions become features. We're grateful to be building it with you.";
 import { useAuth } from '../auth/AuthProvider';
 import KnockReply from '../components/KnockReply';
+import KnockCard from '../components/KnockCard';
 import './Invite.css';
 
 type GiftTier = 'community' | 'concierge';
@@ -58,7 +59,7 @@ export default function Invite() {
     // Invite-with-a-seat (2026-09-03): the space + role riding this invite.
     space_role?: string | null; space?: { name: string } | null;
   };
-  type KnockRow = { id: string; name: string; email: string; story: string | null; status: string; space?: { name: string } | null; replied_at?: string | null; reply_count?: number | null };
+  type KnockRow = { id: string; name: string; email: string; story: string | null; status: string; created_at?: string; space?: { name: string } | null; replied_at?: string | null; reply_count?: number | null; last_reply?: string | null };
   const [invites, setInvites] = useState<InviteRow[]>([]);
   const [knocks, setKnocks] = useState<KnockRow[]>([]);
   const loadLedger = useCallback(async () => {
@@ -89,7 +90,7 @@ export default function Invite() {
     setInvites(rows);
     if (isAdmin) {
       const { data: k } = await supabase.from('join_requests')
-        .select('id, name, email, story, status, replied_at, reply_count, space:spaces(name)').order('created_at', { ascending: false }).limit(50);
+        .select('id, name, email, story, status, created_at, replied_at, reply_count, last_reply, space:spaces(name)').order('created_at', { ascending: false }).limit(50);
       setKnocks((k as KnockRow[] | null) ?? []);
     }
     setLedgerLoaded(true);
@@ -203,6 +204,11 @@ export default function Invite() {
   // invited lives on as its invitation in the list above; declined ones
   // simply step out of the way.
   const waitingKnocks = knocks.filter((k) => k.status === 'new');
+  // EACH KNOCK IS A THREAD (founder 2026-11-10): the door now keeps everyone
+  // who knocked — waiting ones first (peach), then those let in (green) and
+  // those declined or marked spam (red) — each one expandable.
+  const doorKnocks = [...waitingKnocks, ...knocks.filter((k) => k.status !== 'new')];
+  const [knockSent, setKnockSent] = useState<Record<string, number>>({});
   const [error, setError] = useState('');
 
   // Email invites send from our server (Resend). Phone invites can't be
@@ -753,26 +759,23 @@ export default function Invite() {
               At the door
               {waitingKnocks.length > 0 && <span className="invite__tally">{waitingKnocks.length} waiting</span>}
             </h2>
-            {waitingKnocks.length === 0 ? (
-              <p className="invite__muted">Nobody knocking right now.</p>
-            ) : (
-              <ul className="invite__list">
+            {waitingKnocks.length === 0 && <p className="invite__muted">Nobody knocking right now.</p>}
+            {doorKnocks.length > 0 && (
+              <ul className="invite__list kcard__list">
                 {/* Who they are on one full-width line, the answers on their
                     own line below — the old center-aligned wrap squeezed long
                     names into a broken column (founder 2026-08-21 screenshot).
                     No status pill here: everyone in this list is 'new'. */}
-                {waitingKnocks.map((k) => (
-                  <li className={'invite__row invite__row--knock' + (calledEmail && k.email.toLowerCase() === calledEmail ? ' is-called' : '')} key={k.id}>
-                    <span className="invite__row-who">
-                      <span className="invite__knock-name">
-                        <strong>{k.name}</strong> · {k.email}
-                        {looksSpammy(k.name, k.story) && (
-                          <span className="invite__spamflag" title="Automated guess from the name/story shape — you decide">looks like spam</span>
-                        )}
-                      </span>
-                      {k.space && <span className="invite__knock-door">knocked at {k.space.name} — its stewards can answer too</span>}
-                      {k.story && <em className="invite__story">{k.story}</em>}
-                    </span>
+                {doorKnocks.map((k) => (
+                  <KnockCard
+                    key={k.id}
+                    knock={k}
+                    defaultOpen={!!calledEmail && k.email.toLowerCase() === calledEmail}
+                    highlight={!!calledEmail && k.email.toLowerCase() === calledEmail}
+                    sentNonce={knockSent[k.id] ?? 0}
+                    flag={looksSpammy(k.name, k.story) ? <span className="invite__spamflag" title="Automated guess from the name/story shape — you decide">looks like spam</span> : undefined}
+                    sub={k.space ? <span className="invite__knock-door">knocked at {k.space.name} — its stewards can answer too</span> : undefined}
+                  >
                     {k.status === 'new' && composeFor !== k.id && (
                       <span className="invite__knock-acts">
                         {/* The standard invitation is the default — a personal
@@ -786,7 +789,10 @@ export default function Invite() {
                           Customize &amp; send
                         </button>
                         {/* Reply WITHOUT letting them in (founder 2026-11-10). */}
-                        <KnockReply knock={k} />
+                        <KnockReply knock={k} onSent={(at) => {
+                          setKnocks((cur) => cur.map((x) => (x.id === k.id ? { ...x, replied_at: at, reply_count: (x.reply_count ?? 0) + 1 } : x)));
+                          setKnockSent((m) => ({ ...m, [k.id]: (m[k.id] ?? 0) + 1 }));
+                        }} />
                         <button className="invite__dismiss" onClick={() => void resolveKnock(k.id, 'declined')}>
                           Not now
                         </button>
@@ -819,7 +825,7 @@ export default function Invite() {
                         </span>
                       </span>
                     )}
-                  </li>
+                  </KnockCard>
                 ))}
               </ul>
             )}

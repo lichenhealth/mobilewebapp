@@ -55,6 +55,7 @@ import ContactFields, { ContactList, type ContactInfo } from '../components/Cont
 import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/PublicPage';
 import PageTabsEditor from '../components/PageTabsEditor';
 import KnockReply from '../components/KnockReply';
+import KnockCard from '../components/KnockCard';
 import CollapsibleSection from '../components/CollapsibleSection';
 import {
   readDraft, writeDraft, clearDraft, sameDraft, listVersions, restoreVersion, describeChange,
@@ -145,6 +146,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
   // Knocks from the public page (founder 2026-08-17: a gateway) — strangers
   // who asked to join THIS space; the steward can send the invitation.
   const [knocks, setKnocks] = useState<SpaceKnock[]>([]);
+  const [knockSent, setKnockSent] = useState<Record<string, number>>({});
   const [knockNote, setKnockNote] = useState<Record<string, string>>({});
   const [knockBusy, setKnockBusy] = useState<string | null>(null);
   const [knockErr, setKnockErr] = useState('');
@@ -2784,13 +2786,13 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           {/* Knocks from the open web (founder 2026-08-17): not yet on Lichen at
               all. The steward's invitation is the vouch; membership here is
               filed automatically when they sign up. */}
-          {knocks.map((k) => (
-            <div className="sprof__req sprof__req--knock" key={k.id}>
-              <span className="sprof__req-name">
-                {k.name} <span className="sprof__knock-email">· {k.email}</span>
-                <em className="sprof__req-tag"> knocked from the public page · not on Lichen yet</em>
-                {k.story && <span className="sprof__knock-story">{k.story}</span>}
-              </span>
+          {/* EACH KNOCK IS A THREAD (founder 2026-11-10): waiting ones first in
+              peach, then let-in (green) and not-a-fit/spam (red), each one
+              expandable to what they wrote and every reply sent back. */}
+          <ul className="kcard__list">
+          {[...knocks.filter((k) => k.status === 'new'), ...knocks.filter((k) => k.status !== 'new')].map((k) => (
+            <KnockCard key={k.id} knock={k} sentNonce={knockSent[k.id] ?? 0}
+              sub={<em className="sprof__req-tag">knocked from the public page · not on Lichen yet</em>}>
               <div className="sprof__knock-acts">
                 <input
                   className="sprof__knock-note"
@@ -2802,15 +2804,15 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                   onClick={() => {
                     setKnockBusy(k.id); setKnockErr('');
                     inviteKnocker(k, myRow?.profile?.full_name ?? '', knockNote[k.id] ?? '')
-                      .then(() => setKnocks((cur) => cur.filter((x) => x.id !== k.id)))
-                      .catch((e: Error) => { setKnockErr(e.message); setKnocks((cur) => cur.filter((x) => x.id !== k.id || !/already on Lichen/.test(e.message))); })
+                      .then(() => setKnocks((cur) => cur.map((x) => (x.id === k.id ? { ...x, status: 'invited' } : x))))
+                      .catch((e: Error) => { setKnockErr(e.message); if (/already on Lichen/.test(e.message)) setKnocks((cur) => cur.map((x) => (x.id === k.id ? { ...x, status: 'invited' } : x))); })
                       .finally(() => setKnockBusy(null));
                   }}>{knockBusy === k.id ? 'Sending…' : 'Send the invitation'}</button>
                 <button className="btn sprof__invite-btn" disabled={knockBusy === k.id}
                   onClick={() => {
                     setKnockBusy(k.id);
                     decideSpaceKnock(k.id, 'declined')
-                      .then(() => setKnocks((cur) => cur.filter((x) => x.id !== k.id)))
+                      .then(() => setKnocks((cur) => cur.map((x) => (x.id === k.id ? { ...x, status: 'declined' } : x))))
                       .catch((e: Error) => setKnockErr(e.message))
                       .finally(() => setKnockBusy(null));
                   }}>Not a fit</button>
@@ -2821,15 +2823,19 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                   onClick={() => {
                     setKnockBusy(k.id);
                     decideSpaceKnock(k.id, 'spam')
-                      .then(() => setKnocks((cur) => cur.filter((x) => x.id !== k.id)))
+                      .then(() => setKnocks((cur) => cur.map((x) => (x.id === k.id ? { ...x, status: 'spam' } : x))))
                       .catch((e: Error) => setKnockErr(e.message))
                       .finally(() => setKnockBusy(null));
                   }}>Spam</button>
                 {/* Reply WITHOUT letting them in (founder 2026-11-10). */}
-                <KnockReply knock={k} />
+                <KnockReply knock={k} onSent={(at) => {
+                  setKnocks((cur) => cur.map((x) => (x.id === k.id ? { ...x, replied_at: at, reply_count: (x.reply_count ?? 0) + 1 } : x)));
+                  setKnockSent((m) => ({ ...m, [k.id]: (m[k.id] ?? 0) + 1 }));
+                }} />
               </div>
-            </div>
+            </KnockCard>
           ))}
+          </ul>
           {knockErr && <p className="sprof__knock-err">{knockErr}</p>}
           {pendingReqs.map((r) => {
             const initiatorRole = members.find((m) => m.profile_id === r.initiated_by)?.role;
