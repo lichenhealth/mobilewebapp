@@ -16,6 +16,7 @@ const DEFAULT_MISSION =
   + 'while connecting with other pioneers in our Alpha Tester Group, where '
   + "suggestions become features. We're grateful to be building it with you.";
 import { useAuth } from '../auth/AuthProvider';
+import KnockReply from '../components/KnockReply';
 import './Invite.css';
 
 type GiftTier = 'community' | 'concierge';
@@ -57,7 +58,7 @@ export default function Invite() {
     // Invite-with-a-seat (2026-09-03): the space + role riding this invite.
     space_role?: string | null; space?: { name: string } | null;
   };
-  type KnockRow = { id: string; name: string; email: string; story: string | null; status: string; space?: { name: string } | null };
+  type KnockRow = { id: string; name: string; email: string; story: string | null; status: string; space?: { name: string } | null; replied_at?: string | null; reply_count?: number | null };
   const [invites, setInvites] = useState<InviteRow[]>([]);
   const [knocks, setKnocks] = useState<KnockRow[]>([]);
   const loadLedger = useCallback(async () => {
@@ -88,7 +89,7 @@ export default function Invite() {
     setInvites(rows);
     if (isAdmin) {
       const { data: k } = await supabase.from('join_requests')
-        .select('id, name, email, story, status, space:spaces(name)').order('created_at', { ascending: false }).limit(50);
+        .select('id, name, email, story, status, replied_at, reply_count, space:spaces(name)').order('created_at', { ascending: false }).limit(50);
       setKnocks((k as KnockRow[] | null) ?? []);
     }
     setLedgerLoaded(true);
@@ -784,6 +785,8 @@ export default function Invite() {
                           onClick={() => { setComposeFor(k.id); setComposeNote(DEFAULT_MISSION); }}>
                           Customize &amp; send
                         </button>
+                        {/* Reply WITHOUT letting them in (founder 2026-11-10). */}
+                        <KnockReply knock={k} />
                         <button className="invite__dismiss" onClick={() => void resolveKnock(k.id, 'declined')}>
                           Not now
                         </button>

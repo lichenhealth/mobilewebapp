@@ -84,11 +84,24 @@ export const LIFE_TOOLS = [
     description: 'Light or snuff their presence candle (whether they show as present to their network). lit=true lights it for `hours` (default 4); lit=false snuffs it.',
     input_schema: { type: 'object', properties: { lit: { type: 'boolean' }, hours: { type: 'number' } }, required: ['lit'] },
   },
+  {
+    name: 'my_event',
+    description: 'Look up one of their events — one they host, co-host, or are invited to/attending — and get what they need to act: when (with time zone), where, the event\'s OWN Zoom join link (only to hosts and invitees), the friendly event address, whether a shareable link exists and who it lets in, and (hosts only) the guest list with each person\'s status and whether they opened their invitation. Leave event_title empty for their soonest upcoming event (today first). Hosts may also act: make_link=true creates the shareable link if it is missing (it is how off-Lichen guests open the friendly address); link_access = anyone | invited | members changes who that link lets in — ONLY when they explicitly asked to change who gets in (never widen it on your own; "fix it" means create a missing link, not open it to anyone); zoom_room=true gives the event its own Zoom room when it has none (Lichen\'s Zoom serves only some hosts — a refusal is a capacity limit, say so plainly). Use this whenever they ask for their Zoom link, "the link", how a guest gets in, or who has replied — never send them hunting on the event page.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_title: { type: 'string', description: 'Exact title, or empty for the soonest upcoming event' },
+        make_link: { type: 'boolean' },
+        link_access: { type: 'string', enum: ['anyone', 'invited', 'members'] },
+        zoom_room: { type: 'boolean' },
+      },
+    },
+  },
 ];
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home',
+  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events',
 };
 
 const enc = encodeURIComponent;
@@ -311,6 +324,120 @@ export async function runLifeTool(
     }) });
     if (!res.ok) return { ok: false, error: 'The candle would not change.' };
     return { ok: true, change: lit ? `lit their candle for ${hours} hours` : 'snuffed their candle' };
+  }
+
+  if (name === 'my_event') {
+    const APP = 'https://lichen.health';
+    type Ev = { id: string; title: string | null; start_date: string; start_min: number | null; end_min: number | null; all_day: boolean | null; timezone: string | null; location: string | null; creator_id: string; zoom_unique: boolean | null; guest_link_token: string | null; link_access: string | null; poll_status: string | null };
+    const cols = 'id,title,start_date,start_min,end_min,all_day,timezone,location,creator_id,zoom_unique,guest_link_token,link_access,poll_status';
+    const arr = <T,>(x: unknown) => (Array.isArray(x) ? x : []) as T[];
+    const since = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+    // The candidate set: events they host, co-host, or hold an RSVP row for.
+    const hosted = arr<Ev>(await (await sb(`events?creator_id=eq.${me}&is_draft=eq.false&start_date=gte.${since}&select=${cols}&order=start_date.asc&limit=60`)).json());
+    const coIds = arr<{ event_id: string }>(await (await sb(`event_cohosts?profile_id=eq.${me}&select=event_id`)).json()).map((r) => r.event_id);
+    const attIds = arr<{ event_id: string; status: string }>(await (await sb(`event_attendees?profile_id=eq.${me}&select=event_id,status`)).json());
+    const otherIds = [...new Set([...coIds, ...attIds.map((a) => a.event_id)])].filter((id) => !hosted.some((h) => h.id === id));
+    const others = otherIds.length
+      ? arr<Ev>(await (await sb(`events?id=in.(${otherIds.slice(0, 150).join(',')})&is_draft=eq.false&start_date=gte.${since}&select=${cols}`)).json())
+      : [];
+    const all = [...hosted, ...others].sort((a, b) => (a.start_date + String(a.start_min ?? 0).padStart(4, '0')).localeCompare(b.start_date + String(b.start_min ?? 0).padStart(4, '0')));
+    const title = String(input.event_title ?? '').trim().toLowerCase();
+    let ev: Ev | undefined;
+    if (title) {
+      const hits = all.filter((e) => (e.title ?? '').trim().toLowerCase() === title);
+      const loose = hits.length ? hits : all.filter((e) => (e.title ?? '').toLowerCase().includes(title));
+      if (loose.length > 1 && !hits.length) return { ok: false, error: `Several of their events match "${input.event_title}": ${loose.slice(0, 6).map((e) => `"${e.title}" (${e.start_date})`).join(', ')}. Ask which.` };
+      ev = loose[0];
+    } else {
+      ev = all.find((e) => e.start_date >= today()) ?? all[0];
+    }
+    if (!ev) return { ok: false, error: title ? `No upcoming event of theirs is titled "${input.event_title}".` : 'They have no upcoming events.' };
+    const isHost = ev.creator_id === me || coIds.includes(ev.id);
+    const mine = attIds.find((a) => a.event_id === ev!.id);
+    const changes: string[] = [];
+
+    if (isHost && input.make_link && !ev.guest_link_token) {
+      const tok = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');
+      const r = await sb(`events?id=eq.${ev.id}&guest_link_token=is.null`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_link_token: tok }) });
+      if (r.ok) { ev.guest_link_token = tok; changes.push('created the shareable link'); }
+    } else if (!isHost && (input.make_link || input.link_access || input.zoom_room)) {
+      return { ok: false, error: 'Only the event\'s hosts can make or change its shareable link.' };
+    }
+    if (isHost && input.link_access && ['anyone', 'invited', 'members'].includes(String(input.link_access))) {
+      const r = await sb(`events?id=eq.${ev.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ link_access: input.link_access, link_space_ids: [] }) });
+      if (r.ok) { ev.link_access = String(input.link_access); changes.push(`set the link to let in: ${input.link_access}`); }
+    }
+
+    if (isHost && input.zoom_room && !ev.zoom_unique) {
+      const ps = arr<{ value: unknown }>(await (await sb(`platform_settings?key=eq.zoom_providers&select=value`)).json())[0];
+      const allowed = Array.isArray(ps?.value) && (ps!.value as string[]).includes(me);
+      if (!allowed) {
+        changes.push('could NOT add a Zoom room — Lichen\'s one Zoom account only serves a few hosts for now (a capacity limit, not an outage); they can paste their own Zoom/Meet link as the event\'s place on its edit screen');
+      } else {
+        const r = await sb(`events?id=eq.${ev.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ zoom_unique: true, location: 'Zoom' }) });
+        if (r.ok) { ev.zoom_unique = true; changes.push('gave the event its own Zoom room (the link appears within a minute — ask again to get it)'); }
+      }
+    }
+
+    const fmt = (m: number | null) => m == null ? '' : `${((Math.floor(m / 60) + 11) % 12) + 1}${m % 60 ? ':' + String(m % 60).padStart(2, '0') : ''}${m < 720 ? 'am' : 'pm'}`;
+    const when = `${ev.start_date}${ev.all_day || ev.start_min == null ? ' (all day)' : ` ${fmt(ev.start_min)}${ev.end_min != null ? '–' + fmt(ev.end_min) : ''}`} ${ev.timezone ?? ''}`.trim();
+
+    // The room: hosts and invitees only (event_meetings is never public).
+    let zoom: string | null = null;
+    if (isHost || mine) {
+      const m = arr<{ join_url: string }>(await (await sb(`event_meetings?event_id=eq.${ev.id}&select=join_url`)).json())[0];
+      zoom = m?.join_url ?? null;
+    }
+    const post = arr<{ id: string; slug: string | null; author_id: string; author_space_id: string | null }>(
+      await (await sb(`posts?linked_event_id=eq.${ev.id}&select=id,slug,author_id,author_space_id&limit=1`)).json())[0];
+    let address: string | null = null;
+    if (post) {
+      let handle: string | null = null;
+      if (post.slug) {
+        const h = post.author_space_id
+          ? arr<{ handle: string | null }>(await (await sb(`spaces?id=eq.${post.author_space_id}&select=handle`)).json())[0]
+          : arr<{ handle: string | null }>(await (await sb(`profiles?id=eq.${post.author_id}&select=handle`)).json())[0];
+        handle = h?.handle ?? null;
+      }
+      address = handle && post.slug ? `${APP}/events/${handle}/${post.slug}` : `${APP}/events/${post.id}`;
+    }
+    const accessWords: Record<string, string> = {
+      anyone: 'anyone with the link opens it straight away',
+      invited: 'people on the invite list type the email or phone they were invited with and land on their own invitation; anyone else asks the host',
+      members: 'Lichen members come in by signing in; people off Lichen are asked to sign in',
+      circles: 'members of the chosen groups come in; everyone else is turned away',
+    };
+    const out: Out = {
+      ok: true,
+      title: ev.title, when, where: ev.zoom_unique ? 'Zoom (its own room)' : (ev.location || 'not set'),
+      you_are: isHost ? 'host' : (mine ? `invited — ${mine.status}` : 'not on it'),
+      zoom_join_link: zoom ?? (ev.zoom_unique ? (isHost || mine ? 'the room is still being made — try again in a minute' : 'only hosts and invitees see the room') : 'no Zoom room on this event'),
+      event_address: address,
+      shareable_link: ev.guest_link_token
+        ? `exists — ${accessWords[ev.link_access ?? ''] ?? 'it follows the event\'s visibility'}`
+        : (isHost ? 'NOT created yet — off-Lichen guests cannot open the event address until it is; offer to create it (make_link=true)' : 'not created'),
+      guest_page_link: ev.guest_link_token && isHost ? `${APP}/e/${ev.guest_link_token}` : undefined,
+      poll: ev.poll_status === 'open' ? 'a time poll is still open — the time is not final' : undefined,
+    };
+    if (changes.length) out.change = changes.join('; ');
+    if (isHost) {
+      const gs = arr<{ name: string | null; email: string | null; phone: string | null; status: string; opened_at: string | null }>(
+        await (await sb(`event_guests?event_id=eq.${ev.id}&select=name,email,phone,status,opened_at&order=created_at.asc&limit=80`)).json());
+      out.guests_off_lichen = gs.map((g) => `${g.name ?? '(no name)'} · ${g.email ? 'email' : 'phone'} · ${g.status}${g.opened_at ? ' · opened' : ' · not opened yet'}`);
+      const att = arr<{ status: string; profiles: { full_name: string | null } | null }>(
+        await (await sb(`event_attendees?event_id=eq.${ev.id}&select=status,profiles!event_attendees_profile_id_fkey(full_name)&limit=80`)).json());
+      out.members = att.map((a) => `${a.profiles?.full_name ?? 'a member'} · ${a.status}`);
+    }
+    out.copies = [
+      ...(zoom ? [{ text: zoom, label: 'Copy the Zoom link' }] : []),
+      ...(address ? [{ text: address, label: 'Copy the event address' }]
+        : (ev.guest_link_token && isHost ? [{ text: `${APP}/e/${ev.guest_link_token}`, label: 'Copy the shareable link' }] : [])),
+    ];
+    if (post) out.door = { path: `/events/${post.id}`, label: `Open ${ev.title ?? 'the event'} →` };
+    out.note = out.copies && (out.copies as unknown[]).length
+      ? 'These ride along as Copy buttons under your reply: ' + (out.copies as { label: string }[]).map((c) => c.label).join(', ') + '. Say they are there; do not paste long URLs. Speak the guest list in plain words.'
+      : 'No Copy buttons ride along this time — do not promise any.';
+    return out;
   }
 
   return { ok: false, error: 'Unknown tool.' };

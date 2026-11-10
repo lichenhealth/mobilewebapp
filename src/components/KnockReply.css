@@ -1,0 +1,13 @@
+.kreply { display: inline-flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.kreply__done { font-size: 12px; color: var(--moss, var(--green-deep)); }
+.kreply--open { display: flex; flex-direction: column; gap: var(--s-2); width: 100%; margin-top: var(--s-2); }
+.kreply__hint { margin: 0; font-size: 13px; color: var(--ink-muted); text-wrap: pretty; }
+.kreply__box { width: 100%; box-sizing: border-box; }
+.kreply__acts { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.kreply__spacer { flex: 1; }
+.kreply__chip {
+  border: 1px solid var(--peach); background: var(--peach-tint); color: var(--peach-deep);
+  border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.kreply__chip:disabled { cursor: default; opacity: 0.85; }
+.kreply__err { margin: 0; font-size: 13px; color: var(--red-deep, #A0442B); }
