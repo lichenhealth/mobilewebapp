@@ -26,6 +26,7 @@ import SnapshotPanel from '../components/SnapshotPanel';
 import BuildModeSplit from '../components/BuildModeSplit';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
+import KnockDraftCard from '../components/KnockDraftCard';
 import './AssistantFeed.css';
 
 function timeAgo(iso: string): string {
@@ -1472,6 +1473,15 @@ export default function AssistantFeed() {
                   .map((a) => (
                     <div className="afeed__pubrow" key={`${p.id}:confirm:${a.id}`}>
                       <ConfirmCard id={a.id} kind={a.kind} summary={a.summary} amount={a.amount} />
+                    </div>
+                  ))}
+                {/* A KNOCK REPLY, DRAFTED (founder 2026-11-10) — the person
+                    edits and taps Send; the email goes out on their tap. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'knock_reply' ? [a] : []))
+                  .map((a) => (
+                    <div className="afeed__pubrow" key={`${p.id}:knock:${a.knock_id}`}>
+                      <KnockDraftCard knockId={a.knock_id} name={a.name} email={a.email} message={a.message} />
                     </div>
                   ))}
                 {/* A COPYABLE VALUE (founder 2026-11-02, the feed URL
