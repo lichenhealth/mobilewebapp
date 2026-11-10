@@ -43,6 +43,9 @@ export type FeedAttachment =
    *  pasting a long URL into prose. Text is composed server-side (the
    *  app_link rule — never model-written). */
   | { type: 'copy_text'; text: string; label: string }
+  // A drafted reply to someone at the door (founder 2026-11-10) — the
+  // member edits and taps Send; nothing goes out on the model's word.
+  | { type: 'knock_reply'; knock_id: string; name: string; email: string; message: string }
   /** THE HAND-OFF (founder 2026-11-02: "the briefing of whats been done
    *  manually should be a sent message to claude, not a composed one…
    *  how about its from claude to claude?"): marks a DELIVERED

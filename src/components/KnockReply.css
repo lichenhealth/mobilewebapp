@@ -11,3 +11,8 @@
 }
 .kreply__chip:disabled { cursor: default; opacity: 0.85; }
 .kreply__err { margin: 0; font-size: 13px; color: var(--red-deep, #A0442B); }
+.kreply--card { background: var(--paper, #fff); border: 1px solid var(--bone-edge); border-radius: 14px; padding: var(--s-3); max-width: 520px; }
+.kreply__notnow { background: none; border: 0; font: inherit; font-size: 14px; color: var(--ink-muted); cursor: pointer; padding: 6px 8px; }
+.kreply__notnow:hover { color: var(--peach-deep); }
+.kreply--card .kreply__acts { justify-content: flex-end; }
+.kreply--card .kreply__spacer { display: none; }
