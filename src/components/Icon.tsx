@@ -501,11 +501,12 @@ const ICONS: Record<IconName, IconEntry> = {
   },
   // Two bubbles — a conversation ABOUT something (founder 2026-07-28):
   // distinct from 'message', which opens the entity's own chat.
-  // Travel: an airliner in the set's hairline idiom (founder 2026-07-28).
+  // Travel: an airliner in the set's hairline idiom (founder 2026-07-28);
+  // wings sit forward, near the nose, like a real airliner (founder 2026-11-10).
   'plane': {
     viewBox: '1 2 22 20',
     strokeWidth: 1.4,
-    content: <path d="M22 14.6l-8.6-2.4V5.4c0-1.2-.6-2.2-1.4-2.2s-1.4 1-1.4 2.2v6.8L2 14.6v1.9l8.6-1.8v3.8L8.2 20v1.2l3.8-.9 3.8.9V20l-2.4-1.5v-3.8l8.6 1.8z" stroke="currentColor" strokeLinejoin="round" fill="none"/>,
+    content: <path d="M22 12.1l-8.6-2.4V5.4c0-1.2-.6-2.2-1.4-2.2s-1.4 1-1.4 2.2v4.3L2 12.1v1.9l8.6-1.8v6.3L8.2 20v1.2l3.8-.9 3.8.9V20l-2.4-1.5v-6.3l8.6 1.8z" stroke="currentColor" strokeLinejoin="round" fill="none"/>,
   },
   // A ground ride (founder 2026-10-06: "rides should have a car" — the plane
   // moved to Travel's Flights lens). Side-view body + two wheels, the set's
