@@ -11,13 +11,13 @@ import './KnockReply.css';
  *  knock stays at the door; the row just remembers it was answered. */
 export type ReplyableKnock = {
   id: string; name: string; email: string;
-  replied_at?: string | null; reply_count?: number | null;
+  replied_at?: string | null; reply_count?: number | null; last_reply?: string | null;
 };
 
 const dateWord = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-export default function KnockReply({ knock }: { knock: ReplyableKnock }) {
+export default function KnockReply({ knock, onSent }: { knock: ReplyableKnock; onSent?: (repliedAt: string) => void }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -26,6 +26,9 @@ export default function KnockReply({ knock }: { knock: ReplyableKnock }) {
   const [err, setErr] = useState<string | null>(null);
   const [repliedAt, setRepliedAt] = useState<string | null>(knock.replied_at ?? null);
   const [count, setCount] = useState<number>(knock.reply_count ?? 0);
+  // A plain receipt right where Send was pressed (founder 2026-11-10: "I don't
+  // see confirmation"); the words themselves live in the knock's thread.
+  const [justSent, setJustSent] = useState(false);
 
   useEffect(() => {
     if (!open || !user) return;
@@ -47,7 +50,7 @@ export default function KnockReply({ knock }: { knock: ReplyableKnock }) {
     setBusy(true); setErr(null);
     try {
       const r = await replyToKnock(knock.id, text.trim());
-      setRepliedAt(r.replied_at); setCount((c) => c + 1);
+      setRepliedAt(r.replied_at); setCount((c) => c + 1); setJustSent(true); onSent?.(r.replied_at);
       setOpen(false); setText('');
     } catch (e) { setErr((e as Error).message || 'That didn’t send.'); }
     finally { setBusy(false); }
@@ -59,8 +62,8 @@ export default function KnockReply({ knock }: { knock: ReplyableKnock }) {
         <button type="button" className="btn invite__use kreply__open" onClick={() => setOpen(true)} disabled={count >= 3}>
           {repliedAt ? 'Reply again' : 'Reply'}
         </button>
-        {repliedAt && (
-          <span className="kreply__done">Replied {dateWord(repliedAt)} ✓ · still at the door</span>
+        {justSent && repliedAt && (
+          <span className="kreply__done">Sent to {first} ✓ {dateWord(repliedAt)} — it's in the thread, and a copy is in your inbox</span>
         )}
       </span>
     );
@@ -70,7 +73,7 @@ export default function KnockReply({ knock }: { knock: ReplyableKnock }) {
     <div className="kreply kreply--open">
       <p className="kreply__hint">
         Write to {first} without inviting them in — the email goes to {knock.email}, their reply comes
-        straight to your inbox, and their knock stays here until you decide.
+        straight to your inbox (a copy of yours lands there too), and their knock stays here until you decide.
       </p>
       <textarea
         className="invite__input invite__textarea kreply__box"
