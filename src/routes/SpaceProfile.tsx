@@ -54,6 +54,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import ContactFields, { ContactList, type ContactInfo } from '../components/ContactFields';
 import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/PublicPage';
 import PageTabsEditor from '../components/PageTabsEditor';
+import KnockReply from '../components/KnockReply';
 import CollapsibleSection from '../components/CollapsibleSection';
 import {
   readDraft, writeDraft, clearDraft, sameDraft, listVersions, restoreVersion, describeChange,
@@ -2824,6 +2825,8 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                       .catch((e: Error) => setKnockErr(e.message))
                       .finally(() => setKnockBusy(null));
                   }}>Spam</button>
+                {/* Reply WITHOUT letting them in (founder 2026-11-10). */}
+                <KnockReply knock={k} />
               </div>
             </div>
           ))}

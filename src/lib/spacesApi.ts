@@ -688,13 +688,13 @@ export async function cohortInfo(spaceId: string): Promise<{ term: string | null
 
 // ─── Knocks at a space's door (founder 2026-08-17: public pages are gateways) ─
 export interface SpaceKnock {
-  id: string; name: string; email: string; story: string | null; status: 'new' | 'invited' | 'declined'; created_at: string;
+  id: string; name: string; email: string; story: string | null; status: 'new' | 'invited' | 'declined'; created_at: string; replied_at?: string | null; reply_count?: number | null;
 }
 /** Strangers who asked to join THIS space from its public page. RLS: the
  *  space's admins (and platform admins). Only the still-asking ones. */
 export async function listSpaceKnocks(spaceId: string): Promise<SpaceKnock[]> {
   const { data, error } = await supabase.from('join_requests')
-    .select('id, name, email, story, status, created_at')
+    .select('id, name, email, story, status, created_at, replied_at, reply_count')
     .eq('space_id', spaceId).eq('status', 'new')
     .order('created_at', { ascending: false });
   if (error) { console.warn('listSpaceKnocks:', error.message); return []; }

@@ -751,6 +751,9 @@
  "pollApi:guestPollVote": {
   "exempt": "Off-Lichen guest voting by invitation token — no member, no assistant."
  },
+ "knockReplyApi:replyToKnock": {
+  "gap": "2"
+ },
  "calendarApi:carryDraftZoom": {
   "exempt": "Plumbing inside Compose's Post — moves the draft's Zoom room to the live event; not a member-facing act of its own."
  },

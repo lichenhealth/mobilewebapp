@@ -1408,6 +1408,9 @@ Deno.serve(async (req) => {
   // under the reply (the page_edit Preview/Publish grammar for posts).
   const postDraftDoors: { id: string; title: string }[] = [];
   const confirmDoors: ConfirmDoor[] = [];
+  // my_event hands its Zoom link + event address as Copy buttons (the
+  // calendar_feed_link copy_text grammar) — server facts, never model text.
+  const copyButtons: { text: string; label: string }[] = [];
   // The space-side twins of readPage/patchMe — scoped to the THREAD's space
   // (or General's verified selection), never a model-supplied id.
   // Draft-first like the member pair above.
@@ -1447,7 +1450,16 @@ Deno.serve(async (req) => {
       return await runConfirmTool(sb, profile_id, name, input as Record<string, unknown>, offSections, memberText, confirmDoors);
     }
     if (name in LIFE_TOOL_SECTION) {
-      return await runLifeTool(sb, profile_id, name, input as Record<string, unknown>, offSections, trigger?.source_post_id ?? null);
+      const lr = await runLifeTool(sb, profile_id, name, input as Record<string, unknown>, offSections, trigger?.source_post_id ?? null);
+      if (name === 'my_event' && lr.ok) {
+        for (const c of (lr.copies as { text: string; label: string }[] | undefined) ?? []) {
+          if (!copyButtons.some((b) => b.text === c.text)) copyButtons.push(c);
+        }
+        const door = lr.door as { path: string; label: string } | undefined;
+        if (door && /^\/events\/[0-9a-f-]{36}$/.test(door.path) && !appDoors.some((d) => d.path === door.path)) appDoors.push(door);
+        delete lr.copies; delete lr.door;
+      }
+      return lr;
     }
     if (name === 'read_website') {
       const raw = String(input.url ?? '').trim();
@@ -3184,7 +3196,7 @@ Deno.serve(async (req) => {
     add_booking_type: 'calendar', update_booking_type: 'calendar',
     my_booking_requests: 'calendar', respond_booking_request: 'calendar',
     set_booking_type_active: 'calendar', add_task: 'calendar',
-    calendar_feed_link: 'calendar',
+    calendar_feed_link: 'calendar', my_event: 'events',
     my_courses: 'courses', create_course: 'courses', update_course: 'courses',
     my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace', draft_event: 'events', design_invite: 'events', delete_draft: 'marketplace',
     my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
@@ -3261,6 +3273,10 @@ Deno.serve(async (req) => {
   // by default, and thinking draws from max_tokens. A starved answer gets ONE
   // re-run with thinking off rather than an "I hit a snag" note.
   let starved = false;
+  // Words the model wrote BEFORE a tool call in an earlier round (founder
+  // 2026-11-10 harness: the explanation was said, then a tool ran, and only
+  // the last round's trailing sentence reached the member).
+  const interimText: string[] = [];
   let data: {
     content?: { type: string; text?: string; id?: string; name?: string; input?: Record<string, string & string[]> }[];
     usage?: { input_tokens?: number; output_tokens?: number };
@@ -3359,6 +3375,10 @@ Deno.serve(async (req) => {
     }
 
     messages.push({ role: 'assistant', content: data.content });
+    {
+      const said = (data?.content ?? []).filter((c) => c.type === 'text').map((c) => (c.text ?? '').trim()).filter(Boolean).join('\n');
+      if (said) interimText.push(said);
+    }
     // Parallel calls come back in ONE user message — splitting them teaches
     // the model to stop batching.
     const results = [];
@@ -3388,7 +3408,8 @@ Deno.serve(async (req) => {
 
   // Parse EVERY text block, not content[0] — a non-text leading block silently
   // yielded an empty result in profile-snapshot.
-  let reply = (data?.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n').trim();
+  let reply = [...interimText, (data?.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n').trim()]
+    .filter(Boolean).join('\n\n').trim();
   // No silent edits: if it wrote and then said nothing, say it for them.
   if (!reply && changes.length) reply = `Done — I ${changes.join(', and ')}. Have a look, and tell me what to change.`;
   if (!reply) {
@@ -3431,6 +3452,7 @@ Deno.serve(async (req) => {
     });
   }
   if (calFeedUrl) replyAttachments.push({ type: 'copy_text', text: calFeedUrl, label: 'Copy your calendar link' });
+  for (const c of copyButtons) replyAttachments.push({ type: 'copy_text', ...c });
   if (treasuryDoor) replyAttachments.push({ type: 'space_thread', room: 'currentcy', ...treasuryDoor });
   if (consentDoor) replyAttachments.push({ type: 'space_consent', room: 'currentcy', ...consentDoor });
   for (const d of appDoors) replyAttachments.push({ type: 'app_link', ...d });
