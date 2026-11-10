@@ -27,3 +27,7 @@
 .kcard__acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: var(--s-3); border-top: 1px solid var(--bone-edge); }
 .kcard__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
 .kcard__list > .kcard + .kcard { margin-top: 0; }
+
+/* Whatever action row a desk hands the card wraps whole inside it. */
+.kcard__acts > * { min-width: 0; max-width: 100%; }
+.kcard__acts button { white-space: nowrap; }

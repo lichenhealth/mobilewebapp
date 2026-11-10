@@ -99,7 +99,12 @@ a.invite__send { display: inline-flex; align-items: center; text-decoration: non
 .invite__pill.is-declined { background: #F5DDD1; color: var(--rust); }
 .invite__use { padding: 4px 12px; font-size: 12px; }
 .invite__by { display: block; font-size: 11.5px; color: var(--ink-faint); }
-.invite__knock-acts { display: flex; align-items: center; gap: 8px; }
+.invite__knock-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; min-width: 0; }
+/* A row's buttons wrap WHOLE, never break their words or poke past the card
+   (founder 2026-11-10, "Not now" splitting and Spam clipped in the knock
+   card). The two quiet dismissals ride to the right as their own pair. */
+.invite__knock-acts .btn, .invite__knock-acts .invite__dismiss { white-space: nowrap; }
+.invite__knock-acts .kreply + .invite__dismiss { margin-left: auto; }
 .invite__dismiss {
   font-size: 12px; color: var(--ink-muted); background: none; border: none;
   cursor: pointer; padding: 4px 4px;

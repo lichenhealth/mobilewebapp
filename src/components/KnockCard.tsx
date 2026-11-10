@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { emailIsMember } from '../lib/bookingApi';
 import { knockStatusWord, knockTone, loadKnockReplies, type KnockReplyRow } from '../lib/knockThreadApi';
 import './KnockCard.css';
 
@@ -29,7 +30,15 @@ export default function KnockCard({ knock, children, defaultOpen = false, flag, 
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [replies, setReplies] = useState<KnockReplyRow[] | null>(null);
-  const tone = knockTone(knock.status);
+  // Invited → did they actually make an account? (email_is_member: yes/no only)
+  const [joined, setJoined] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    if (knock.status !== 'invited' || !knock.email) return;
+    let live = true;
+    void emailIsMember(knock.email).then((j) => { if (live) setJoined(j); });
+    return () => { live = false; };
+  }, [knock.status, knock.email]);
+  const tone = knockTone(knock.status, joined);
 
   useEffect(() => { if (defaultOpen) setOpen(true); }, [defaultOpen]);
   useEffect(() => {
@@ -44,7 +53,7 @@ export default function KnockCard({ knock, children, defaultOpen = false, flag, 
       <button type="button" className="kcard__head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         <span className="kcard__who">
           <span className="kcard__name"><strong>{knock.name}</strong> <span className="kcard__email">· {knock.email}</span></span>
-          <span className="kcard__status">{knockStatusWord(knock.status, knock.replied_at)}</span>
+          <span className="kcard__status">{knockStatusWord(knock.status, knock.replied_at, joined)}</span>
         </span>
         <span className="kcard__fold" aria-hidden="true" />
       </button>

@@ -15,14 +15,17 @@ export async function loadKnockReplies(knockId: string): Promise<KnockReplyRow[]
 /** The colour of a knock's state: peach while it's in your hands, green once
  *  you let them in, red for not-a-fit and spam. */
 export type KnockTone = 'open' | 'in' | 'out';
-export function knockTone(status: string): KnockTone {
-  if (status === 'invited') return 'in';
+/** `joined` = the address now holds a Lichen account. An invitation SENT is
+ *  not someone let in — Megan's card read green while her invite sat unused
+ *  (founder 2026-11-10) — so green waits for the account. */
+export function knockTone(status: string, joined?: boolean): KnockTone {
+  if (status === 'invited') return joined ? 'in' : 'open';
   if (status === 'declined' || status === 'spam') return 'out';
   return 'open';
 }
-export function knockStatusWord(status: string, repliedAt?: string | null): string {
+export function knockStatusWord(status: string, repliedAt?: string | null, joined?: boolean): string {
   const d = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  if (status === 'invited') return 'Let in ✓';
+  if (status === 'invited') return joined ? 'Joined Lichen ✓' : 'Invited · hasn\u2019t joined yet';
   if (status === 'spam') return 'Spam';
   if (status === 'declined') return 'Not a fit';
   return repliedAt ? `Replied ${d(repliedAt)} · still at the door` : 'Waiting for you';
