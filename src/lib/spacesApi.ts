@@ -701,7 +701,7 @@ export async function listSpaceKnocks(spaceId: string): Promise<SpaceKnock[]> {
   if (error) { console.warn('listSpaceKnocks:', error.message); return []; }
   return (data as SpaceKnock[] | null) ?? [];
 }
-export async function decideSpaceKnock(id: string, status: 'invited' | 'declined' | 'spam'): Promise<void> {
+export async function decideSpaceKnock(id: string, status: 'new' | 'invited' | 'declined' | 'spam'): Promise<void> {
   const { error } = await supabase.from('join_requests').update({ status }).eq('id', id);
   if (error) throw new Error(error.message);
 }

@@ -27,6 +27,6 @@ export function knockStatusWord(status: string, repliedAt?: string | null, joine
   const d = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   if (status === 'invited') return joined ? 'Joined Lichen ✓' : 'Invited · hasn\u2019t joined yet';
   if (status === 'spam') return 'Spam';
-  if (status === 'declined') return 'Not a fit';
+  if (status === 'declined') return 'Not yet \u2014 kept on file';
   return repliedAt ? `Replied ${d(repliedAt)} · still at the door` : 'Waiting for you';
 }
