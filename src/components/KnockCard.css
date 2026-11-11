@@ -35,3 +35,7 @@
 /* Not a fit → actually spam (founder 2026-11-11). */
 .kcard__tospam { background: none; border: none; padding: 4px 0; font-size: 13px; color: var(--red-deep); cursor: pointer; white-space: nowrap; }
 .kcard__tospam:hover { text-decoration: underline; }
+.kcard__kept { flex: 1 1 100%; font-size: 13px; color: var(--ink-muted); }
+.kcard__reopen { background: none; border: none; padding: 4px 0; font-size: 13px; color: var(--peach-deep); cursor: pointer; white-space: nowrap; }
+.kcard__reopen:hover { color: var(--ink); }
+.kcard__reopen + .kcard__tospam { margin-left: auto; }

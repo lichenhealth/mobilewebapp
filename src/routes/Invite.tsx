@@ -166,7 +166,7 @@ export default function Invite() {
   // Handling a knock moves it off the "waiting" tally and the side-menu
   // badge (founder 2026-08-02) — the row stays visible here either way, so
   // nothing is ever truly lost, just no longer flagged as needing you.
-  async function resolveKnock(id: string, status: 'invited' | 'declined' | 'spam') {
+  async function resolveKnock(id: string, status: 'new' | 'invited' | 'declined' | 'spam') {
     const prior = knocks;
     setKnocks((cur) => cur.map((k) => (k.id === id ? { ...k, status } : k)));
     const { error } = await supabase.from('join_requests').update({ status }).eq('id', id);
@@ -776,6 +776,7 @@ export default function Invite() {
                     key={k.id}
                     knock={k}
                     onSpam={() => void resolveKnock(k.id, 'spam')}
+                    onReopen={() => void resolveKnock(k.id, 'new')}
                     defaultOpen={!!calledEmail && k.email.toLowerCase() === calledEmail}
                     highlight={!!calledEmail && k.email.toLowerCase() === calledEmail}
                     sentNonce={knockSent[k.id] ?? 0}
@@ -800,7 +801,7 @@ export default function Invite() {
                           setKnockSent((m) => ({ ...m, [k.id]: (m[k.id] ?? 0) + 1 }));
                         }} />
                         <button className="invite__dismiss" onClick={() => void resolveKnock(k.id, 'declined')}>
-                          Not now
+                          Not yet
                         </button>
                         {/* Spam is a CATEGORY (founder 2026-08-21): the row
                             steps out like a decline, the address is quietly

@@ -17,7 +17,7 @@ export type KnockCardData = {
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export default function KnockCard({ knock, children, defaultOpen = false, flag, sub, sentNonce = 0, highlight = false, onSpam }: {
+export default function KnockCard({ knock, children, defaultOpen = false, flag, sub, sentNonce = 0, highlight = false, onSpam, onReopen }: {
   knock: KnockCardData;
   /** The desk's actions — shown inside the open card, only while the knock waits. */
   children?: ReactNode;
@@ -29,6 +29,8 @@ export default function KnockCard({ knock, children, defaultOpen = false, flag, 
   highlight?: boolean;
   /** A Not-a-fit knock that was really spam goes to the trash (founder 2026-11-11). */
   onSpam?: () => void;
+  /** A "Not yet" knock goes back to the door — the row was kept for this. */
+  onReopen?: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [replies, setReplies] = useState<KnockReplyRow[] | null>(null);
@@ -78,9 +80,11 @@ export default function KnockCard({ knock, children, defaultOpen = false, flag, 
             )}
           </ol>
           {knock.status === 'new' && children && <div className="kcard__acts">{children}</div>}
-          {knock.status === 'declined' && onSpam && (
+          {knock.status === 'declined' && (onSpam || onReopen) && (
             <div className="kcard__acts">
-              <button className="kcard__tospam" onClick={onSpam}>It was spam — move to trash</button>
+              <span className="kcard__kept">Not yet — they stay out of Lichen, and their request stays on file.</span>
+              {onReopen && <button className="kcard__reopen" onClick={onReopen}>Back to the door</button>}
+              {onSpam && <button className="kcard__tospam" onClick={onSpam}>It was spam — move to trash</button>}
             </div>
           )}
         </div>

@@ -2800,6 +2800,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                   .then(() => setKnocks((cur) => cur.map((x) => (x.id === k.id ? { ...x, status: 'spam' } : x))))
                   .catch((e: Error) => setKnockErr(e.message));
               }}
+              onReopen={() => {
+                decideSpaceKnock(k.id, 'new')
+                  .then(() => setKnocks((cur) => cur.map((x) => (x.id === k.id ? { ...x, status: 'new' } : x))))
+                  .catch((e: Error) => setKnockErr(e.message));
+              }}
               sub={<em className="sprof__req-tag">knocked from the public page · not on Lichen yet</em>}>
               <div className="sprof__knock-acts">
                 <input
@@ -2823,7 +2828,7 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
                       .then(() => setKnocks((cur) => cur.map((x) => (x.id === k.id ? { ...x, status: 'declined' } : x))))
                       .catch((e: Error) => setKnockErr(e.message))
                       .finally(() => setKnockBusy(null));
-                  }}>Not a fit</button>
+                  }}>Not yet</button>
                 {/* Spam is a category, not just a dismissal (founder
                     2026-08-21): the address is quietly barred from knocking
                     again, and the labeled row becomes training data. */}
