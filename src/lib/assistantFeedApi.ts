@@ -236,6 +236,7 @@ export const BRAIN_RAIL: BrainRailItem[] = [
 const EXTRA_SECTION_ICONS: Record<string, { icon: string; label: string }> = {
   home: { icon: 'home', label: 'Home' },
   maps: { icon: 'maps', label: 'Maps' },
+  mail: { icon: 'mail', label: 'Mail' },
   mycelium: { icon: 'leaf', label: 'My-celium' },
   drive: { icon: 'drive', label: 'Drive' },
   saved: { icon: 'drive', label: 'Drive' },

@@ -789,5 +789,8 @@
  },
  "trashApi:emptySpamKnocks": {
   "gap": "1"
+ },
+ "mailApi:listMailAccounts": {
+  "exempt": "read-only list of the member's connected inboxes"
  }
 }

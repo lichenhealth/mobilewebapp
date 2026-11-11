@@ -67,6 +67,7 @@ export type IconName =
   | 'reply'
   | 'copy'
   | 'trash'
+  | 'mail'
   | 'repeat'
   | 'rent'
   | 'drive'
@@ -341,6 +342,12 @@ const ICONS: Record<IconName, IconEntry> = {
     content: <><rect x="9" y="9" width="12" height="12" rx="2" fill="none" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" /></>,
   },
   // The can with its lid — the message menu's Delete (founder 2026-10-21).
+  // Lichen Mail — a plain envelope (never the Events RSVP mark: a section mark is never reused)
+  'mail': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><rect x="3" y="5" width="18" height="14" rx="2" fill="none" /><path d="M3.5 6.5l8.5 6.5 8.5-6.5" fill="none" /></>,
+  },
   'trash': {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
