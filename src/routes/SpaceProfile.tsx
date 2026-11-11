@@ -2795,6 +2795,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
           <ul className="kcard__list">
           {[...knocks.filter((k) => k.status === 'new'), ...knocks.filter((k) => k.status !== 'new' && k.status !== 'spam')].map((k) => (
             <KnockCard key={k.id} knock={k} sentNonce={knockSent[k.id] ?? 0}
+              onSpam={() => {
+                decideSpaceKnock(k.id, 'spam')
+                  .then(() => setKnocks((cur) => cur.map((x) => (x.id === k.id ? { ...x, status: 'spam' } : x))))
+                  .catch((e: Error) => setKnockErr(e.message));
+              }}
               sub={<em className="sprof__req-tag">knocked from the public page · not on Lichen yet</em>}>
               <div className="sprof__knock-acts">
                 <input
