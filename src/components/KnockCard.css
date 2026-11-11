@@ -31,3 +31,7 @@
 /* Whatever action row a desk hands the card wraps whole inside it. */
 .kcard__acts > * { min-width: 0; max-width: 100%; }
 .kcard__acts button { white-space: nowrap; }
+
+/* Not a fit → actually spam (founder 2026-11-11). */
+.kcard__tospam { background: none; border: none; padding: 4px 0; font-size: 13px; color: var(--red-deep); cursor: pointer; white-space: nowrap; }
+.kcard__tospam:hover { text-decoration: underline; }

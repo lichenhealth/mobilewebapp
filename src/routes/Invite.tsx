@@ -775,6 +775,7 @@ export default function Invite() {
                   <KnockCard
                     key={k.id}
                     knock={k}
+                    onSpam={() => void resolveKnock(k.id, 'spam')}
                     defaultOpen={!!calledEmail && k.email.toLowerCase() === calledEmail}
                     highlight={!!calledEmail && k.email.toLowerCase() === calledEmail}
                     sentNonce={knockSent[k.id] ?? 0}

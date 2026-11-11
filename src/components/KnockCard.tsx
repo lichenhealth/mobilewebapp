@@ -17,7 +17,7 @@ export type KnockCardData = {
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export default function KnockCard({ knock, children, defaultOpen = false, flag, sub, sentNonce = 0, highlight = false }: {
+export default function KnockCard({ knock, children, defaultOpen = false, flag, sub, sentNonce = 0, highlight = false, onSpam }: {
   knock: KnockCardData;
   /** The desk's actions — shown inside the open card, only while the knock waits. */
   children?: ReactNode;
@@ -27,6 +27,8 @@ export default function KnockCard({ knock, children, defaultOpen = false, flag, 
   /** Bump after a reply sends so the thread re-reads. */
   sentNonce?: number;
   highlight?: boolean;
+  /** A Not-a-fit knock that was really spam goes to the trash (founder 2026-11-11). */
+  onSpam?: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [replies, setReplies] = useState<KnockReplyRow[] | null>(null);
@@ -76,6 +78,11 @@ export default function KnockCard({ knock, children, defaultOpen = false, flag, 
             )}
           </ol>
           {knock.status === 'new' && children && <div className="kcard__acts">{children}</div>}
+          {knock.status === 'declined' && onSpam && (
+            <div className="kcard__acts">
+              <button className="kcard__tospam" onClick={onSpam}>It was spam — move to trash</button>
+            </div>
+          )}
         </div>
       )}
     </li>
