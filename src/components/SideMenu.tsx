@@ -5,6 +5,7 @@ import { useActing } from '../acting/ActingProvider';
 import { MyceliumMark } from './MyceliumMark';
 import { listMyMemberSpaces, listMyAdminDeskCounts, type MappableSpace, type AdminDesk } from '../lib/spacesApi';
 import { useAuth } from '../auth/AuthProvider';
+import { mailEnabled } from '../lib/mailApi';
 import { useNotifications } from '../notifications/NotificationsProvider';
 import { sectionForRoute } from '../lib/sections';
 import { navFamily } from '../lib/navFamily';
@@ -55,6 +56,7 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/maps',      label: 'Maps',      icon: 'maps' },
   { to: '/profile',   label: 'Profile',   icon: 'profile' },
   { to: '/invite',    label: 'Invite to Lichen', icon: 'user-multiple' },
+  { to: '/mail',      label: 'Mail',      icon: 'mail' },
   { to: '/trash',     label: 'Trash',     icon: 'trash' },
   { to: '/help',      label: 'Help',      icon: 'info' },
   { to: '/membership', label: 'Membership', icon: 'dollar' },
@@ -89,8 +91,12 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const { user, isAdmin: platformAdmin } = useAuth();
+  const [mailOk, setMailOk] = useState(false);
+  useEffect(() => { void mailEnabled(user?.id).then(setMailOk); }, [user?.id]);
   const primary = PRIMARY
     .filter((p) => p.to !== '/help' || user?.email?.toLowerCase() !== SUPPORT_EMAIL)
+    // Mail is a personal test (founder 2026-11-11) — only its testers see the door.
+    .filter((p) => p.to !== '/mail' || mailOk)
     // "Public profile" = see yourself as other members do (/members/<me>).
     // 'Public profile' retired from the nav (founder 2026-07-28): the three
     // views live as tabs INSIDE Profile — Admin · In Lichen · Web page.

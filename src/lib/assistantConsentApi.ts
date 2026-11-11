@@ -33,6 +33,7 @@ export const CONSENT_SECTIONS: { id: string; label: string }[] = [
   { id: 'courses', label: 'Courses' },
   { id: 'saved', label: 'Drive' },
   { id: 'maps', label: 'Maps' },
+  { id: 'mail', label: 'Mail (your connected inboxes)' },
   { id: 'search', label: 'Search' },
   { id: 'profile', label: 'Profile management' },
   { id: 'member', label: 'Member briefings' },
