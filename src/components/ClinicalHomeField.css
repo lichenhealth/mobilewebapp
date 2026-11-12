@@ -1,0 +1,12 @@
+.clinhome { display: flex; flex-direction: column; gap: 8px; margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--bone-edge); }
+.clinhome__lead { font-weight: 500; margin: 0; }
+.clinhome__opt { color: var(--ink-muted); font-weight: 300; }
+.clinhome__hint { margin: 0; color: var(--ink-muted); font-size: 13px; line-height: 1.45; text-wrap: pretty; }
+.clinhome__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.clinhome__msg { font-size: 13px; color: var(--ink-soft); }
+/* Shown on a member's profile + care surfaces */
+.clinline { display: flex; align-items: flex-start; gap: 8px; margin: var(--s-3) 0; padding: 10px 12px;
+  border: 1px solid var(--bone-edge); border-radius: 12px; background: var(--bone-warm, var(--bone)); font-size: 13px; line-height: 1.45; }
+.clinline__icon { flex-shrink: 0; margin-top: 2px; color: var(--peach-deep); }
+.clinline p { margin: 0; }
+.clinline__note { color: var(--ink-muted); }

@@ -97,11 +97,16 @@ export const LIFE_TOOLS = [
       },
     },
   },
+  {
+    name: 'set_clinical_home',
+    description: 'For licensed providers: name the HIPAA tool where their CLINICAL conversations and records live (SimplePractice, Spruce, Hushmail…), with an optional client-portal link and a short note for clients. Members see "For anything clinical, X uses …" on their profile and care team. Lichen is not a HIPAA platform yet — it points there and never holds clinical records. service empty clears it. A url only if they typed it in this conversation.',
+    input_schema: { type: 'object', properties: { service: { type: 'string' }, url: { type: 'string' }, note: { type: 'string' } }, required: ['service'] },
+  },
 ];
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events',
+  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', set_clinical_home: 'profile',
 };
 
 const enc = encodeURIComponent;
@@ -438,6 +443,23 @@ export async function runLifeTool(
       ? 'These ride along as Copy buttons under your reply: ' + (out.copies as { label: string }[]).map((c) => c.label).join(', ') + '. Say they are there; do not paste long URLs. Speak the guest list in plain words.'
       : 'No Copy buttons ride along this time — do not promise any.';
     return out;
+  }
+
+  if (name === 'set_clinical_home') {
+    const service = String(input.service ?? '').trim().slice(0, 60);
+    if (!service) {
+      await sb(`profiles?id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ clinical_home: null }) });
+      return { ok: true, change: 'cleared their clinical home' };
+    }
+    let url = String(input.url ?? '').trim();
+    if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+    url = url.replace(/^http:\/\//i, 'https://');
+    if (url && !/^https:\/\/[^\s]{3,400}$/.test(url)) return { ok: false, error: 'That link does not look like a web address.' };
+    const note = String(input.note ?? '').trim().slice(0, 200);
+    const value = { service, url: url || null, note: note || null };
+    const res = await sb(`profiles?id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ clinical_home: value }) });
+    if (!res.ok) return { ok: false, error: 'It would not save.' };
+    return { ok: true, change: `set their clinical home to ${service}${url ? ` (${url})` : ''}`, note: 'Members now see it on their profile and care team. Remind them plainly: clinical details belong there, not in Lichen chat.' };
   }
 
   return { ok: false, error: 'Unknown tool.' };
