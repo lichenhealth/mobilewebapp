@@ -36,6 +36,7 @@ import { listMyOfflineSpaces, restoreSpace, deleteSpace, type OfflineSpace } fro
 import { APP_ORIGIN } from '../lib/customDomain';
 import PageTabsEditor from '../components/PageTabsEditor';
 import CollapsibleSection from '../components/CollapsibleSection';
+import ClinicalHomeField from '../components/ClinicalHomeField';
 import AssistantDoor, { aiWorkHint } from '../components/AssistantDoor';
 import AssistantConsentList from '../components/AssistantConsentList';
 import AssistantAllowances from '../components/AssistantAllowances';
@@ -1480,6 +1481,11 @@ export default function Profile() {
             />
           </div>
         )}
+
+        {/* The clinical home (founder 2026-11-12): licensed providers name
+            the HIPAA tool their clinical conversations live in; Lichen points
+            there and never holds the records. */}
+        <ClinicalHomeField userId={user.id} />
 
         {/* The overlap, honored (founder 2026-08-20): what you provide may
             also be who you are — but only you say so. Each linked identity

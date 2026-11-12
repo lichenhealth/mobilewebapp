@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { loadClinicalHomes, type ClinicalHome } from '../lib/clinicalHomeApi';
 import type { ChangeEvent } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, IconName } from '../components/Icon';
@@ -805,6 +806,7 @@ function SelfAudit({ me, onDone, onOpenMeans }: { me: string; onDone: () => void
  *  remove); viewing a client's Concierge it stays a read-only roster —
  *  who joins their team is the patient's call. */
 function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string; me: string; addNonce?: number }) {
+  const [clinHomes, setClinHomes] = useState<Map<string, ClinicalHome>>(new Map());
   const navigate = useNavigate();
   const managing = !!me && subjectId === me;
   // The ADMIN | LICHEN VIEW toggle is RETIRED here (founder 2026-09-26:
@@ -895,6 +897,12 @@ function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string;
   const activeRows = managing
     ? active.map((l) => ({ key: l.id, linkId: l.id, personId: l.caregiver_id, name: l.caregiverName, rich: rosterMap.get(l.caregiver_id) }))
     : roster.map((r) => ({ key: r.id, linkId: '', personId: r.id, name: r.name, rich: r as OnCallCaregiver | undefined }));
+  const clinKey = activeRows.map((r) => r.personId).join(',');
+  useEffect(() => {
+    let live = true;
+    void loadClinicalHomes(clinKey ? clinKey.split(',') : []).then((m) => { if (live) setClinHomes(m); });
+    return () => { live = false; };
+  }, [clinKey]);
 
   return (
     <section className="conc__team">
@@ -913,7 +921,8 @@ function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string;
       )}
 
       {ready && activeRows.map((row) => (
-        <div className="conc__team-row" key={row.key}>
+        <Fragment key={row.key}>
+        <div className="conc__team-row">
           <button className="conc__team-who" onClick={() => navigate(`/members/${row.personId}`)}>
             <span
               className="urgent__avatar urgent__avatar--sm"
@@ -940,6 +949,16 @@ function CareTeamDirectory({ subjectId, me, addNonce = 0 }: { subjectId: string;
             )}
           </span>
         </div>
+        {clinHomes.get(row.personId) && (() => {
+          const h = clinHomes.get(row.personId)!;
+          return (
+            <p className="conc__team-clin">
+              For anything clinical, {row.name.split(/\s+/)[0]} uses{' '}
+              {h.url ? <a className="link-cue" href={h.url} target="_blank" rel="noopener noreferrer">{h.service} ↗</a> : <strong>{h.service}</strong>}
+            </p>
+          );
+        })()}
+        </Fragment>
       ))}
 
       {ready && admin && pending.map((l) => {

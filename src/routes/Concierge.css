@@ -1724,3 +1724,6 @@
   font-size: 12px; font-family: inherit; color: var(--ink); cursor: pointer;
 }
 .conc__dash-select:focus { outline: 2px solid var(--peach); outline-offset: 1px; }
+
+/* Clinical home under a caregiver's row (founder 2026-11-12) */
+.conc__team-clin { margin: -2px 0 8px 46px; font-size: 13px; color: var(--ink-muted); }

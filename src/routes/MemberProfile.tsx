@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { useTopIdentityFor } from '../lib/topIdentity';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
+import ClinicalHomeLine from '../components/ClinicalHomeLine';
 import { useActing, useSelfLinkHat } from '../acting/ActingProvider';
 import { getIdentityTags } from '../lib/meansApi';
 import { loadSteward } from '../lib/stewardshipApi';
@@ -542,7 +543,7 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
         feed={memberFeed}
         belowIdentity={viewToggleBar ?? undefined}
         siteMasthead
-        beforeContent={me ? identityExtras : undefined}
+        beforeContent={me ? <>{!isSelf && <ClinicalHomeLine profileId={member.id} name={name} />}{identityExtras}</> : undefined}
       />
       </>
     );
@@ -594,6 +595,7 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
           </p>
         )}
       </div>
+      {me && !isSelf && <ClinicalHomeLine profileId={member.id} name={name} />}
       {identityExtras}
       {memberFeed({ showing: true, open: () => {}, guest: !me })}
     </div>
