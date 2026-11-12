@@ -804,5 +804,11 @@
  },
  "mailApi:listMailAccounts": {
   "exempt": "read-only list of the member's connected inboxes"
+ },
+ "conciergeApi:setCareFunding": {
+  "tool": "set_care_funding"
+ },
+ "conciergeApi:reviewCareSubsidy": {
+  "gap": "3"
  }
 }
