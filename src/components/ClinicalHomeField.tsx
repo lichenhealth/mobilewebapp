@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CLINICAL_SERVICES, cleanClinicalHome, loadClinicalHome, saveClinicalHome } from '../lib/clinicalHomeApi';
 import './ClinicalHomeField.css';
 
@@ -57,6 +58,10 @@ export default function ClinicalHomeField({ userId }: { userId: string }) {
         </button>
         {msg && <span className="clinhome__msg">{msg}</span>}
       </div>
+      <p className="clinhome__hint">
+        <Link className="link-cue" to="/practice">Practice payments &amp; superbills ›</Link> — import your Ivy Pay
+        spreadsheets, name your clients once, and print superbills.
+      </p>
     </div>
   );
 }

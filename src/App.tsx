@@ -22,6 +22,7 @@ import ChatRoomDrive from './routes/ChatRoomDrive';
 import Donate from './routes/Donate';
 import DonateHow from './routes/DonateHow';
 import Giving from './routes/Giving';
+import Practice from './routes/Practice';
 import Saved from './routes/Saved';
 import Trash from './routes/Trash';
 import Mail from './routes/Mail';
@@ -489,6 +490,7 @@ export default function App() {
           <Route path="/donate" element={<Donate />} />
           <Route path="/donate/how" element={<DonateHow />} />
           <Route path="/giving" element={<Giving />} />
+          <Route path="/practice" element={<Practice />} />
 
           {/* Side-menu passages — placeholders */}
           <Route path="/organizations" element={<SpacesDirectory kind="organization" />} />
