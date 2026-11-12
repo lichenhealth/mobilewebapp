@@ -24,6 +24,15 @@
  "assistantFeedApi:renameConvo": {
   "gap": "1"
  },
+ "practiceApi:importPracticePayments": {
+  "exempt": "practice ledger of a provider's own clients — clinical-adjacent; assistant access waits on the founder's consent call (BUSINESS honesty rule 6)"
+ },
+ "practiceApi:savePracticeInfo": {
+  "exempt": "practice ledger — same consent hold as importPracticePayments"
+ },
+ "practiceApi:savePracticeClient": {
+  "exempt": "client key holds client names — no assistant path until the founder decides"
+ },
  "clinicalHomeApi:saveClinicalHome": {
   "tool": "set_clinical_home"
  },
