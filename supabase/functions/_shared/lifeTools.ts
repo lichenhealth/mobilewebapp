@@ -102,11 +102,24 @@ export const LIFE_TOOLS = [
     description: 'For licensed providers: name the HIPAA tool where their CLINICAL conversations and records live (SimplePractice, Spruce, Hushmail…), with an optional client-portal link and a short note for clients. Members see "For anything clinical, X uses …" on their profile and care team. Lichen is not a HIPAA platform yet — it points there and never holds clinical records. service empty clears it. A url only if they typed it in this conversation.',
     input_schema: { type: 'object', properties: { service: { type: 'string' }, url: { type: 'string' }, note: { type: 'string' } }, required: ['service'] },
   },
+  {
+    name: 'set_care_funding',
+    description: 'On the member\'s OWN care plan: say how one entry is paid — any of covered (paid some other way: insurance, Medi-Cal, a contract), subsidy (asks the subsidy fund), self (they pay it themselves) — each with an optional dollar amount, e.g. $80 covered + $40 subsidy. NEVER ask or record HOW something is covered, only that it is. Target the entry by its exact title on their plan. A subsidy ask goes to the entry\'s provider to confirm. Empty parts clears it. Use only amounts the member said.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        entry_title: { type: 'string' },
+        parts: { type: 'array', items: { type: 'string', enum: ['covered', 'subsidy', 'self'] } },
+        covered_usd: { type: 'number' }, subsidy_usd: { type: 'number' }, self_usd: { type: 'number' },
+      },
+      required: ['entry_title', 'parts'],
+    },
+  },
 ];
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', set_clinical_home: 'profile',
+  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', set_clinical_home: 'profile', set_care_funding: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -460,6 +473,27 @@ export async function runLifeTool(
     const res = await sb(`profiles?id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ clinical_home: value }) });
     if (!res.ok) return { ok: false, error: 'It would not save.' };
     return { ok: true, change: `set their clinical home to ${service}${url ? ` (${url})` : ''}`, note: 'Members now see it on their profile and care team. Remind them plainly: clinical details belong there, not in Lichen chat.' };
+  }
+
+  if (name === 'set_care_funding') {
+    const title = String(input.entry_title ?? '').trim();
+    if (!title) return { ok: false, error: 'Name the care-plan entry by its title.' };
+    const rows = await (await sb(`care_posts?patient_id=eq.${me}&kind=eq.koc&ai_omit=is.null&title=ilike.${encodeURIComponent(title.replace(/[%_*]/g, ''))}&select=id,title`)).json();
+    const list = Array.isArray(rows) ? rows : [];
+    if (list.length !== 1) {
+      const all = await (await sb(`care_posts?patient_id=eq.${me}&kind=eq.koc&ai_omit=is.null&title=not.is.null&select=title&limit=30`)).json();
+      return { ok: false, error: list.length ? 'Several entries share that title — ask which one.' : 'No entry on their care plan has that exact title.', titles: (Array.isArray(all) ? all : []).map((r: { title: string }) => r.title) };
+    }
+    const cents = (v: unknown) => { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
+    const parts = (Array.isArray(input.parts) ? input.parts : []).map(String).filter((x) => ['covered', 'subsidy', 'self'].includes(x));
+    const res = await sb('rpc/_set_care_funding', { method: 'POST', body: JSON.stringify({
+      p_actor: me, p_post: list[0].id, p_parts: parts,
+      p_covered: cents(input.covered_usd), p_subsidy: cents(input.subsidy_usd), p_self: cents(input.self_usd),
+    }) });
+    if (!res.ok) { const t = await res.text(); return { ok: false, error: (t.match(/"message":"([^"]+)"/)?.[1]) || 'It would not save.' }; }
+    const out = await res.json();
+    return { ok: true, change: parts.length ? `marked «${list[0].title}» as ${parts.join(' + ')}` : `cleared how «${list[0].title}» is paid`,
+      note: out?.review === 'pending' ? (out?.provider ? 'The provider will be asked to confirm the subsidy request.' : 'A coordinator reviews subsidy requests.') : undefined };
   }
 
   return { ok: false, error: 'Unknown tool.' };

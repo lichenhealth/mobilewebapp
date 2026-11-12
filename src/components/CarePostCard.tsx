@@ -7,6 +7,7 @@ import { createReminder } from '../lib/remindersApi';
 import { linkify, hrefFor } from '../lib/linkify';
 import { recurrenceLabel } from '../lib/recurrence';
 import { minToLabel } from '../lib/calendarApi';
+import CareFunding from './CareFunding';
 import './CarePostCard.css';
 
 /** Render body text with pasted URLs turned into clickable links. */
@@ -229,6 +230,8 @@ export default function CarePostCard({
             ))}
           </div>
         )}
+
+        <CareFunding post={post} me={me} />
 
         {onAsk && (
           <footer className="cpost__foot cpost__foot--plan">

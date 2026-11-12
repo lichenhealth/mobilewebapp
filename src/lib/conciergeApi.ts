@@ -83,9 +83,41 @@ export interface CarePostRow {
   created_at: string;
   updated_at: string;
   author?: { full_name: string | null } | null;
+  /** HOW THIS PART OF THE PLAN IS PAID (founder 2026-11-12) — never HOW it
+   *  is covered, only that it is and for how much. Written only through
+   *  setCareFunding (client, or the provider whose work it is); whoever
+   *  didn't submit a subsidy ask confirms or questions it. */
+  pay_parts?: CarePayPart[] | null;
+  pay_covered_cents?: number | null;
+  pay_subsidy_cents?: number | null;
+  pay_self_cents?: number | null;
+  pay_provider_id?: string | null;
+  pay_set_by?: string | null;
+  subsidy_review?: 'pending' | 'confirmed' | 'questioned' | null;
 }
+export type CarePayPart = 'covered' | 'subsidy' | 'self';
 const CARE_POST_COLS =
-  'id, patient_id, author_id, kind, title, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, sensitive, intent, at_min, duration_min';
+  'id, patient_id, author_id, kind, title, body, dimensions, score, start_date, end_date, recurrence, attachments, links, previews, created_at, updated_at, ai_omit, sensitive, intent, at_min, duration_min, pay_parts, pay_covered_cents, pay_subsidy_cents, pay_self_cents, pay_provider_id, pay_set_by, subsidy_review';
+
+/** Say how a care-plan entry is paid. Parts with no amount store 0 =
+ *  "amount unknown". Empty parts clears it. The server re-checks who may. */
+export async function setCareFunding(
+  postId: string, parts: CarePayPart[],
+  amounts: { covered?: number | null; subsidy?: number | null; self?: number | null },
+): Promise<void> {
+  const { error } = await supabase.rpc('set_care_funding', {
+    p_post: postId, p_parts: parts,
+    p_covered: amounts.covered ?? null, p_subsidy: amounts.subsidy ?? null, p_self: amounts.self ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** The other party's check on a subsidy ask: confirm, or question it (a
+ *  question carries no reason — it bells the coordinators to talk). */
+export async function reviewCareSubsidy(postId: string, ok: boolean): Promise<void> {
+  const { error } = await supabase.rpc('review_care_subsidy', { p_post: postId, p_ok: ok });
+  if (error) throw new Error(error.message);
+}
 
 // ─── Date helpers (parse date-only strings in LOCAL time to avoid tz drift) ──
 export function localDate(iso: string): Date {
