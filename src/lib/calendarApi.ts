@@ -56,6 +56,9 @@ export interface EventRow {
    *  htmlLink, or an ICS URL) — "edit it there" needs a there to go to
    *  (founder 2026-08-14). */
   sourceUrl?: string | null;
+  /** A MULTI-DAY event drawn as one bar across the top of the week
+   *  (founder 2026-11-13, Google's top bar). */
+  spanBar?: boolean;
   /** Which imported calendar this row came from (external rows only). */
   extCalId?: string;
   /** A CARE-PLAN entry overlaid on the calendar (founder 2026-09-24:
@@ -445,6 +448,8 @@ export interface ExternalCalendar {
   last_synced_at: string | null;
   last_error: string | null;
   event_count: number;
+  /** Google only: every calendar on the account + its Show/Busy switches. */
+  sub_settings?: Record<string, SubCalSetting> | null;
 }
 
 export async function listExternalCalendars(me: string): Promise<ExternalCalendar[]> {
@@ -509,18 +514,39 @@ export interface ExternalBusyRow {
   end_min: number | null;
   title: string | null;
   source_url?: string | null;
+  /** Which Google calendar on the account (2026-11-13) + its colour. */
+  sub_cal?: string | null;
+  color?: string | null;
+  /** A multi-day event: the same id on every day it touches. */
+  span_id?: string | null;
+  span_start?: string | null;
+  span_end?: string | null;
+  span_label?: string | null;
+  /** From a calendar shown but NOT counted as busy (external_show). */
+  showOnly?: boolean;
 }
 
-/** The owner's own imported blocks (titles included) for the calendar grid. */
+const EXT_COLS = 'id, calendar_id, on_date, all_day, start_min, end_min, title, source_url, sub_cal, color, span_id, span_start, span_end, span_label';
+
+/** The owner's own imported blocks (titles included) for the calendar grid —
+ *  busy calendars AND shown-only ones (a partner's shared calendar, holidays). */
 export async function loadMyExternalBusy(me: string, from: string, to: string): Promise<ExternalBusyRow[]> {
-  const { data, error } = await supabase
-    .from('external_busy')
-    .select('id, calendar_id, on_date, all_day, start_min, end_min, title, source_url')
-    .eq('profile_id', me)
-    .gte('on_date', from)
-    .lte('on_date', to);
-  if (error) { console.warn('loadMyExternalBusy:', error.message); return []; }
-  return (data as ExternalBusyRow[] | null) ?? [];
+  const [busy, show] = await Promise.all([
+    supabase.from('external_busy').select(EXT_COLS).eq('profile_id', me).gte('on_date', from).lte('on_date', to),
+    supabase.from('external_show').select(EXT_COLS).eq('profile_id', me).gte('on_date', from).lte('on_date', to),
+  ]);
+  if (busy.error) console.warn('loadMyExternalBusy:', busy.error.message);
+  return [
+    ...((busy.data as ExternalBusyRow[] | null) ?? []),
+    ...((show.data as ExternalBusyRow[] | null) ?? []).map((r) => ({ ...r, showOnly: true })),
+  ];
+}
+
+/** Every calendar on a connected Google account, with its two switches. */
+export type SubCalSetting = { name: string; color: string | null; primary: boolean; include: boolean; busy: boolean };
+export async function saveSubCalSettings(calendarId: string, subs: Record<string, SubCalSetting>): Promise<void> {
+  const { error } = await supabase.from('external_calendars').update({ sub_settings: subs }).eq('id', calendarId);
+  if (error) throw error;
 }
 
 // ─── Pinned calendar overlays (cross-device; founder 2026-07-17) ─────────────

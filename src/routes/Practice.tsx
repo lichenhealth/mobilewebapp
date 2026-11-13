@@ -7,6 +7,7 @@ import {
   importPracticePayments, lineFor, loadPractice, money, parseIvyWorkbook, paymentsCsv,
   savePracticeClient, savePracticeInfo, type PracticeClient, type PracticeInfo, type PracticePayment,
 } from '../lib/practiceApi';
+import RevenueStreams from '../components/RevenueStreams';
 import './Practice.css';
 
 /** /practice — a provider's own payments ledger + superbills (founder
@@ -22,7 +23,7 @@ export default function Practice() {
   const [loaded, setLoaded] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState<Set<string>>(new Set(['import']));
+  const [open, setOpen] = useState<Set<string>>(new Set([typeof window !== 'undefined' && window.location.hash === '#streams' ? 'streams' : 'import']));
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -75,7 +76,7 @@ export default function Practice() {
       <PageHead onBack={() => navigate('/profile#offer')} />
       <header className="myc__head">
         <h1 className="myc__title">Practice payments</h1>
-        <p className="myc__sub">Your processor’s payments, your clients, and superbills — private to you.</p>
+        <p className="myc__sub">Your processor’s payments, your clients, superbills, and who pays for what — private to you.</p>
       </header>
 
       <CollapsibleSection id="import" title="Import payments" meta="Ivy Pay activity spreadsheet" open={open.has('import')} onToggle={() => toggle('import')}>
@@ -120,6 +121,10 @@ export default function Practice() {
           </table>
         )}
         <p className="prac__hint">Totals follow the session date. Ask your tax person how they want income and processing fees reported.</p>
+      </CollapsibleSection>
+
+      <CollapsibleSection id="streams" title="Your services & who pays" meta="revenue streams · the gap subsidies can fill" open={open.has('streams')} onToggle={() => toggle('streams')}>
+        <RevenueStreams me={me} />
       </CollapsibleSection>
 
       <CollapsibleSection id="details" title="Your practice details" meta="shown on every superbill" open={open.has('details')} onToggle={() => toggle('details')}>

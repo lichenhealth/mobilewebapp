@@ -103,6 +103,20 @@ export const LIFE_TOOLS = [
     input_schema: { type: 'object', properties: { service: { type: 'string' }, url: { type: 'string' }, note: { type: 'string' } }, required: ['service'] },
   },
   {
+    name: 'revenue_streams',
+    description: 'For practitioners: read, add, change or remove their OWN revenue streams — per service, the rate that makes the work feasible for them, and each payer with what it covers (a dollar amount like "Medi-Cal pays $80", or a percentage like "out of network reimburses 70%"). The gap is what a client pays over coverage, or what a subsidy request asks the fund for; the care-plan payment box fills from these. action=list reads them. action=set adds or updates a payer row matched by service + payer label (case-insensitive) — rate_usd applies to the whole service. action=remove deletes one payer row. Business facts only, never client details. Use only numbers the member said.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'set', 'remove'] },
+        service: { type: 'string' }, payer: { type: 'string' },
+        kind: { type: 'string', enum: ['cash', 'sliding', 'insurance_in', 'insurance_out', 'public', 'contract', 'other'] },
+        rate_usd: { type: 'number' }, covers_usd: { type: 'number' }, covers_pct: { type: 'number' }, note: { type: 'string' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'set_care_funding',
     description: 'On the member\'s OWN care plan: say how one entry is paid — any of covered (paid some other way: insurance, Medi-Cal, a contract), subsidy (asks the subsidy fund), self (they pay it themselves) — each with an optional dollar amount, e.g. $80 covered + $40 subsidy. NEVER ask or record HOW something is covered, only that it is. Target the entry by its exact title on their plan. A subsidy ask goes to the entry\'s provider to confirm. Empty parts clears it. Use only amounts the member said.',
     input_schema: {
@@ -119,7 +133,7 @@ export const LIFE_TOOLS = [
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', set_clinical_home: 'profile', set_care_funding: 'concierge',
+  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -473,6 +487,49 @@ export async function runLifeTool(
     const res = await sb(`profiles?id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ clinical_home: value }) });
     if (!res.ok) return { ok: false, error: 'It would not save.' };
     return { ok: true, change: `set their clinical home to ${service}${url ? ` (${url})` : ''}`, note: 'Members now see it on their profile and care team. Remind them plainly: clinical details belong there, not in Lichen chat.' };
+  }
+
+  if (name === 'revenue_streams') {
+    const action = String(input.action ?? 'list');
+    const all = await (await sb(`practitioner_streams?owner_id=eq.${me}&select=id,service,rate_cents,label,kind,pays_cents,pays_pct,note&order=service,sort`)).json();
+    const rows: { id: string; service: string; rate_cents: number; label: string; kind: string; pays_cents: number | null; pays_pct: number | null; note: string | null }[] = Array.isArray(all) ? all : [];
+    const d = (c: number) => '$' + (c / 100).toFixed(2).replace(/\.00$/, '');
+    const describe = (r: typeof rows[number]) => {
+      const cov = r.kind === 'cash' || r.kind === 'sliding' ? 0 : r.pays_pct ? Math.round(r.rate_cents * r.pays_pct / 100) : Math.min(r.pays_cents ?? 0, r.rate_cents);
+      return `${r.service} (rate ${d(r.rate_cents)}) · ${r.label}: ${r.kind === 'cash' ? 'client pays in full' : r.kind === 'sliding' ? 'sliding scale' : `covers ${r.pays_pct ? r.pays_pct + '%' : d(cov)} → gap ${d(Math.max(0, r.rate_cents - cov))}`}${r.note ? ` (${r.note})` : ''}`;
+    };
+    if (action === 'list') return { ok: true, streams: rows.map(describe), door: { path: '/practice#streams', label: 'Open your services & who pays →' } };
+    const service = String(input.service ?? '').trim().slice(0, 80);
+    const payer = String(input.payer ?? '').trim().slice(0, 60);
+    if (!service || !payer) return { ok: false, error: 'Name both the service and the payer.' };
+    const match = rows.find((r) => r.service.toLowerCase() === service.toLowerCase() && r.label.toLowerCase() === payer.toLowerCase());
+    if (action === 'remove') {
+      if (!match) return { ok: false, error: 'No payer row by that name for that service.', streams: rows.map(describe) };
+      await sb(`practitioner_streams?id=eq.${match.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      return { ok: true, change: `removed ${payer} from ${service}` };
+    }
+    const cents = (v: unknown) => { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
+    const sibling = rows.find((r) => r.service.toLowerCase() === service.toLowerCase());
+    const rate = cents(input.rate_usd) ?? match?.rate_cents ?? sibling?.rate_cents ?? null;
+    if (!rate) return { ok: false, error: 'I need the rate that makes this service feasible for them.' };
+    const kind = String(input.kind ?? match?.kind ?? 'other');
+    const pct = Number(input.covers_pct) > 0 ? Math.min(100, Math.round(Number(input.covers_pct))) : null;
+    const amt = pct ? null : cents(input.covers_usd);
+    const needsPays = kind !== 'cash' && kind !== 'sliding';
+    const row = {
+      owner_id: me, service: sibling?.service ?? service, rate_cents: rate, label: match?.label ?? payer, kind,
+      pays_cents: needsPays ? (amt ?? (pct ? null : match?.pays_cents ?? null)) : null,
+      pays_pct: needsPays ? (pct ?? (amt ? null : match?.pays_pct ?? null)) : null,
+      note: input.note != null ? (String(input.note).trim().slice(0, 200) || null) : (match?.note ?? null),
+    };
+    if (needsPays && !row.pays_cents && !row.pays_pct) return { ok: false, error: 'Say what this payer covers — a dollar amount or a percentage.' };
+    const res = match
+      ? await sb(`practitioner_streams?id=eq.${match.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) })
+      : await sb('practitioner_streams', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+    if (!res.ok) return { ok: false, error: 'It would not save.' };
+    // The rate belongs to the whole service — keep its other payers in step.
+    await sb(`practitioner_streams?owner_id=eq.${me}&service=eq.${encodeURIComponent(row.service)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ rate_cents: rate }) });
+    return { ok: true, change: `${match ? 'updated' : 'added'} ${row.label} for ${row.service}`, door: { path: '/practice#streams', label: 'Open your services & who pays →' } };
   }
 
   if (name === 'set_care_funding') {

@@ -1485,7 +1485,7 @@ Deno.serve(async (req) => {
           if (!copyButtons.some((b) => b.text === c.text)) copyButtons.push(c);
         }
         const door = lr.door as { path: string; label: string } | undefined;
-        if (door && /^\/events\/[0-9a-f-]{36}$/.test(door.path) && !appDoors.some((d) => d.path === door.path)) appDoors.push(door);
+        if (door && (/^\/events\/[0-9a-f-]{36}$/.test(door.path) || door.path === "/practice#streams") && !appDoors.some((d) => d.path === door.path)) appDoors.push(door);
         delete lr.copies; delete lr.door;
       }
       return lr;

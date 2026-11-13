@@ -141,7 +141,34 @@ function parseIcs(ics: string, fallbackTz: string): IcsEvent[] {
 }
 
 // ─── Expansion into per-day busy rows ────────────────────────────────────────
-interface BusyRow { on_date: string; all_day: boolean; start_min: number | null; end_min: number | null; title: string; source_url?: string | null }
+interface BusyRow {
+  on_date: string; all_day: boolean; start_min: number | null; end_min: number | null; title: string; source_url?: string | null;
+  // Multi-day events (founder 2026-11-13, the top bar): one id across the
+  // event's days so the grid can draw ONE bar.
+  span_id?: string | null; span_start?: string | null; span_end?: string | null; span_label?: string | null;
+  sub_cal?: string | null; color?: string | null;
+}
+
+function minLabel(m: number): string {
+  const h = Math.floor(m / 60), mm = m % 60;
+  const ap = h >= 12 ? 'pm' : 'am';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return mm ? `${h12}:${String(mm).padStart(2, '0')}${ap}` : `${h12}${ap}`;
+}
+/** An event that lands on more than one day becomes a SPAN: every row of it
+ *  carries the same id + first/last date + the label the bar shows
+ *  ("Gabe on Shift, 9am" — Google's grammar for a timed multi-day event). */
+function stampSpan(evRows: BusyRow[], key: string, title: string): BusyRow[] {
+  const dates = [...new Set(evRows.map((r) => r.on_date))].sort();
+  if (dates.length < 2) return evRows;
+  const first = evRows.find((r) => r.on_date === dates[0]);
+  const label = title + (first && !first.all_day && first.start_min ? `, ${minLabel(first.start_min)}` : '');
+  for (const r of evRows) {
+    r.span_id = `${key}:${dates[0]}`.slice(0, 300);
+    r.span_start = dates[0]; r.span_end = dates[dates.length - 1]; r.span_label = label.slice(0, 200);
+  }
+  return evRows;
+}
 
 const DAY_MS = 86400000;
 const BYDAY: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
@@ -212,7 +239,13 @@ function expand(events: IcsEvent[], tz: string, windowStart: number, windowEnd: 
   for (const ev of events) if (ev.recurrenceId && ev.uid) overridden.add(ev.uid + ':' + ev.recurrenceId);
 
   const rows: BusyRow[] = [];
-  const push = (startUtc: number, durMs: number, allDay: boolean, dateOnly: string | null, title: string, srcUrl: string | null = null) => {
+  const push = (startUtc: number, durMs: number, allDay: boolean, dateOnly: string | null, title: string, srcUrl: string | null = null, key = '') => {
+    const before = rows.length;
+    pushRaw(startUtc, durMs, allDay, dateOnly, title, srcUrl);
+    const mine = rows.splice(before);
+    rows.push(...stampSpan(mine, key || title, title));
+  };
+  const pushRaw = (startUtc: number, durMs: number, allDay: boolean, dateOnly: string | null, title: string, srcUrl: string | null = null) => {
     if (allDay && dateOnly) {
       const days = Math.max(1, Math.round(durMs / DAY_MS));
       const baseT = Date.parse(dateOnly + 'T00:00:00Z');
@@ -251,7 +284,7 @@ function expand(events: IcsEvent[], tz: string, windowStart: number, windowEnd: 
       // An override instance — emit directly.
       const startT = ev.start.utc ?? Date.parse(ev.start.date + 'T00:00:00Z');
       if (startT <= windowEnd && startT + durMs >= windowStart) {
-        push(startT, durMs, isAllDay, ev.start.date, ev.title, ev.url ?? null);
+        push(startT, durMs, isAllDay, ev.start.date, ev.title, ev.url ?? null, ev.uid ?? '');
       }
       continue;
     }
@@ -271,24 +304,24 @@ function expand(events: IcsEvent[], tz: string, windowStart: number, windowEnd: 
 // The Calendar API with singleEvents=true expands recurrence for us — richer
 // and fresher than the secret-ICS feed. Tokens live in a deny-all table; only
 // this service-role path can read them.
-function googleItemsToRows(
-  items: { status?: string; summary?: string; htmlLink?: string;
-    start?: { date?: string; dateTime?: string };
-    end?: { date?: string; dateTime?: string } }[],
-  tz: string,
-): BusyRow[] {
+type GItem = { id?: string; status?: string; summary?: string; htmlLink?: string;
+  start?: { date?: string; dateTime?: string };
+  end?: { date?: string; dateTime?: string } };
+
+function googleItemsToRows(items: GItem[], tz: string, sub: { id: string; color: string | null }): BusyRow[] {
   const rows: BusyRow[] = [];
   for (const it of items) {
     if (it.status === 'cancelled') continue;
     const title = (it.summary ?? '').slice(0, 200);
     const source_url = it.htmlLink ?? null;   // Google's direct link to this event
+    const mine: BusyRow[] = [];
     if (it.start?.date) {
       const startT = Date.parse(it.start.date + 'T00:00:00Z');
       const endT = it.end?.date ? Date.parse(it.end.date + 'T00:00:00Z') : startT + DAY_MS;
       const days = Math.max(1, Math.round((endT - startT) / DAY_MS));
       for (let i = 0; i < Math.min(days, 60); i++) {
         const dd = new Date(startT + i * DAY_MS);
-        rows.push({ on_date: isoDate(dd.getUTCFullYear(), dd.getUTCMonth() + 1, dd.getUTCDate()), all_day: true, start_min: null, end_min: null, title, source_url });
+        mine.push({ on_date: isoDate(dd.getUTCFullYear(), dd.getUTCMonth() + 1, dd.getUTCDate()), all_day: true, start_min: null, end_min: null, title, source_url });
       }
     } else if (it.start?.dateTime) {
       let cursor = Date.parse(it.start.dateTime);
@@ -297,20 +330,28 @@ function googleItemsToRows(
       while (cursor < endUtc && guard++ < 60) {
         const w = utcToWall(cursor, tz);
         const segEnd = Math.min(endUtc, cursor + (1440 - w.min) * 60000);
-        rows.push({
+        mine.push({
           on_date: isoDate(w.y, w.mo, w.d), all_day: false,
           start_min: w.min, end_min: Math.min(1440, w.min + Math.round((segEnd - cursor) / 60000)), title, source_url,
         });
         cursor = segEnd;
       }
     }
+    for (const r of stampSpan(mine, `${sub.id}:${it.id ?? title}`, title)) {
+      r.sub_cal = sub.id.slice(0, 300); r.color = sub.color; rows.push(r);
+    }
   }
-  return rows.slice(0, 4000);
+  return rows;
 }
+
+/** One entry per calendar on the Google account (founder 2026-11-13):
+ *  include = shown on Lichen, busy = blocks your bookable time. */
+type SubSetting = { name: string; color: string | null; primary: boolean; include: boolean; busy: boolean };
 
 async function fetchGoogleRows(
   accountId: string, profileId: string, tz: string, windowStart: number, windowEnd: number,
-): Promise<BusyRow[]> {
+  prior: Record<string, SubSetting>,
+): Promise<{ busy: BusyRow[]; show: BusyRow[]; subs: Record<string, SubSetting> }> {
   const svc = { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}` };
   const accts = await (await fetch(
     `${SUPABASE_URL}/rest/v1/google_calendar_accounts?select=refresh_token&id=eq.${accountId}&profile_id=eq.${profileId}`,
@@ -328,22 +369,53 @@ async function fetchGoogleRows(
   });
   if (!tokenRes.ok) throw new Error('Google sign-in expired — reconnect');
   const { access_token } = await tokenRes.json();
+  const H = { Authorization: `Bearer ${access_token}` };
 
-  const items: unknown[] = [];
-  let pageToken = '';
-  for (let page = 0; page < 3; page++) {
-    const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
-      + `?timeMin=${new Date(windowStart).toISOString()}&timeMax=${new Date(windowEnd).toISOString()}`
-      + '&singleEvents=true&maxResults=2500&fields=items(status,summary,start,end,htmlLink),nextPageToken'
-      + (pageToken ? `&pageToken=${pageToken}` : '');
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${access_token}` } });
-    if (!res.ok) throw new Error(`Google Calendar answered ${res.status}`);
-    const body = await res.json();
-    items.push(...(body.items ?? []));
-    if (!body.nextPageToken) break;
-    pageToken = body.nextPageToken;
+  // Every calendar on the account. A failed list read falls back to primary
+  // alone — the old behaviour, never worse.
+  const subs: Record<string, SubSetting> = {};
+  const listRes = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList'
+    + '?maxResults=100&fields=items(id,summary,summaryOverride,backgroundColor,selected,primary,hidden)', { headers: H });
+  if (listRes.ok) {
+    const lb = await listRes.json();
+    for (const c of (lb.items ?? []) as { id: string; summary?: string; summaryOverride?: string; backgroundColor?: string; selected?: boolean; primary?: boolean; hidden?: boolean }[]) {
+      const was = prior[c.id];
+      const isPrimary = !!c.primary;
+      subs[c.id] = {
+        name: (c.summaryOverride || c.summary || c.id).slice(0, 100),
+        color: c.backgroundColor ?? null,
+        primary: isPrimary,
+        include: was ? was.include : (isPrimary || (c.selected === true && !c.hidden)),
+        busy: was ? was.busy : isPrimary,
+      };
+    }
   }
-  return googleItemsToRows(items as Parameters<typeof googleItemsToRows>[0], tz);
+  if (!Object.keys(subs).length) subs['primary'] = prior['primary'] ?? { name: 'Primary', color: null, primary: true, include: true, busy: true };
+
+  const busy: BusyRow[] = [], show: BusyRow[] = [];
+  for (const [calId, sub] of Object.entries(subs)) {
+    if (!sub.include) continue;
+    const items: GItem[] = [];
+    let pageToken = '';
+    for (let page = 0; page < 3; page++) {
+      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`
+        + `?timeMin=${new Date(windowStart).toISOString()}&timeMax=${new Date(windowEnd).toISOString()}`
+        + '&singleEvents=true&maxResults=2500&fields=items(id,status,summary,start,end,htmlLink),nextPageToken'
+        + (pageToken ? `&pageToken=${pageToken}` : '');
+      const res = await fetch(url, { headers: H });
+      if (!res.ok) {
+        if (sub.primary) throw new Error(`Google Calendar answered ${res.status}`);
+        break; // one unreadable shared calendar never sinks the rest
+      }
+      const body = await res.json();
+      items.push(...(body.items ?? []));
+      if (!body.nextPageToken) break;
+      pageToken = body.nextPageToken;
+    }
+    const rows = googleItemsToRows(items, tz, { id: calId, color: sub.color });
+    (sub.busy ? busy : show).push(...rows);
+  }
+  return { busy: busy.slice(0, 4000), show: show.slice(0, 4000), subs };
 }
 
 // ─── REST helpers (caller's token — RLS scopes everything) ───────────────────
@@ -376,7 +448,7 @@ Deno.serve(async (req) => {
 
   const db = rest(auth);
   const calFilter = body.calendarId ? `&id=eq.${body.calendarId}` : '';
-  const cals = await db.get(`external_calendars?select=id,url,name,last_synced_at&profile_id=eq.${user.id}${calFilter}`);
+  const cals = await db.get(`external_calendars?select=id,url,name,last_synced_at,sub_settings&profile_id=eq.${user.id}${calFilter}`);
   if (!Array.isArray(cals)) return json({ error: 'Could not load calendars' }, 500);
 
   const now = Date.now();
@@ -391,8 +463,11 @@ Deno.serve(async (req) => {
     }
     try {
       let rows: BusyRow[];
+      let showRows: BusyRow[] = [];
+      let subs: Record<string, SubSetting> | null = null;
       if (String(cal.url).startsWith('google:')) {
-        rows = await fetchGoogleRows(String(cal.url).slice(7), user.id, tz, windowStart, windowEnd);
+        const g = await fetchGoogleRows(String(cal.url).slice(7), user.id, tz, windowStart, windowEnd, (cal.sub_settings ?? {}) as Record<string, SubSetting>);
+        rows = g.busy; showRows = g.show; subs = g.subs;
       } else {
         const url = String(cal.url).replace(/^webcal:\/\//i, 'https://');
         const res = await fetch(url, { headers: { 'User-Agent': 'Lichen-Calendar-Sync/1.0' }, redirect: 'follow' });
@@ -403,15 +478,25 @@ Deno.serve(async (req) => {
       }
 
       await db.del(`external_busy?calendar_id=eq.${cal.id}`);
-      for (let i = 0; i < rows.length; i += 400) {
-        const batch = rows.slice(i, i + 400).map((r) => ({ ...r, calendar_id: cal.id, profile_id: user.id }));
-        const ins = await db.post('external_busy', batch);
-        if (!ins.ok) throw new Error('Could not save busy blocks');
+      await db.del(`external_show?calendar_id=eq.${cal.id}`);
+      for (const [table, list] of [['external_busy', rows], ['external_show', showRows]] as const) {
+        for (let i = 0; i < list.length; i += 400) {
+          // PostgREST bulk inserts need identical keys on every object.
+          const batch = list.slice(i, i + 400).map((r) => ({
+            on_date: r.on_date, all_day: r.all_day, start_min: r.start_min, end_min: r.end_min, title: r.title,
+            source_url: r.source_url ?? null, sub_cal: r.sub_cal ?? null, color: r.color ?? null,
+            span_id: r.span_id ?? null, span_start: r.span_start ?? null, span_end: r.span_end ?? null, span_label: r.span_label ?? null,
+            calendar_id: cal.id, profile_id: user.id,
+          }));
+          const ins = await db.post(table, batch);
+          if (!ins.ok) throw new Error('Could not save calendar blocks');
+        }
       }
       await db.patch(`external_calendars?id=eq.${cal.id}`, {
-        last_synced_at: new Date().toISOString(), last_error: null, event_count: rows.length, timezone: tz,
+        last_synced_at: new Date().toISOString(), last_error: null, event_count: rows.length + showRows.length, timezone: tz,
+        ...(subs ? { sub_settings: subs } : {}),
       });
-      results.push({ id: cal.id, events: rows.length });
+      results.push({ id: cal.id, events: rows.length + showRows.length });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await db.patch(`external_calendars?id=eq.${cal.id}`, { last_synced_at: new Date().toISOString(), last_error: msg });

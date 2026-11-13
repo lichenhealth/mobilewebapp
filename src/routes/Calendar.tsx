@@ -300,12 +300,26 @@ export default function Calendar() {
     // calendar renders only while its chip is lit.
     if (extSel.length > 0) {
       for (const b of (await loadMyExternalBusy(me, from, to)).filter((r) => extSel.includes(r.calendar_id))) {
+        // A multi-day event collapses to ONE bar across its days.
+        if (b.span_id && b.span_start && b.span_end) {
+          const key = 'ext:span:' + b.calendar_id + ':' + b.span_id;
+          if (byId.has(key)) continue;
+          byId.set(key, {
+            id: key, creator_id: '', owner_profile_id: me, owner_space_id: null,
+            title: b.span_label || b.title || 'Busy', description: '', location: '', lat: null, lng: null,
+            start_date: b.span_start, end_date: b.span_end, all_day: true,
+            start_min: null, end_min: null, recurrence: null,
+            created_at: '', external: true, spanBar: true, tint: b.color || colorFor('extcal:' + b.calendar_id),
+            sourceUrl: b.source_url ?? null, extCalId: b.calendar_id,
+          });
+          continue;
+        }
         byId.set('ext:' + b.id, {
           id: 'ext:' + b.id, creator_id: '', owner_profile_id: me, owner_space_id: null,
           title: b.title || 'Busy', description: '', location: '', lat: null, lng: null,
           start_date: b.on_date, end_date: b.on_date, all_day: b.all_day,
           start_min: b.start_min, end_min: b.end_min, recurrence: null,
-          created_at: '', external: true, tint: colorFor('extcal:' + b.calendar_id),
+          created_at: '', external: true, tint: b.color || colorFor('extcal:' + b.calendar_id),
           sourceUrl: b.source_url ?? null, extCalId: b.calendar_id,
         });
       }
@@ -514,8 +528,13 @@ export default function Calendar() {
     else setAnchor(addDays(anchor, (view === 'day' ? 1 : 3) * dir));
   };
 
+  /** THE TOP BAR (founder 2026-11-13): anything spanning more than one day
+   *  — an imported multi-day event, or a Lichen event whose end date passes
+   *  its start — draws as one bar across the week, Google's grammar, instead
+   *  of a chip or block on every day it touches. */
+  const isSpan = (e: EventRow) => !!e.spanBar || (!e.recurrence && !!e.end_date && e.end_date > e.start_date);
   const timedOn = (iso: string) =>
-    events.filter((e) => !e.all_day && occursOn(e, iso)).sort((a, b) => (a.start_min ?? 0) - (b.start_min ?? 0));
+    events.filter((e) => !isSpan(e) && !e.all_day && occursOn(e, iso)).sort((a, b) => (a.start_min ?? 0) - (b.start_min ?? 0));
 
   /** Google-style overlap layout: events that overlap in time share the
    *  column side-by-side instead of stacking (founder, 2026-07-17 — a long
@@ -544,7 +563,24 @@ export default function Calendar() {
     flush();
     return out;
   };
-  const allDayOn = (iso: string) => events.filter((e) => e.all_day && occursOn(e, iso));
+  const allDayOn = (iso: string) => events.filter((e) => !isSpan(e) && e.all_day && occursOn(e, iso));
+  // Bars for the visible days, stacked into lanes so overlaps never collide.
+  const spanBars = (() => {
+    if (!days.length) return [] as { e: EventRow; c0: number; c1: number; lane: number; contL: boolean; contR: boolean }[];
+    const first = days[0], last = days[days.length - 1];
+    const list = events.filter((e) => isSpan(e) && e.start_date <= last && e.end_date >= first)
+      .sort((a, b) => a.start_date.localeCompare(b.start_date) || b.end_date.localeCompare(a.end_date));
+    const laneEnds: number[] = [];
+    return list.map((e) => {
+      const c0 = Math.max(0, days.indexOf(e.start_date < first ? first : e.start_date));
+      const endIso = e.end_date > last ? last : e.end_date;
+      let c1 = days.indexOf(endIso);
+      if (c1 < 0) c1 = days.length - 1;
+      let lane = laneEnds.findIndex((end) => end < c0);
+      if (lane < 0) { lane = laneEnds.length; laneEnds.push(c1); } else laneEnds[lane] = c1;
+      return { e, c0, c1, lane, contL: e.start_date < first, contR: e.end_date > last };
+    });
+  })();
   const remsOn = (iso: string) => selectedCals.includes('me') ? remindersOn(reminders, iso) : [];
   const remKey = (r: ReminderRow, iso: string) => `${r.id}:${iso}`;
   const toggleRem = (r: ReminderRow, iso: string) => {
@@ -563,7 +599,7 @@ export default function Calendar() {
   // Timed tasks live ON the grid now (founder 2026-10-03) — the top-of-day
   // lane is for the untimed ones; Schedule keeps every task tickable.
   const laneRemsOn = (iso: string) => remsOn(iso).filter((r) => r.at_min == null);
-  const hasAllDayRow = days.some((d) => allDayOn(d).length > 0 || laneRemsOn(d).length > 0);
+  const hasAllDayRow = spanBars.length > 0 || days.some((d) => allDayOn(d).length > 0 || laneRemsOn(d).length > 0);
 
   async function onDelete(ev: EventRow) { await deleteEvent(ev.id); setSelected(null); load(); }
   async function onRsvp(ev: EventRow, status: 'going' | 'tentative' | 'declined') { await rsvp(ev.id, me, status); setSelected(null); load(); }
@@ -592,7 +628,14 @@ export default function Calendar() {
   // grows with the selection; release opens the composer with that span.
   // A plain click/tap creates at the slot with the default duration. Touch
   // drags stay reserved for scrolling (the browser fires pointercancel).
-  const dragRef = useRef<{ iso: string; anchor: number; start: number; end: number; moved: boolean } | null>(null);
+  // DOUBLE-BOOKING IS ALLOWED (founder 2026-11-13: "if I have an event on my
+  // cal, I can't create another one by dragging… make it possible"): a
+  // mouse drag that STARTS on an event block creates too. It begins as a
+  // PENDING drag — no box, no pointer capture — so a plain click still
+  // reaches the block's own button and opens it; only once the pointer
+  // moves a slot does it become a create-drag (capture then reroutes the
+  // pointerup to the column, so the block's click never fires).
+  const dragRef = useRef<{ iso: string; anchor: number; start: number; end: number; moved: boolean; onBlock: boolean; pid: number } | null>(null);
   const [drag, setDrag] = useState<{ iso: string; start: number; end: number } | null>(null);
   const slotAt = (e: React.PointerEvent, el: HTMLElement) =>
     Math.max(0, Math.min(1410, Math.floor((e.clientY - el.getBoundingClientRect().top) / (HOUR_PX / 2)) * 30));
@@ -608,9 +651,12 @@ export default function Calendar() {
   };
 
   const onColDown = (iso: string) => (e: React.PointerEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('button')) return; // blocks/slots own their clicks
+    const onBlock = !!(e.target as HTMLElement).closest('button');
+    // On a block, only a MOUSE drag can create — a tap stays the block's.
+    if (onBlock && e.pointerType !== 'mouse') return;
     const s = slotAt(e, e.currentTarget);
-    dragRef.current = { iso, anchor: s, start: s, end: s + 30, moved: false };
+    dragRef.current = { iso, anchor: s, start: s, end: s + 30, moved: false, onBlock, pid: e.pointerId };
+    if (onBlock) { e.preventDefault(); return; } // pending until it moves (no text-select)
     setDrag({ iso, start: s, end: s + 30 });
     if (e.pointerType === 'mouse') e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -618,7 +664,11 @@ export default function Calendar() {
     const d = dragRef.current;
     if (!d || d.iso !== iso || e.pointerType !== 'mouse') return;
     const s = slotAt(e, e.currentTarget);
-    if (s !== d.anchor) d.moved = true;
+    if (s !== d.anchor && !d.moved) {
+      d.moved = true;
+      if (d.onBlock) { try { e.currentTarget.setPointerCapture(d.pid); } catch { /* released */ } }
+    }
+    if (d.onBlock && !d.moved) return;
     d.start = Math.min(d.anchor, s);
     d.end = Math.max(d.anchor + 30, s + 30);
     setDrag({ iso, start: d.start, end: d.end });
@@ -629,6 +679,8 @@ export default function Calendar() {
     dragRef.current = null;
     setDrag(null);
     if (!d || d.iso !== iso) return;
+    // A plain click on a block belongs to the block (its own onClick opens it).
+    if (d.onBlock && !d.moved) return;
     navigate('/calendar/new' + composerQS([
       `date=${iso}`, `start=${d.start}`,
       ...(d.moved ? [`end=${d.end}`] : []),
@@ -1000,6 +1052,23 @@ export default function Calendar() {
         {/* All-day + reminders ride INSIDE the pin so they stay frozen with
             the day header — reminders are top-matter you keep in view. */}
         {view !== 'month' && view !== 'schedule' && view !== 'todo' && hasAllDayRow && (
+          <>
+          {spanBars.length > 0 && (
+            <div className="calp__spans" style={gridCols}>
+              {spanBars.map(({ e, c0, c1, lane, contL, contR }) => (
+                <button
+                  key={e.id}
+                  className={blockClass(e, 'calp__span') + (contL ? ' is-contl' : '') + (contR ? ' is-contr' : '') + (tintOf(e) ? ' calp__span--tinted' : '')}
+                  style={{
+                    gridColumn: `${c0 + 2} / ${c1 + 3}`, gridRow: lane + 1,
+                    ...(tintOf(e) ? { background: `color-mix(in srgb, ${tintOf(e)} 22%, var(--bone-warm))`, borderLeft: `3px solid ${tintOf(e)}` } : {}),
+                  }}
+                  onClick={() => setSelected(e)}
+                  title={e.title}
+                >{e.is_draft ? 'Draft · ' : ''}{e.title}</button>
+              ))}
+            </div>
+          )}
           <div className="calp__alldays" style={gridCols}>
             <span className="calp__gutter-head" />
             {days.map((iso) => (
@@ -1030,6 +1099,7 @@ export default function Calendar() {
               </div>
             ))}
           </div>
+          </>
         )}
       </div>
 

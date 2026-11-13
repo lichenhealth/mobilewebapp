@@ -20,3 +20,7 @@
 .cfund__btn--go { border-color: var(--peach); color: var(--peach-deep); }
 .cfund__btn--go:hover { background: var(--peach-tint); }
 .cfund__btn:disabled { opacity: .6; cursor: default; }
+.cfund__select { max-width: 100%; padding: 5px 8px; border: 1px solid var(--bone-edge); border-radius: 8px; font: inherit; font-size: 12.5px; background: #fff; }
+.cfund__gap { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--ink-muted); }
+.cfund__chip { border: 1px solid var(--bone-edge); background: none; border-radius: var(--r-full); padding: 3px 10px; font: inherit; font-size: 12px; color: var(--ink-soft); cursor: pointer; }
+.cfund__chip.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
