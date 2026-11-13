@@ -869,3 +869,8 @@
 .evlink__btn { border: 1px solid var(--peach); color: var(--peach-deep); background: #fff; border-radius: var(--r-full); padding: 6px 14px; font-size: 13px; }
 .evlink__btn:hover { background: var(--peach-tint); }
 .evlink__btn:disabled { opacity: .6; }
+
+/* "+ Another email or phone for Gabe" — an inline editor, not a pill row. */
+.calp__match.calp__addcontact { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border-radius: 12px; border-color: var(--bone-edge); cursor: default; }
+.calp__addcontact .cedit__input { flex: 1 1 200px; min-width: 0; }
+.calp__addcontact .calp__match-soft { flex-basis: 100%; }

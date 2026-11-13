@@ -86,14 +86,41 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'my_event',
-    description: 'Look up one of their events — one they host, co-host, or are invited to/attending — and get what they need to act: when (with time zone), where, the event\'s OWN Zoom join link (only to hosts and invitees), the friendly event address, whether a shareable link exists and who it lets in, and (hosts only) the guest list with each person\'s status and whether they opened their invitation. Leave event_title empty for their soonest upcoming event (today first). Hosts may also act: make_link=true creates the shareable link if it is missing (it is how off-Lichen guests open the friendly address); link_access = anyone | invited | members changes who that link lets in — ONLY when they explicitly asked to change who gets in (never widen it on your own; "fix it" means create a missing link, not open it to anyone); zoom_room=true gives the event its own Zoom room when it has none (Lichen\'s Zoom serves only some hosts — a refusal is a capacity limit, say so plainly). Use this whenever they ask for their Zoom link, "the link", how a guest gets in, or who has replied — never send them hunting on the event page.',
+    description: 'Look up one of their events — one they host, co-host, or are invited to/attending — and get what they need to act: when (with time zone), where, the event\'s OWN Zoom join link (only to hosts and invitees), the friendly event address, whether a shareable link exists and who it lets in, and (hosts only) the guest list with each person\'s status and whether they opened their invitation. Leave event_title empty for their soonest upcoming event (today first). Hosts may also act: make_link=true creates the shareable link if it is missing (it is how off-Lichen guests open the friendly address); link_access = anyone | invited | members | circles (with link_circles = the exact names of their own communities/groups) changes who that link lets in — ONLY when they explicitly asked to change who gets in (never widen it on your own; "fix it" means create a missing link, not open it to anyone); zoom_room=true gives the event its own Zoom room when it has none (Lichen\'s Zoom serves only some hosts — a refusal is a capacity limit, say so plainly). Use this whenever they ask for their Zoom link, "the link", how a guest gets in, or who has replied — never send them hunting on the event page.',
     input_schema: {
       type: 'object',
       properties: {
         event_title: { type: 'string', description: 'Exact title, or empty for the soonest upcoming event' },
         make_link: { type: 'boolean' },
-        link_access: { type: 'string', enum: ['anyone', 'invited', 'members'] },
+        link_access: { type: 'string', enum: ['anyone', 'invited', 'members', 'circles'] },
+        link_circles: { type: 'array', items: { type: 'string' }, description: 'With link_access=circles: the exact names of communities/groups they belong to' },
         zoom_room: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    name: 'add_calendar_event',
+    description: 'Put an event on their OWN Lichen calendar (private to them until they invite people) — a dog\'s vet visit, a dinner, a shift. title + date (YYYY-MM-DD); start_min/end_min = minutes since midnight in their time zone, or all_day=true. location and description only as they said them. Then invite_to_event can invite people, and my_event (make_link) can make an invite link. Hands a door to the event.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' }, date: { type: 'string' }, end_date: { type: 'string' },
+        start_min: { type: 'number' }, end_min: { type: 'number' }, all_day: { type: 'boolean' },
+        location: { type: 'string' }, description: { type: 'string' },
+      },
+      required: ['title', 'date'],
+    },
+  },
+  {
+    name: 'invite_to_event',
+    description: 'Invite people to an event they HOST (calendar event or formal event), by name and/or email. It never sends by itself: a card under your reply lists who will be invited and the MEMBER taps Send. people = names; each must match exactly one Lichen member (their invitation reaches them in Lichen and, if calendar=true, as a real calendar invitation at the email they signed up with — Lichen never shows that address) or a name on the member\'s own saved contacts/guest lists (that saved email is used). emails = addresses they typed in THIS conversation (others are refused). calendar=true (default) emails everyone a real Google/Apple/Outlook invitation with Yes/No/Maybe. Say plainly who could not be matched.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_title: { type: 'string', description: 'Exact title, or empty for their soonest upcoming hosted event' },
+        people: { type: 'array', items: { type: 'string' } },
+        emails: { type: 'array', items: { type: 'string' } },
+        calendar: { type: 'boolean' },
       },
     },
   },
@@ -133,7 +160,7 @@ export const LIFE_TOOLS = [
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
+  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', invite_to_event: 'calendar', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -166,7 +193,7 @@ async function findPost(sb: SbFn, me: string, title: string, sharedPostId: strin
 
 export async function runLifeTool(
   sb: SbFn, me: string, name: string, input: Record<string, unknown>,
-  offSections: Set<string>, sharedPostId: string | null,
+  offSections: Set<string>, sharedPostId: string | null, memberText = '',
 ): Promise<Out> {
   const sec = LIFE_TOOL_SECTION[name];
   const which = name === 'my_lists' ? String(input.which ?? '') : '';
@@ -358,6 +385,72 @@ export async function runLifeTool(
     return { ok: true, change: lit ? `lit their candle for ${hours} hours` : 'snuffed their candle' };
   }
 
+  if (name === 'add_calendar_event') {
+    const title = String(input.title ?? '').trim().slice(0, 200);
+    const date = String(input.date ?? '');
+    if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: 'A title and a date (YYYY-MM-DD) are needed.' };
+    const end = /^\d{4}-\d{2}-\d{2}$/.test(String(input.end_date ?? '')) && String(input.end_date) >= date ? String(input.end_date) : date;
+    const allDay = !!input.all_day || typeof input.start_min !== 'number';
+    const sm = allDay ? null : Math.max(0, Math.min(1439, Math.round(Number(input.start_min))));
+    let em = allDay ? null : (typeof input.end_min === 'number' ? Math.round(Number(input.end_min)) : (sm! + 60));
+    if (em != null) em = Math.max(sm! + 5, Math.min(1440, em));
+    const r = await sb('events', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+      creator_id: me, owner_profile_id: me, title, start_date: date, end_date: end, all_day: allDay,
+      start_min: sm, end_min: em, location: String(input.location ?? '').trim(),
+      description: String(input.description ?? '').trim(),
+    }) });
+    const row = (await r.json().catch(() => null)) as { id: string }[] | null;
+    if (!r.ok || !row?.[0]) return { ok: false, error: 'The calendar didn\'t take it — try again.' };
+    return { ok: true, change: `added "${title}" to their calendar on ${date}${allDay ? ' (all day)' : ''}`, door: { path: `/calendar/edit/${row[0].id}`, label: `Open ${title} →` } };
+  }
+
+  if (name === 'invite_to_event') {
+    const arr = <T,>(x: unknown) => (Array.isArray(x) ? x : []) as T[];
+    const since = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+    const coIds = arr<{ event_id: string }>(await (await sb(`event_cohosts?profile_id=eq.${me}&select=event_id`)).json()).map((r) => r.event_id);
+    const cols = 'id,title,start_date,creator_id';
+    const hosted = arr<{ id: string; title: string | null; start_date: string }>(await (await sb(`events?creator_id=eq.${me}&is_draft=eq.false&end_date=gte.${since}&select=${cols}&order=start_date.asc&limit=80`)).json());
+    const co = coIds.length ? arr<{ id: string; title: string | null; start_date: string }>(await (await sb(`events?id=in.(${coIds.slice(0, 80).join(',')})&end_date=gte.${since}&select=${cols}`)).json()) : [];
+    const all = [...hosted, ...co];
+    const t = String(input.event_title ?? '').trim().toLowerCase();
+    let ev = t ? all.find((e) => (e.title ?? '').trim().toLowerCase() === t) : all.find((e) => e.start_date >= today());
+    if (!ev && t) {
+      const loose = all.filter((e) => (e.title ?? '').toLowerCase().includes(t));
+      if (loose.length > 1) return { ok: false, error: `Several of their events match: ${loose.slice(0, 6).map((e) => `"${e.title}" (${e.start_date})`).join(', ')}. Ask which.` };
+      ev = loose[0];
+    }
+    if (!ev) return { ok: false, error: t ? `They don't host an upcoming event titled "${input.event_title}".` : 'They host no upcoming events.' };
+
+    const members: { id: string; name: string }[] = [];
+    const emails: { email: string; name: string }[] = [];
+    const unplaced: string[] = [];
+    const lists = arr<{ entries: { kind: string; name?: string; value?: string }[] }>(await (await sb(`guest_lists?owner_id=eq.${me}&select=entries`)).json());
+    const norm = (x: string) => x.trim().toLowerCase().replace(/\s+/g, ' ');
+    for (const raw of arr<string>(input.people).map((x) => String(x).trim()).filter(Boolean).slice(0, 25)) {
+      const n = norm(raw);
+      const hits = arr<{ id: string; full_name: string | null }>(await (await sb(`profiles?full_name=ilike.${encodeURIComponent(raw)}&kind=eq.person&onboarded=eq.true&select=id,full_name&limit=3`)).json());
+      const saved = lists.flatMap((l) => l.entries).filter((e) => e.kind === 'email' && e.value && e.name
+        && (norm(e.name) === n || norm(e.name).split(' ')[0] === n));
+      if (hits.length === 1 && hits[0].id !== me) { if (!members.some((m) => m.id === hits[0].id)) members.push({ id: hits[0].id, name: hits[0].full_name ?? raw }); }
+      else if (hits.length > 1) { unplaced.push(`${raw} (more than one member has that name — ask for the full name)`); continue; }
+      for (const e of saved) if (!emails.some((x) => x.email === e.value)) emails.push({ email: e.value!.toLowerCase(), name: e.name! });
+      if (hits.length === 0 && !saved.length) unplaced.push(`${raw} (no member or saved contact by that name — ask for their email)`);
+    }
+    const said = memberText.toLowerCase();
+    for (const raw of arr<string>(input.emails).map((x) => String(x).trim().toLowerCase()).filter(Boolean).slice(0, 25)) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) { unplaced.push(`${raw} (not an email)`); continue; }
+      if (!said.includes(raw)) { unplaced.push(`${raw} (only an address they typed in this conversation)`); continue; }
+      if (!emails.some((x) => x.email === raw)) emails.push({ email: raw, name: raw.split('@')[0] });
+    }
+    if (!members.length && !emails.length) return { ok: false, error: 'Nobody could be matched: ' + (unplaced.join('; ') || 'no names or emails given') + '.' };
+    const calendar = input.calendar !== false || emails.length > 0;
+    return {
+      ok: true,
+      invite: { type: 'cal_invite', event_id: ev.id, title: ev.title ?? 'the event', members, emails, calendar },
+      note: `A card under your reply lists who will be invited to "${ev.title}" — nothing is sent until they tap Send.${calendar ? ' Each person will also get a real calendar invitation by email.' : ''}${unplaced.length ? ' Could not match: ' + unplaced.join('; ') + '.' : ''}`,
+    };
+  }
+
   if (name === 'my_event') {
     const APP = 'https://lichen.health';
     type Ev = { id: string; title: string | null; start_date: string; start_min: number | null; end_min: number | null; all_day: boolean | null; timezone: string | null; location: string | null; creator_id: string; zoom_unique: boolean | null; guest_link_token: string | null; link_access: string | null; poll_status: string | null };
@@ -398,6 +491,16 @@ export async function runLifeTool(
     if (isHost && input.link_access && ['anyone', 'invited', 'members'].includes(String(input.link_access))) {
       const r = await sb(`events?id=eq.${ev.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ link_access: input.link_access, link_space_ids: [] }) });
       if (r.ok) { ev.link_access = String(input.link_access); changes.push(`set the link to let in: ${input.link_access}`); }
+    } else if (isHost && input.link_access === 'circles') {
+      // Circles by EXACT name, only ones they belong to (no invented targets).
+      const wanted = (Array.isArray(input.link_circles) ? input.link_circles : []).map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+      const mineSp = arr<{ space_id: string; spaces: { name: string } | null }>(await (await sb(`space_members?profile_id=eq.${me}&select=space_id,spaces(name)`)).json());
+      const ids = mineSp.filter((m) => m.spaces && wanted.includes(m.spaces.name.trim().toLowerCase())).map((m) => m.space_id);
+      if (!wanted.length || ids.length !== wanted.length) {
+        return { ok: false, error: `Name the communities or groups exactly — theirs are: ${mineSp.map((m) => m.spaces?.name).filter(Boolean).slice(0, 20).join(', ') || '(none)'}.` };
+      }
+      const r = await sb(`events?id=eq.${ev.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ link_access: 'circles', link_space_ids: ids }) });
+      if (r.ok) { ev.link_access = 'circles'; changes.push(`set the link to let in members of: ${wanted.join(', ')}`); }
     }
 
     if (isHost && input.zoom_room && !ev.zoom_unique) {
