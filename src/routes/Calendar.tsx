@@ -39,7 +39,7 @@ import { occursOn, recurrenceLabel, weekdayMon0 } from '../lib/recurrence';
 import { listReminders, listDone, setDone, remindersOn, leaveReminder, type Reminder as ReminderRow } from '../lib/remindersApi';
 import {
   EventRow, FreeBusyRow, MemberWindow,
-  loadMyEvents, loadSpaceEvents, deleteEvent, rsvp, minToLabel, freeBusy, availabilityOf,
+  loadMyEvents, loadSpaceEvents, deleteEvent, cancelCalendarInvites, rsvp, minToLabel, freeBusy, availabilityOf,
   loadMyExternalBusy, syncExternalCalendars, listExternalCalendars,
   listCalendarPins, addCalendarPin, removeCalendarPin,
 } from '../lib/calendarApi';
@@ -601,7 +601,7 @@ export default function Calendar() {
   const laneRemsOn = (iso: string) => remsOn(iso).filter((r) => r.at_min == null);
   const hasAllDayRow = spanBars.length > 0 || days.some((d) => allDayOn(d).length > 0 || laneRemsOn(d).length > 0);
 
-  async function onDelete(ev: EventRow) { await deleteEvent(ev.id); setSelected(null); load(); }
+  async function onDelete(ev: EventRow) { await cancelCalendarInvites(ev.id); await deleteEvent(ev.id); setSelected(null); load(); }
   async function onRsvp(ev: EventRow, status: 'going' | 'tentative' | 'declined') { await rsvp(ev.id, me, status); setSelected(null); load(); }
 
   const headerLabel = view === 'schedule'

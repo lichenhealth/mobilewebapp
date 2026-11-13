@@ -308,7 +308,7 @@ export default function GuestEvent() {
                 : 'This link is for Lichen members — come as yourself.'}</p>
               <button className="btn btn-primary gev__btn" disabled={busy} onClick={async () => {
                 setBusy(true); setOMsg('');
-                try { const pid = await joinEventByLink(token); navigate(pid ? `/events/${pid}` : '/events'); }
+                try { const pid = await joinEventByLink(token); navigate(pid ? `/events/${pid}` : `/calendar?d=${ev.start_date}`); }
                 catch (e) { setOMsg((e as Error).message || 'That didn’t work.'); setBusy(false); }
               }}>{busy ? 'One moment…' : 'Come as myself'}</button>
             </>) : (<>

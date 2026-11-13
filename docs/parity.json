@@ -147,6 +147,9 @@
  "calendarApi:saveSubCalSettings": {
   "gap": "1"
  },
+ "calendarApi:loadCalendarSends": {
+  "exempt": "read-only view of who got a calendar invitation"
+ },
  "calendarApi:deleteEvent": {
   "gap": "3"
  },
