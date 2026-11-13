@@ -802,3 +802,43 @@
 
 /* A draft event's time-hold (2026-11-09) — dashed, it isn't real yet. */
 .calp__draft { border-style: dashed !important; opacity: 0.85; }
+
+/* THE TOP BAR (founder 2026-11-13): multi-day events as one bar across the
+   week, Google's grammar — lanes stack, an arrow edge says it runs on past
+   the visible days. */
+.calp__spans {
+  display: grid; grid-auto-rows: 20px; row-gap: 2px; padding: 3px 0 0;
+  border-bottom: 0;
+}
+.calp__pin .calp__spans {
+  margin: 0 calc(var(--s-3) - var(--s-5));
+  background: var(--bone-warm);
+  border-left: 1px solid var(--bone-edge);
+  border-right: 1px solid var(--bone-edge);
+}
+.calp__span {
+  margin: 0 2px; min-width: 0; border: 0; cursor: pointer;
+  background: var(--peach); color: #fff; border-radius: 6px;
+  font: inherit; font-size: 10px; font-weight: 500; line-height: 20px;
+  padding: 0 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+}
+.calp__span.is-contl { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0;
+  clip-path: polygon(6px 0, 100% 0, 100% 100%, 6px 100%, 0 50%); padding-left: 10px; }
+.calp__span.is-contr { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%); }
+.calp__span.is-contl.is-contr { clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%); }
+.calp__span--external { border: 1px dashed var(--bone-edge); background: var(--bone-deep, var(--bone-warm)); color: var(--ink-muted); }
+.calp__span--tinted { color: var(--ink); border-style: solid; border-color: transparent; }
+/* Every calendar on a connected Google account (2026-11-13) */
+.cset__subcals { margin: 6px 0 8px; padding: 8px 10px; border: 1px solid var(--bone-edge); border-radius: 10px; background: var(--bone-warm); }
+.cset__subcal { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 5px 0; border-top: 1px solid var(--bone-edge); font-size: 13px; }
+.cset__subcal:first-of-type { border-top: 0; }
+.cset__subcal-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.cset__subcal-name { flex: 1 1 140px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cset__subcal-box { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-soft); font-size: 12.5px; }
+
+/* Guest lists in the calendar invite (2026-11-13). */
+.calp__glists { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.calp__glist { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--bone-edge); background: #fff; border-radius: var(--r-full); padding: 4px 11px; font: inherit; font-size: 12.5px; color: var(--ink-soft); cursor: pointer; }
+.calp__glist:hover { border-color: var(--peach); color: var(--peach-deep); }
+.calp__offlink { background: none; border: 0; padding: 0; font: inherit; color: var(--peach-deep); cursor: pointer; }

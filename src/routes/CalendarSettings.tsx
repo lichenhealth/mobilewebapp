@@ -13,7 +13,7 @@ import {
   loadMyShares, upsertShare, deleteShare,
   ExternalCalendar, listExternalCalendars, addExternalCalendar,
   removeExternalCalendar, syncExternalCalendars, deleteEveryoneShare,
-  startGoogleConnect, disconnectGoogle, googleAccountId,
+  startGoogleConnect, disconnectGoogle, googleAccountId, saveSubCalSettings, type SubCalSetting,
   loadMyCalendarFeedToken, mintCalendarFeedToken, calendarFeedUrl,
 } from '../lib/calendarApi';
 import { useSearchParams } from 'react-router-dom';
@@ -1404,6 +1404,12 @@ export default function CalendarSettings() {
                   <Icon name="close" size={13} />
                 </button>
               </div>
+              {googleAccountId(c.url) && c.sub_settings && Object.keys(c.sub_settings).length > 0 && (
+                <SubCalendars cal={c} onSaved={async () => {
+                  try { await syncExternalCalendars({ force: true, calendarId: c.id }); } catch { /* row shows the error */ }
+                  await load();
+                }} />
+              )}
               <details className="cset__calrules">
                 <summary>Who sees my {c.name}{googleAccountId(c.url) ? ' (Google)' : ''} calendar</summary>
                 <p className="cedit__hint">
@@ -1540,6 +1546,41 @@ export default function CalendarSettings() {
         </div>
 
       </div>
+    </div>
+  );
+}
+
+/** Every calendar on a connected Google account (founder 2026-11-13: a
+ *  partner's shared calendar — "when he's on shift" — and holidays were never
+ *  arriving; only the main calendar was read). Two switches each: SHOW it on
+ *  Lichen, and COUNT IT AS BUSY (blocks your bookable time). Someone else's
+ *  shift shows on your week without closing your booking page. */
+function SubCalendars({ cal, onSaved }: { cal: ExternalCalendar; onSaved: () => Promise<void> }) {
+  const [subs, setSubs] = useState<Record<string, SubCalSetting>>(cal.sub_settings ?? {});
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  useEffect(() => setSubs(cal.sub_settings ?? {}), [cal.sub_settings]);
+  const entries = Object.entries(subs).sort(([, a], [, b]) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name));
+  const flip = async (id: string, key: 'include' | 'busy') => {
+    const cur = subs[id];
+    const next = { ...subs, [id]: { ...cur, [key]: !cur[key], ...(key === 'busy' && !cur.busy ? { include: true } : {}) } };
+    setSubs(next); setBusy(true); setNote('');
+    try { await saveSubCalSettings(cal.id, next); await onSaved(); setNote('Saved ✓ — refreshed'); }
+    catch (e) { setNote((e as { message?: string } | null)?.message || 'Couldn’t save.'); setSubs(subs); }
+    setBusy(false);
+  };
+  return (
+    <div className="cset__subcals">
+      <p className="cedit__hint">Calendars on this Google account. <strong>Show</strong> puts it on your Lichen calendar; <strong>Busy</strong> also blocks your bookable time.</p>
+      {entries.map(([id, sc]) => (
+        <div className="cset__subcal" key={id}>
+          <span className="cset__subcal-dot" style={{ background: sc.color || 'var(--ink-faint)' }} />
+          <span className="cset__subcal-name">{sc.name}{sc.primary ? ' (main)' : ''}</span>
+          <label className="cset__subcal-box"><input type="checkbox" checked={sc.include} disabled={busy} onChange={() => void flip(id, 'include')} /> Show</label>
+          <label className="cset__subcal-box"><input type="checkbox" checked={sc.busy && sc.include} disabled={busy || !sc.include} onChange={() => void flip(id, 'busy')} /> Busy</label>
+        </div>
+      ))}
+      {note && <p className="cedit__hint">{note}</p>}
     </div>
   );
 }

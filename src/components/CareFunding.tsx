@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CarePostRow, CarePayPart, setCareFunding, reviewCareSubsidy } from '../lib/conciergeApi';
 import { numericAmount } from '../lib/ledgerApi';
+import { coveredBy, gapOf, listMyStreams, usd, type Stream } from '../lib/streamsApi';
 import './CareFunding.css';
 
 /** HOW THIS PART OF THE PLAN IS PAID (founder 2026-11-12): three parts —
@@ -33,6 +34,27 @@ export default function CareFunding({ post, me }: { post: CarePostRow; me?: stri
   const [amt, setAmt] = useState<Record<CarePayPart, string>>({ covered: '', subsidy: '', self: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  // The provider's own revenue streams pre-shape an ask (founder 2026-11-12).
+  const [streams, setStreams] = useState<Stream[]>([]);
+  const [streamGap, setStreamGap] = useState<number | null>(null);
+  useEffect(() => { if (open && isProvider && me && !streams.length) void listMyStreams(me).then(setStreams); }, [open, isProvider, me]); // eslint-disable-line react-hooks/exhaustive-deps
+  const applyStream = (id: string) => {
+    const st = streams.find((x) => x.id === id);
+    if (!st) return;
+    const cov = coveredBy(st), gap = gapOf(st);
+    const n = new Set<CarePayPart>();
+    const a = { covered: '', subsidy: '', self: '' } as Record<CarePayPart, string>;
+    if (cov) { n.add('covered'); a.covered = String(cov / 100); }
+    if (gap) { n.add('subsidy'); a.subsidy = String(gap / 100); }
+    setSel(n); setAmt(a); setStreamGap(gap || null);
+  };
+  /** Move the stream's gap between "subsidy needed" and "client pays". */
+  const gapTo = (part: 'subsidy' | 'self') => {
+    if (streamGap == null) return;
+    const other = part === 'subsidy' ? 'self' : 'subsidy';
+    const n = new Set(sel); n.delete(other); n.add(part); setSel(n);
+    setAmt({ ...amt, [other]: '', [part]: String(streamGap / 100) });
+  };
 
   const cur = row.pay_parts ?? [];
   const providerName = (post.author?.full_name || '').split(' ')[0] || 'the provider';
@@ -78,6 +100,26 @@ export default function CareFunding({ post, me }: { post: CarePostRow; me?: stri
     return (
       <div className="cfund cfund--edit">
         <p className="cfund__q">How is this paid? <span>Pick any that apply — amounts are optional.</span></p>
+        {isProvider && streams.length > 0 && (
+          <div className="cfund__row">
+            <select className="cfund__select" defaultValue="" onChange={(e) => applyStream(e.target.value)} aria-label="Fill from one of your revenue streams">
+              <option value="" disabled>Fill from your revenue streams…</option>
+              {streams.map((st) => (
+                <option key={st.id} value={st.id}>{st.service} · {st.label} ({usd(coveredBy(st))} covered, {usd(gapOf(st))} gap)</option>
+              ))}
+            </select>
+            {streamGap != null && (
+              <span className="cfund__gap">
+                The {usd(streamGap)} gap:
+                <button className={'cfund__chip' + (sel.has('subsidy') ? ' is-on' : '')} onClick={() => gapTo('subsidy')}>ask the well</button>
+                <button className={'cfund__chip' + (sel.has('self') ? ' is-on' : '')} onClick={() => gapTo('self')}>client pays it</button>
+              </span>
+            )}
+          </div>
+        )}
+        {isProvider && !streams.length && (
+          <p className="cfund__fine">Tip: list your rates and what each payer covers under <a className="link-cue" href="/practice#streams">Practice → Your services &amp; who pays</a>, and this box fills itself.</p>
+        )}
         {PARTS.map((p) => (
           <div key={p.key} className="cfund__row">
             <label className="cfund__check">

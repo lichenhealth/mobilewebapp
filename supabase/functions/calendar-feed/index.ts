@@ -11,7 +11,9 @@
 // wrong token answers 404 with nothing else said.
 //
 // WHAT RIDES OUT — events only: the member's own events plus their
-// going/tentative RSVPs. Confirmed bookings already live as provider-owned
+// going/tentative RSVPs — and since 2026-11-13 pending INVITATIONS too, as
+// STATUS:TENTATIVE, so an invite reaches the invitee's Google before they
+// answer (the founder inviting Gabe to the vet visit). Confirmed bookings already live as provider-owned
 // events with the booker seated as an attendee (_booking_attach_event), so
 // sessions reach both parties with no double-count. Reminders/tasks and the
 // care plan deliberately stay OUT of v1 — widening what leaves the platform
@@ -140,7 +142,7 @@ Deno.serve(async (req) => {
   const COLS = 'id,title,description,location,start_date,end_date,all_day,start_min,end_min,recurrence';
   const [own, rsvp] = await Promise.all([
     sb(`events?owner_profile_id=eq.${me}&select=${COLS}&start_date=lte.${hi}&or=(end_date.gte.${lo},start_date.gte.${lo},recurrence.not.is.null)&order=start_date&limit=1000`),
-    sb(`event_attendees?profile_id=eq.${me}&status=in.(going,tentative)&select=status,event:events(${COLS})&limit=1000`),
+    sb(`event_attendees?profile_id=eq.${me}&status=in.(going,tentative,invited)&select=status,event:events(${COLS})&limit=1000`),
   ]);
 
   const byId = new Map<string, Ev>();
@@ -149,7 +151,7 @@ Deno.serve(async (req) => {
     const e = row.event;
     if (!e || byId.has(e.id)) continue;
     if (e.start_date > hi || ((e.end_date ?? e.start_date) < lo && !e.recurrence)) continue;
-    byId.set(e.id, { ...e, _tentative: row.status === 'tentative' });
+    byId.set(e.id, { ...e, _tentative: row.status === 'tentative' || row.status === 'invited' });
   }
 
   const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');

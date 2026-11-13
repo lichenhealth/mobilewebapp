@@ -19,6 +19,7 @@ import { parseFlex, defaultWindow } from '../lib/flexParse';
 import { createReminder, getReminder, updateReminder, deleteReminder, loadReminderRecipients, type Recipient } from '../lib/remindersApi';
 import { SmartLocation } from './Calendar';
 import { classifyCareContact } from '../lib/careTeamApi';
+import { listGuestLists, type GuestList, type ListEntry } from '../lib/guestListsApi';
 import './Concierge.css';
 import './Calendar.css';
 
@@ -65,6 +66,13 @@ export default function EventComposer() {
   const [recurrence, setRecurrence] = useState<Recurrence | null>(null);
   const [members, setMembers] = useState<MemberOpt[]>([]);
   const [query, setQuery] = useState('');
+  // GUEST LISTS ride the calendar invite too (founder 2026-11-13: "invite
+  // guest lists (e.g. Family…) … so the on platform/off platform ease that
+  // we're trying to build is everywhere"). Members on a list take seats;
+  // anyone off Lichen on it carries into a formal event's guest list.
+  const [guestLists, setGuestLists] = useState<GuestList[]>([]);
+  const [offGuests, setOffGuests] = useState<ListEntry[]>([]);
+  useEffect(() => { if (me) void listGuestLists(me).then(setGuestLists).catch(() => {}); }, [me]);
   const [invitees, setInvitees] = useState<MemberOpt[]>([]);
   const [location, setLocation] = useState('');
   // Coordinates from a picked LocationField suggestion (null = text-only).
@@ -344,6 +352,15 @@ export default function EventComposer() {
   // deeper set of info and a pretty invite"): everything typed here rides
   // into Compose's event flow — title, when, where, notes, and the people
   // (members as seats, an off-Lichen email/phone as a guest).
+  function addGuestList(gl: GuestList) {
+    const seats: MemberOpt[] = gl.entries.filter((e): e is Extract<ListEntry, { kind: 'member' }> => e.kind === 'member' && e.id !== me)
+      .map((e) => ({ id: e.id, full_name: e.name } as MemberOpt));
+    setInvitees((cur) => [...cur, ...seats.filter((m) => !cur.some((c) => c.id === m.id))]);
+    const off = gl.entries.filter((e) => e.kind !== 'member');
+    setOffGuests((cur) => [...cur, ...off.filter((e) => !cur.some((c) => c.kind === e.kind && 'value' in c && 'value' in e && c.value === e.value))]);
+    for (const sid of gl.space_ids ?? []) void expandSpace(sid);
+  }
+
   function makeFormal(extra?: { kind: 'email'; value: string; name: string } | { kind: 'phone'; value: string; sms: string; name: string }) {
     const q = new URLSearchParams({ area: 'events' });
     if (title.trim()) q.set('title', title.trim());
@@ -354,6 +371,7 @@ export default function EventComposer() {
     if (allDay) q.set('allday', '1');
     else { q.set('start', String(startMin)); q.set('endmin', String(endMin)); }
     const inv: unknown[] = invitees.map((m) => ({ kind: 'member', id: m.id, name: m.full_name ?? 'Member' }));
+    inv.push(...offGuests);
     if (extra) inv.push(extra);
     if (inv.length) q.set('invite', JSON.stringify(inv));
     if (calendar !== 'me') q.set('space', calendar);
@@ -823,11 +841,30 @@ export default function EventComposer() {
               ))}
             </div>
           )}
+          {offGuests.length > 0 && (
+            <p className="calp__match-soft">
+              {offGuests.length === 1 ? `${offGuests[0].name} isn’t on Lichen` : `${offGuests.length} people on your list aren’t on Lichen`} — a calendar seat can’t hold them.{' '}
+              {kind === 'event' && !eventId
+                ? <button className="calp__offlink" onClick={() => makeFormal()}>Make it a formal event to invite them too ›</button>
+                : 'Send them the invite from a formal event.'}
+              {' '}<button className="calp__offlink" onClick={() => setOffGuests([])}>Leave them off</button>
+            </p>
+          )}
           <input
             className="cedit__input" placeholder="Name, circle, email or phone"
             autoCapitalize="none" autoCorrect="off" spellCheck={false}
             value={query} onChange={(e) => setQuery(e.target.value)}
           />
+          {guestLists.length > 0 && !query.trim() && (
+            <div className="calp__glists">
+              <span className="calp__match-soft">Your guest lists:</span>
+              {guestLists.map((gl) => (
+                <button key={gl.id} className="calp__glist" onClick={() => addGuestList(gl)}>
+                  <Icon name="user-multiple" size={12} /> {gl.name}
+                </button>
+              ))}
+            </div>
+          )}
           {circleMatches.map((sp) => (
             <button className="calp__match" key={'sp-' + sp.id}
               onClick={() => { setQuery(''); void expandSpace(sp.id); }}>

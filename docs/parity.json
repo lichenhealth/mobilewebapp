@@ -144,6 +144,9 @@
  "calendarApi:createEvent": {
   "tool": "draft_event (Compose creates it on the member's Post)"
  },
+ "calendarApi:saveSubCalSettings": {
+  "gap": "1"
+ },
  "calendarApi:deleteEvent": {
   "gap": "3"
  },
@@ -810,5 +813,11 @@
  },
  "conciergeApi:reviewCareSubsidy": {
   "gap": "3"
+ },
+ "streamsApi:saveStream": {
+  "tool": "revenue_streams"
+ },
+ "streamsApi:deleteStream": {
+  "tool": "revenue_streams"
  }
 }
