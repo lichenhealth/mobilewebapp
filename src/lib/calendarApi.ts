@@ -689,3 +689,41 @@ export async function setEventLinkAccess(eventId: string, access: 'anyone' | 'in
   const { error } = await supabase.rpc('set_event_link_access', { p_event: eventId, p_access: access, p_spaces: access === 'circles' ? spaces ?? [] : null });
   if (error) throw error;
 }
+
+// ── SEND TO THEIR CALENDAR (2026-11-13) ─────────────────────────────────
+// Real calendar invitations (iTIP .ics by email) via send-calendar-invite.
+// A member's email is resolved server-side and never comes back here.
+
+export interface CalendarSend { profile_id: string | null; email: string | null; sent_at: string }
+
+/** Who already got a calendar invitation for this event (host-only view;
+ *  member rows carry profile_id, never their email). */
+export async function loadCalendarSends(eventId: string): Promise<CalendarSend[]> {
+  const { data } = await supabase.from('event_calendar_send_list')
+    .select('profile_id, email, sent_at').eq('event_id', eventId);
+  return (data as CalendarSend[] | null) ?? [];
+}
+
+async function calInvite(body: Record<string, unknown>): Promise<{ sent: number; failed?: string[] }> {
+  const { data, error } = await supabase.functions.invoke('send-calendar-invite', { body });
+  if (error) throw error;
+  const err = (data as { error?: string } | null)?.error;
+  if (err) throw new Error(err);
+  return data as { sent: number; failed?: string[] };
+}
+
+/** Email invited members and/or outside addresses a calendar invitation. */
+export function sendCalendarInvites(eventId: string, members: string[], emails: string[]) {
+  return calInvite({ event_id: eventId, mode: 'send', members, emails });
+}
+/** The event changed — everyone who got one gets the update. */
+export function updateCalendarInvites(eventId: string) {
+  return calInvite({ event_id: eventId, mode: 'update' });
+}
+/** The event is going away — call BEFORE deleting so calendars drop it. */
+export async function cancelCalendarInvites(eventId: string): Promise<void> {
+  try {
+    const sent = await loadCalendarSends(eventId);
+    if (sent.length) await calInvite({ event_id: eventId, mode: 'cancel' });
+  } catch (e) { console.warn('cancelCalendarInvites:', (e as Error).message); }
+}

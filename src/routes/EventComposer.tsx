@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { todayISO, formatDateShort, addDays } from '../lib/conciergeApi';
 import { Recurrence, recurrenceLabel, occursOn } from '../lib/recurrence';
-import { createEvent, updateEvent, loadEvent, minToLabel, freeBusy, FreeBusyRow } from '../lib/calendarApi';
+import { createEvent, updateEvent, loadEvent, minToLabel, freeBusy, FreeBusyRow, sendCalendarInvites, updateCalendarInvites, loadCalendarSends, setEventLinkAccess, type CalendarSend } from '../lib/calendarApi';
 import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { LinkifiedText } from '../components/CarePostCard';
@@ -20,6 +20,7 @@ import { createReminder, getReminder, updateReminder, deleteReminder, loadRemind
 import { SmartLocation } from './Calendar';
 import { classifyCareContact } from '../lib/careTeamApi';
 import { listGuestLists, type GuestList, type ListEntry } from '../lib/guestListsApi';
+import EventLinkPanel, { LINK_TIERS, type LinkTier } from '../components/EventLinkPanel';
 import './Concierge.css';
 import './Calendar.css';
 
@@ -73,6 +74,24 @@ export default function EventComposer() {
   const [guestLists, setGuestLists] = useState<GuestList[]>([]);
   const [offGuests, setOffGuests] = useState<ListEntry[]>([]);
   useEffect(() => { if (me) void listGuestLists(me).then(setGuestLists).catch(() => {}); }, [me]);
+  // SEND TO THEIR CALENDAR (founder 2026-11-13): a real calendar invitation
+  // by email — members (address resolved server-side, never shown here) and
+  // outside email addresses alike. Edits re-send as updates.
+  const [sendCal, setSendCal] = useState(false);
+  const [calSends, setCalSends] = useState<CalendarSend[]>([]);
+  useEffect(() => { if (eventId) void loadCalendarSends(eventId).then((r) => { setCalSends(r); if (r.length) setSendCal(true); }); }, [eventId]);
+  // THE INVITE LINK on a new event: chosen here, minted right after save.
+  useEffect(() => {
+    if (!eventId || params.get('link') !== '1') return;
+    const t = window.setTimeout(() => document.querySelector('.evlink')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 900);
+    return () => window.clearTimeout(t);
+  }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [linkOn, setLinkOn] = useState(false);
+  const [linkTier, setLinkTier] = useState<LinkTier>('invited');
+  const offEmails = offGuests.filter((g): g is Extract<ListEntry, { kind: 'email' }> => g.kind === 'email');
+  const offPhones = offGuests.filter((g) => g.kind === 'phone');
+  const addOffGuest = (g: ListEntry) => setOffGuests((cur) =>
+    cur.some((c) => c.kind === g.kind && 'value' in c && 'value' in g && c.value === g.value) ? cur : [...cur, g]);
   const [invitees, setInvitees] = useState<MemberOpt[]>([]);
   const [location, setLocation] = useState('');
   // Coordinates from a picked LocationField suggestion (null = text-only).
@@ -322,6 +341,34 @@ export default function EventComposer() {
       .slice(0, 6);
   }, [query, members, invitees]);
 
+  // WHAT YOU ALREADY KNOW ABOUT THEM (founder 2026-11-13: "when you type in
+  // Gabe, it shows his lichen profile but also his outside email and phone,
+  // if those are known… on any directories/lists you've saved"): emails and
+  // phones from the host's OWN guest lists — never a member's private profile
+  // contact — offered beside the member, or alone for people off Lichen.
+  const listContacts = useMemo(() => {
+    const out: { entry: Exclude<ListEntry, { kind: 'member' }>; list: string }[] = [];
+    for (const gl of guestLists) for (const e of gl.entries) {
+      if (e.kind === 'member') continue;
+      if (!out.some((o) => o.entry.kind === e.kind && o.entry.value === e.value)) out.push({ entry: e, list: gl.name });
+    }
+    return out;
+  }, [guestLists]);
+  const norm = (x: string) => x.trim().toLowerCase().replace(/\s+/g, ' ');
+  const contactsFor = (name: string | null) => {
+    const n = norm(name ?? '');
+    if (!n) return [];
+    return listContacts.filter((c) => norm(c.entry.name) === n);
+  };
+  const contactMatches = useMemo(() => {
+    const q = norm(query);
+    if (q.length < 2) return [];
+    const memberNames = new Set(matches.map((m) => norm(m.full_name ?? '')));
+    return listContacts.filter((c) => !memberNames.has(norm(c.entry.name))
+      && (norm(c.entry.name).includes(q) || c.entry.value.toLowerCase().includes(q))
+      && !offGuests.some((g) => g.kind === c.entry.kind && 'value' in g && g.value === c.entry.value)).slice(0, 5);
+  }, [query, listContacts, matches, offGuests]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Your circles answer the same box (the Compose grammar).
   const circleMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -403,8 +450,29 @@ export default function EventComposer() {
         inviteeIds: invitees.map((i) => i.id),
         shareLevel: calendar === 'me' ? (shareLevel || null) : null,
       };
+      let id = eventId ?? '';
       if (eventId) await updateEvent(me, eventId, input);
-      else await createEvent(me, input);
+      else id = await createEvent(me, input);
+      let note = '';
+      if (kind === 'event' && sendCal) {
+        try {
+          if (eventId && calSends.length) await updateCalendarInvites(eventId);
+          const already = new Set(calSends.map((c) => c.profile_id ?? c.email));
+          const members = invitees.map((i) => i.id).filter((x) => !already.has(x));
+          const emails = offEmails.map((g) => g.value.toLowerCase()).filter((x) => !already.has(x));
+          if (members.length || emails.length) {
+            const r = await sendCalendarInvites(id, members, emails);
+            if (r.failed?.length) note = `Saved — but ${r.failed.length} calendar invitation${r.failed.length === 1 ? '' : 's'} didn’t send.`;
+          }
+        } catch (e) { note = `Saved — but the calendar invitations didn’t send: ${(e as Error).message}`; }
+      }
+      if (!eventId && linkOn && id) {
+        try { await setEventLinkAccess(id, linkTier, []); } catch { /* the panel can set it */ }
+        setSaving(false);
+        navigate(`/calendar/edit/${id}?link=1`, { replace: true });
+        return;
+      }
+      if (note) { setError(note); setSaving(false); return; }
       back();
     } catch (e) {
       // Supabase errors are plain objects, not Error instances — read .message either way.
@@ -842,12 +910,21 @@ export default function EventComposer() {
             </div>
           )}
           {offGuests.length > 0 && (
+            <div className="calp__invitees">
+              {offGuests.map((g) => (
+                <button className="calp__invitee calp__invitee--off" key={g.kind + ('value' in g ? g.value : '')}
+                  onClick={() => setOffGuests((cur) => cur.filter((x) => x !== g))}>
+                  {g.name}{g.kind === 'email' ? ` · ${g.value}` : ' · phone'} ×
+                </button>
+              ))}
+            </div>
+          )}
+          {offPhones.length > 0 && (
             <p className="calp__match-soft">
-              {offGuests.length === 1 ? `${offGuests[0].name} isn’t on Lichen` : `${offGuests.length} people on your list aren’t on Lichen`} — a calendar seat can’t hold them.{' '}
+              {offPhones.length === 1 ? 'A phone number' : `${offPhones.length} phone numbers`} can’t receive a calendar invitation.{' '}
               {kind === 'event' && !eventId
-                ? <button className="calp__offlink" onClick={() => makeFormal()}>Make it a formal event to invite them too ›</button>
-                : 'Send them the invite from a formal event.'}
-              {' '}<button className="calp__offlink" onClick={() => setOffGuests([])}>Leave them off</button>
+                ? <button className="calp__offlink" onClick={() => makeFormal()}>Make it a formal event to text them an invite ›</button>
+                : 'Text them the invite link below instead.'}
             </p>
           )}
           <input
@@ -871,6 +948,13 @@ export default function EventComposer() {
               <Icon name="user-multiple" size={14} /> {sp.name} <span className="calp__match-soft">— adds its members</span>
             </button>
           ))}
+          {offLichen?.kind === 'email' && kind === 'event' && (
+            <button className="calp__match"
+              onClick={() => { addOffGuest({ kind: 'email', value: offLichen.value, name: offLichen.name }); setSendCal(true); setQuery(''); }}>
+              <Icon name="calendar" size={14} /> Send {offLichen.label} a calendar invitation
+              <span className="calp__match-soft"> — lands in Google, Apple or Outlook</span>
+            </button>
+          )}
           {offLichen && kind === 'event' && !eventId && (
             <button className="calp__match calp__match--formal"
               onClick={() => { const { label: _l, ...g } = offLichen; void _l; makeFormal(g); }}>
@@ -882,14 +966,44 @@ export default function EventComposer() {
             <p className="calp__match-soft">{spaceNotes[spaceNotes.length - 1]}</p>
           )}
           {matches.map((m) => (
-            <button
-              className="calp__match" key={m.id}
-              onClick={() => { setInvitees((cur) => [...cur, m]); setQuery(''); }}
-            >
-              <span className="calp__person-avatar" style={{ background: colorFor(m.id) }}>{monogramFor(m.full_name ?? 'Member')}</span>
-              {m.full_name ?? 'Member'}
+            <div key={m.id} className="calp__matchgroup">
+              <button
+                className="calp__match"
+                onClick={() => { setInvitees((cur) => [...cur, m]); setQuery(''); }}
+              >
+                <span className="calp__person-avatar" style={{ background: colorFor(m.id) }}>{monogramFor(m.full_name ?? 'Member')}</span>
+                {m.full_name ?? 'Member'} <span className="calp__match-soft">— on Lichen</span>
+              </button>
+              {kind === 'event' && contactsFor(m.full_name).map((c) => (
+                <button key={c.entry.kind + c.entry.value} className="calp__match calp__match--sub"
+                  onClick={() => {
+                    setInvitees((cur) => cur.some((x) => x.id === m.id) ? cur : [...cur, m]);
+                    addOffGuest(c.entry); if (c.entry.kind === 'email') setSendCal(true); setQuery('');
+                  }}>
+                  <Icon name={c.entry.kind === 'email' ? 'calendar' : 'chat'} size={13} />
+                  {c.entry.kind === 'email' ? c.entry.value : c.entry.sms}
+                  <span className="calp__match-soft"> — from your {c.list} list{c.entry.kind === 'email' ? '; send to this email' : ''}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+          {kind === 'event' && contactMatches.map((c) => (
+            <button key={'c-' + c.entry.kind + c.entry.value} className="calp__match"
+              onClick={() => { addOffGuest(c.entry); if (c.entry.kind === 'email') setSendCal(true); setQuery(''); }}>
+              <Icon name={c.entry.kind === 'email' ? 'calendar' : 'chat'} size={14} />
+              {c.entry.name} · {c.entry.kind === 'email' ? c.entry.value : c.entry.sms}
+              <span className="calp__match-soft"> — from your {c.list} list</span>
             </button>
           ))}
+          {kind === 'event' && (invitees.length > 0 || offEmails.length > 0) && (
+            <label className="calp__sendcal">
+              <input type="checkbox" checked={sendCal} onChange={(e) => setSendCal(e.target.checked)} />
+              <span>
+                <strong>{calSends.length ? 'Send updates to their calendars' : 'Send to their calendars'}</strong>
+                <em>Each person gets a real calendar invitation by email (Google, Apple, Outlook) with Yes / No / Maybe. It comes from your name, and their answers go to your email. Lichen members’ addresses stay private.</em>
+              </span>
+            </label>
+          )}
         </div>
 
         {kind === 'event' && !eventId && (
@@ -897,6 +1011,29 @@ export default function EventComposer() {
             <span className="calp__formal-title">Make it a formal event ›</span>
             <span className="calp__formal-sub">A pretty invitation, RSVPs, guests on and off Lichen, whole circles and a shareable link — your details come along.</span>
           </button>
+        )}
+
+        {kind === 'event' && eventId && me && (
+          <div className="cedit__field"><EventLinkPanel eventId={eventId} me={me} /></div>
+        )}
+        {kind === 'event' && !eventId && (
+          <div className="cedit__field evlink">
+            <label className="calp__sendcal">
+              <input type="checkbox" checked={linkOn} onChange={(e) => setLinkOn(e.target.checked)} />
+              <span><strong>Make an invite link</strong><em>One link to text, post or email — it lets people in by the rule you choose. You’ll get it to copy right after saving.</em></span>
+            </label>
+            {linkOn && (
+              <div className="evlink__tiers" role="radiogroup" aria-label="Who the link lets in">
+                {LINK_TIERS.filter(([k]) => k !== 'circles').map(([k, label, hint]) => (
+                  <label key={k} className={'evlink__tier' + (linkTier === k ? ' is-on' : '')}>
+                    <input type="radio" name="evlink-new" checked={linkTier === k} onChange={() => setLinkTier(k)} />
+                    <span><strong>{label}</strong><em>{hint}</em></span>
+                  </label>
+                ))}
+                <p className="calp__match-soft">Circle rules are on the link panel once the event is saved.</p>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="only-mobile">{availabilityPanel}</div>

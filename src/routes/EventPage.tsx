@@ -10,7 +10,7 @@ import { SmartLocation } from './Calendar';
 import AddToCal from '../components/AddToCal';
 import EventPoll from '../components/EventPoll';
 import { useAuth } from '../auth/AuthProvider';
-import { loadEvent, deleteEvent, minToLabel, type EventRow, setEventLinkAccess } from '../lib/calendarApi';
+import { loadEvent, deleteEvent, cancelCalendarInvites, minToLabel, type EventRow, setEventLinkAccess } from '../lib/calendarApi';
 import { listMyMemberSpaces } from '../lib/spacesApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
@@ -340,7 +340,7 @@ export default function EventPage(props: { postId?: string } = {}) {
     });
     if (!ok) return;
     try {
-      if (post.linked_event_id) await deleteEvent(post.linked_event_id);
+      if (post.linked_event_id) { await cancelCalendarInvites(post.linked_event_id); await deleteEvent(post.linked_event_id); }
       await deletePost(post.id);
       navigate('/events');
     } catch (e) {

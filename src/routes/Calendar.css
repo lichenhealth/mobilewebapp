@@ -842,3 +842,30 @@
 .calp__glist { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--bone-edge); background: #fff; border-radius: var(--r-full); padding: 4px 11px; font: inherit; font-size: 12.5px; color: var(--ink-soft); cursor: pointer; }
 .calp__glist:hover { border-color: var(--peach); color: var(--peach-deep); }
 .calp__offlink { background: none; border: 0; padding: 0; font: inherit; color: var(--peach-deep); cursor: pointer; }
+
+/* Send-to-their-calendar + the invite link (2026-11-13). */
+.calp__matchgroup { display: flex; flex-direction: column; }
+.calp__match--sub { padding-left: 34px; font-size: 13px; }
+.calp__invitee--off { background: var(--bone-deep); color: var(--ink-soft); }
+.calp__sendcal { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; font-size: 14px; cursor: pointer; }
+.calp__sendcal input { margin-top: 3px; flex-shrink: 0; }
+.calp__sendcal span { display: flex; flex-direction: column; gap: 2px; }
+.calp__sendcal em { font-style: normal; font-size: 12.5px; color: var(--ink-muted); line-height: 1.45; }
+.evlink { display: flex; flex-direction: column; gap: 8px; }
+.evlink__tiers { display: flex; flex-direction: column; gap: 6px; }
+.evlink__tier { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--bone-edge); border-radius: 10px; cursor: pointer; font-size: 14px; background: #fff; }
+.evlink__tier.is-on { border-color: var(--peach); background: var(--peach-tint); }
+.evlink__tier input { margin-top: 3px; flex-shrink: 0; }
+.evlink__tier span { display: flex; flex-direction: column; gap: 2px; }
+.evlink__tier em { font-style: normal; font-size: 12.5px; color: var(--ink-muted); line-height: 1.4; }
+.evlink__circles { display: flex; flex-direction: column; gap: 4px; padding-left: 8px; font-size: 14px; }
+.evlink__circle { display: flex; gap: 8px; align-items: center; }
+.evlink__url { margin: 0; font-family: var(--font-mono, monospace); font-size: 12.5px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.evlink__row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.evlink__btn { white-space: nowrap; }
+.evlink__asked { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--bone-edge); padding-top: 8px; }
+.evlink__guest { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-size: 14px; }
+.evlink__guest em { font-style: normal; color: var(--ink-muted); }
+.evlink__btn { border: 1px solid var(--peach); color: var(--peach-deep); background: #fff; border-radius: var(--r-full); padding: 6px 14px; font-size: 13px; }
+.evlink__btn:hover { background: var(--peach-tint); }
+.evlink__btn:disabled { opacity: .6; }
