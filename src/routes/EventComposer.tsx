@@ -19,7 +19,7 @@ import { parseFlex, defaultWindow } from '../lib/flexParse';
 import { createReminder, getReminder, updateReminder, deleteReminder, loadReminderRecipients, type Recipient } from '../lib/remindersApi';
 import { SmartLocation } from './Calendar';
 import { classifyCareContact } from '../lib/careTeamApi';
-import { listGuestLists, type GuestList, type ListEntry } from '../lib/guestListsApi';
+import { listGuestLists, createGuestList, updateGuestList, type GuestList, type ListEntry } from '../lib/guestListsApi';
 import EventLinkPanel, { LINK_TIERS, type LinkTier } from '../components/EventLinkPanel';
 import './Concierge.css';
 import './Calendar.css';
@@ -358,8 +358,57 @@ export default function EventComposer() {
   const contactsFor = (name: string | null) => {
     const n = norm(name ?? '');
     if (!n) return [];
-    return listContacts.filter((c) => norm(c.entry.name) === n);
+    const first = n.split(' ')[0];
+    // Full name, or a one-word entry that is their first name ("Gabe").
+    return listContacts.filter((c) => { const e = norm(c.entry.name); return e === n || (!e.includes(' ') && e === first); });
   };
+
+  // HOW THEY SIGNED UP (founder 2026-11-13: "it should be how he signed up for
+  // lichen"): every member has a signup email (and often a phone). The
+  // invitation goes there server-side; the host sees it MASKED so the address
+  // itself never crosses (member_contact_hints).
+  const [hints, setHints] = useState<Record<string, { email: string | null; phone: string | null }>>({});
+  useEffect(() => {
+    if (kind !== 'event') return;
+    const need = matches.map((m) => m.id).filter((id) => !(id in hints));
+    if (!need.length) return;
+    let live = true;
+    void supabase.rpc('member_contact_hints', { p_ids: need }).then(({ data }) => {
+      if (!live) return;
+      const next: Record<string, { email: string | null; phone: string | null }> = {};
+      for (const id of need) next[id] = { email: null, phone: null };
+      for (const r of (data as { id: string; email_hint: string | null; phone_hint: string | null }[] | null) ?? [])
+        next[r.id] = { email: r.email_hint, phone: r.phone_hint };
+      setHints((h) => ({ ...h, ...next }));
+    });
+    return () => { live = false; };
+  }, [matches, kind]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // "+ Another email for Gabe": saved ONCE to the host's own "My contacts"
+  // list under the member's name, so it shows under them from then on (and in
+  // Drive → Contacts) — the host's own knowledge, never the member's profile.
+  const [addFor, setAddFor] = useState<string | null>(null);
+  const [addVal, setAddVal] = useState('');
+  const [addMsg, setAddMsg] = useState('');
+  async function saveContactFor(m: { id: string; full_name: string | null }) {
+    const c = classifyCareContact(addVal);
+    const nm = m.full_name ?? 'Member';
+    if (c.kind !== 'email' && c.kind !== 'phone') { setAddMsg('That doesn’t read as an email or a phone number.'); return; }
+    const entry: ListEntry = c.kind === 'email'
+      ? { kind: 'email', value: c.email, name: nm }
+      : { kind: 'phone', value: c.digits, sms: c.sms, name: nm };
+    try {
+      const mine = guestLists.find((g) => g.name.trim().toLowerCase() === 'my contacts');
+      if (mine) {
+        if (!mine.entries.some((e) => e.kind === entry.kind && 'value' in e && e.value === (entry as { value: string }).value))
+          await updateGuestList(mine.id, { entries: [...mine.entries, entry] });
+      } else if (me) await createGuestList(me, 'My contacts', [entry]);
+      if (me) setGuestLists(await listGuestLists(me));
+      setInvitees((cur) => cur.some((x) => x.id === m.id) ? cur : [...cur, m as never]);
+      if (entry.kind === 'email') { addOffGuest(entry); setSendCal(true); }
+      setAddFor(null); setAddVal(''); setAddMsg(''); setQuery('');
+    } catch (e) { setAddMsg((e as Error).message || 'That didn’t save.'); }
+  }
   const contactMatches = useMemo(() => {
     const q = norm(query);
     if (q.length < 2) return [];
@@ -972,7 +1021,7 @@ export default function EventComposer() {
                 onClick={() => { setInvitees((cur) => [...cur, m]); setQuery(''); }}
               >
                 <span className="calp__person-avatar" style={{ background: colorFor(m.id) }}>{monogramFor(m.full_name ?? 'Member')}</span>
-                {m.full_name ?? 'Member'} <span className="calp__match-soft">— on Lichen</span>
+                {m.full_name ?? 'Member'} <span className="calp__match-soft">— on Lichen{kind === 'event' && hints[m.id]?.email ? ` · their invitation goes to ${hints[m.id].email}, the email they signed up with` : ''}{kind === 'event' && hints[m.id]?.phone ? ` · phone ${hints[m.id].phone}` : ''}</span>
               </button>
               {kind === 'event' && contactsFor(m.full_name).map((c) => (
                 <button key={c.entry.kind + c.entry.value} className="calp__match calp__match--sub"
@@ -983,6 +1032,23 @@ export default function EventComposer() {
                   <Icon name={c.entry.kind === 'email' ? 'calendar' : 'chat'} size={13} />
                   {c.entry.kind === 'email' ? c.entry.value : c.entry.sms}
                   <span className="calp__match-soft"> — from your {c.list} list{c.entry.kind === 'email' ? '; send to this email' : ''}</span>
+                </button>
+              ))}
+              {kind === 'event' && (addFor === m.id ? (
+                <div className="calp__match calp__match--sub calp__addcontact">
+                  <input className="cedit__input" autoFocus value={addVal} placeholder={`Another email or phone for ${(m.full_name ?? 'them').split(' ')[0]}`}
+                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                    onChange={(e) => { setAddVal(e.target.value); setAddMsg(''); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void saveContactFor(m); } }} />
+                  <button className="btn evlink__btn" onClick={() => void saveContactFor(m)} disabled={!addVal.trim()}>Save &amp; add</button>
+                  <button className="btn evlink__btn" onClick={() => { setAddFor(null); setAddVal(''); setAddMsg(''); }}>✕</button>
+                  {addMsg ? <span className="calp__match-soft">{addMsg}</span>
+                    : <span className="calp__match-soft">Saved to your “My contacts” list under {m.full_name ?? 'their name'} — it shows up here from now on.</span>}
+                </div>
+              ) : (
+                <button className="calp__match calp__match--sub" onClick={() => { setAddFor(m.id); setAddVal(''); setAddMsg(''); }}>
+                  <Icon name="plus" size={13} /> Another email or phone for {(m.full_name ?? 'them').split(' ')[0]}
+                  <span className="calp__match-soft"> — e.g. a work or personal address</span>
                 </button>
               ))}
             </div>

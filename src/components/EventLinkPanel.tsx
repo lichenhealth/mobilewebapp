@@ -23,9 +23,18 @@ export const LINK_TIERS: [LinkTier, string, string][] = [
   ['invited', 'Anyone with the link can ask to join', 'people you invited land on their own invitation; everyone else asks and you approve'],
 ];
 
-export default function EventLinkPanel({ eventId, me }: { eventId: string; me: string }) {
-  const [link, setLink] = useState<string | null>(null);
-  const [tier, setTier] = useState<LinkTier>('invited');
+/** ONE panel for every event's link (founder 2026-11-13: "merge the two for
+ *  the link on events"): the calendar editor AND a formal event's page render
+ *  this. `defaultTier` = what the event's audience implies when no rule was
+ *  ever set (a formal event's visibility); `showQueue` off where the host's
+ *  page already lists the asks beside its guest list; `onLink` tells the page
+ *  the link exists. */
+export default function EventLinkPanel({ eventId, me, defaultTier = 'invited', showQueue = true, intro, onLink }: {
+  eventId: string; me: string; defaultTier?: LinkTier; showQueue?: boolean; intro?: string; onLink?: (url: string | null) => void;
+}) {
+  const [link, setLinkRaw] = useState<string | null>(null);
+  const setLink = (u: string | null) => { setLinkRaw(u); onLink?.(u); };
+  const [tier, setTier] = useState<LinkTier>(defaultTier);
   const [spaces, setSpaces] = useState<string[]>([]);
   const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
   const [guests, setGuests] = useState<EventGuest[]>([]);
@@ -41,13 +50,13 @@ export default function EventLinkPanel({ eventId, me }: { eventId: string; me: s
         if (!live || !data) return;
         const d = data as { guest_link_token: string | null; link_access: LinkTier | null; link_space_ids: string[] | null };
         if (d.guest_link_token) setLink(`https://lichen.health/e/${d.guest_link_token}`);
-        if (d.link_access) setTier(d.link_access);
+        setTier(d.link_access ?? defaultTier);
         setSpaces(d.link_space_ids ?? []);
       });
     void loadEventGuests(eventId).then((g) => { if (live) setGuests(g); });
     void listMyMemberSpaces(me).then((r) => { if (live) setCircles(r.map((x) => ({ id: x.id, name: x.name }))); }).catch(() => {});
     return () => { live = false; };
-  }, [eventId, me]);
+  }, [eventId, me]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function pick(k: LinkTier, nextSpaces = spaces) {
     setTier(k); setMsg('');
@@ -99,7 +108,7 @@ export default function EventLinkPanel({ eventId, me }: { eventId: string; me: s
   return (
     <div className="evlink">
       <span className="cedit__label">Invite link</span>
-      <p className="calp__match-soft">One link to text, post or email — it lets people in by the rule you choose.</p>
+      <p className="calp__match-soft">{intro ?? 'One link to text, post or email — it lets people in by the rule you choose.'}</p>
       <div className="evlink__tiers" role="radiogroup" aria-label="Who the link lets in">
         {LINK_TIERS.map(([k, label, hint]) => (
           <label key={k} className={'evlink__tier' + (tier === k ? ' is-on' : '')}>
@@ -139,7 +148,7 @@ export default function EventLinkPanel({ eventId, me }: { eventId: string; me: s
       ) : (
         <button className="btn evlink__btn" onClick={() => void make()} disabled={busy}>{busy ? 'Making it…' : 'Create the invite link'}</button>
       )}
-      {asked.length > 0 && (
+      {showQueue && asked.length > 0 && (
         <div className="evlink__asked">
           <span className="cedit__label">Asked to join</span>
           {asked.map((g) => (
@@ -153,7 +162,7 @@ export default function EventLinkPanel({ eventId, me }: { eventId: string; me: s
           ))}
         </div>
       )}
-      {joined.length > 0 && (
+      {showQueue && joined.length > 0 && (
         <p className="calp__match-soft">Came in by link: {joined.map((g) => g.name).join(', ')}</p>
       )}
       {msg && <p className="calp__match-soft" role="status">{msg}</p>}

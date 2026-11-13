@@ -27,6 +27,7 @@ import BuildModeSplit from '../components/BuildModeSplit';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import KnockDraftCard from '../components/KnockDraftCard';
+import CalInviteCard from '../components/CalInviteCard';
 import './AssistantFeed.css';
 
 function timeAgo(iso: string): string {
@@ -1482,6 +1483,14 @@ export default function AssistantFeed() {
                   .map((a) => (
                     <div className="afeed__pubrow" key={`${p.id}:knock:${a.knock_id}`}>
                       <KnockDraftCard knockId={a.knock_id} name={a.name} email={a.email} message={a.message} />
+                    </div>
+                  ))}
+                {/* INVITATIONS, DRAFTED (founder 2026-11-13) — the person taps Send. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'cal_invite' ? [a] : []))
+                  .map((a) => (
+                    <div className="afeed__pubrow" key={`${p.id}:calinv:${a.event_id}`}>
+                      <CalInviteCard eventId={a.event_id} title={a.title} members={a.members} emails={a.emails} calendar={a.calendar} />
                     </div>
                   ))}
                 {/* A COPYABLE VALUE (founder 2026-11-02, the feed URL

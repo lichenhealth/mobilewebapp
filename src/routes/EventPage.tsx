@@ -10,8 +10,8 @@ import { SmartLocation } from './Calendar';
 import AddToCal from '../components/AddToCal';
 import EventPoll from '../components/EventPoll';
 import { useAuth } from '../auth/AuthProvider';
-import { loadEvent, deleteEvent, cancelCalendarInvites, minToLabel, type EventRow, setEventLinkAccess } from '../lib/calendarApi';
-import { listMyMemberSpaces } from '../lib/spacesApi';
+import EventLinkPanel from '../components/EventLinkPanel';
+import { loadEvent, deleteEvent, cancelCalendarInvites, minToLabel, type EventRow } from '../lib/calendarApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
 import {
@@ -24,7 +24,7 @@ import type { MyceliumSignals } from '../components/EngagementFooter';
 import { postToCard, postOpenPath } from '../lib/feedMapping';
 import {
   loadEventGuests, inviteEventGuest, inviteEventGuestByPhone, eventInviteSmsHref,
-  mintEventLink, approveEventGuest, declineEventGuest, type EventGuest,
+  approveEventGuest, declineEventGuest, type EventGuest,
   loadRsvpExtras, saveMyRsvpExtras,
 } from '../lib/eventGuestsApi';
 import EventHostSuite from '../components/EventHostSuite';
@@ -78,14 +78,6 @@ export default function EventPage(props: { postId?: string } = {}) {
   // asks arrive as 'requested' rows the host answers right here.
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [addrCopied, setAddrCopied] = useState(false);
-  const [linkPermBusy, setLinkPermBusy] = useState(false);
-  const [myCircles, setMyCircles] = useState<{ id: string; name: string }[]>([]);
-  useEffect(() => {
-    if (!me) return;
-    void listMyMemberSpaces(me).then((rows) => setMyCircles(rows.map((r) => ({ id: r.id, name: r.name })))).catch(() => {});
-  }, [me]);
-  const [linkBusy, setLinkBusy] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [gActBusy, setGActBusy] = useState<string | null>(null);
   const [armDecline, setArmDecline] = useState<string | null>(null);
   // CO-HOSTS share the guest work (2026-11-08) — the viewer may be one.
@@ -166,23 +158,6 @@ export default function EventPage(props: { postId?: string } = {}) {
       });
     return () => { live = false; };
   }, [post, me]);
-
-  async function makeLink(rotate = false) {
-    if (!post?.linked_event_id || linkBusy) return;
-    setLinkBusy(true);
-    try {
-      const tok = await mintEventLink(post.linked_event_id, rotate);
-      setShareLink(`https://lichen.health/e/${tok}`);
-      setLinkCopied(false);
-    } catch (e) { setGMsg((e as Error).message || 'Could not make the link.'); }
-    finally { setLinkBusy(false); }
-  }
-
-  async function copyLink() {
-    if (!shareLink) return;
-    try { await navigator.clipboard.writeText(shareLink); setLinkCopied(true); window.setTimeout(() => setLinkCopied(false), 3000); }
-    catch { window.prompt('Copy the link:', shareLink); }
-  }
 
   async function approveGuest(g: EventGuest) {
     if (gActBusy) return;
@@ -623,71 +598,11 @@ export default function EventPage(props: { postId?: string } = {}) {
                   </div>
                 </div>
               )}
-              <div className="evp__sharelink">
-                <p className="evp__guests-sub">Or share one link anywhere — a group text, a flyer, a post.</p>
-                {/* WHO THE LINK LETS IN (founder 2026-11-09: "a permissions field in
-                    case people change their mind"): its own setting, changeable any
-                    time; defaults to what the event's audience implies. */}
-                <p className="evp__guests-h4 evp__linkperm-h">Who the link lets in</p>
-                <div className="evp__linkperm" role="radiogroup">
-                  {([
-                    ['anyone', 'Anyone with the link', 'whoever opens it can RSVP straight away'],
-                    ['invited', 'Invited people with the link', 'people you invited land on their own invitation; anyone else asks and you approve'],
-                    ['members', 'Lichen members with the link', 'any signed-in member can come; people off Lichen are asked to sign in'],
-                    ['circles', 'Members of communities or groups you pick', 'only members of the circles you choose below can come'],
-                  ] as const).map(([k, label, hint]) => (
-                    <label key={k} className={'evp__linkperm-opt' + (linkTier === k ? ' is-on' : '')}>
-                      <input type="radio" name="linkperm" checked={linkTier === k} disabled={linkPermBusy}
-                        onChange={async () => {
-                          if (!calEvent) return;
-                          setLinkPermBusy(true);
-                          if (k === 'circles' && !(calEvent.link_space_ids?.length)) { setCalEvent({ ...calEvent, link_access: 'circles' }); setLinkPermBusy(false); return; }
-                          try { await setEventLinkAccess(calEvent.id, k, calEvent.link_space_ids ?? []); setCalEvent({ ...calEvent, link_access: k }); }
-                          catch (e) { alert((e as Error).message || 'That didn’t save.'); }
-                          finally { setLinkPermBusy(false); }
-                        }} />
-                      <span><strong>{label}</strong> — {hint}</span>
-                    </label>
-                  ))}
-                </div>
-                {linkTier === 'circles' && (
-                  <div className="evp__linkcircles">
-                    {myCircles.length === 0 && <p className="evp__guests-fine">You’re not in any communities or groups yet.</p>}
-                    {myCircles.map((c) => {
-                      const on = (calEvent?.link_space_ids ?? []).includes(c.id);
-                      return (
-                        <label key={c.id} className="evp__linkcircle">
-                          <input type="checkbox" checked={on} disabled={linkPermBusy} onChange={async () => {
-                            if (!calEvent) return;
-                            const cur = calEvent.link_space_ids ?? [];
-                            const next = on ? cur.filter((x) => x !== c.id) : [...cur, c.id];
-                            if (!next.length) { setCalEvent({ ...calEvent, link_space_ids: [] }); return; }
-                            setLinkPermBusy(true);
-                            try { await setEventLinkAccess(calEvent.id, 'circles', next); setCalEvent({ ...calEvent, link_access: 'circles', link_space_ids: next }); }
-                            catch (e) { alert((e as Error).message || 'That didn’t save.'); }
-                            finally { setLinkPermBusy(false); }
-                          }} /> {c.name}
-                        </label>
-                      );
-                    })}
-                    {!(calEvent?.link_space_ids?.length) && <p className="evp__guests-fine">Tick at least one — the link keeps its earlier setting until you do.</p>}
-                  </div>
-                )}
-                {shareLink ? (
-                  <>
-                    <p className="evp__sharelink-url">{shareLink}</p>
-                    <div className="evp__sharelink-row">
-                      <button className="btn evp__sharelink-btn" onClick={() => void copyLink()}>{linkCopied ? 'Copied ✓' : 'Copy the link'}</button>
-                      <button className="btn evp__sharelink-btn" onClick={() => void makeLink(true)} disabled={linkBusy}>New link</button>
-                    </div>
-                    <p className="evp__guests-fine">“New link” retires the old one everywhere it was posted.</p>
-                  </>
-                ) : (
-                  <button className="btn btn-primary evp__guests-send" onClick={() => void makeLink()} disabled={linkBusy}>
-                    {linkBusy ? 'Making it…' : 'Create the shareable link'}
-                  </button>
-                )}
-              </div>
+              {calEvent && me && (
+                <EventLinkPanel eventId={calEvent.id} me={me} defaultTier={linkTier} showQueue={false}
+                  intro="Or share one link anywhere — a group text, a flyer, a post. It lets people in by the rule you choose."
+                  onLink={setShareLink} />
+              )}
 
               {guests.some((g) => g.status === 'requested') && (
                 <>

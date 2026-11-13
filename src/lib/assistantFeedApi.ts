@@ -46,6 +46,7 @@ export type FeedAttachment =
   // A drafted reply to someone at the door (founder 2026-11-10) — the
   // member edits and taps Send; nothing goes out on the model's word.
   | { type: 'knock_reply'; knock_id: string; name: string; email: string; message: string }
+  | { type: 'cal_invite'; event_id: string; title: string; members: { id: string; name: string }[]; emails: { email: string; name: string }[]; calendar: boolean }
   /** THE HAND-OFF (founder 2026-11-02: "the briefing of whats been done
    *  manually should be a sent message to claude, not a composed one…
    *  how about its from claude to claude?"): marks a DELIVERED
