@@ -514,7 +514,7 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
   // … just have the profile bubble for the group") — Avatar's monogram is
   // the group's own bubble, never the member stack.
   if (chat.spaceId && ['organization', 'community', 'group', 'place'].includes(chat.kind)) {
-    return <Avatar id={chat.spaceId} name={chat.roomSpaceName ?? chat.title} url={chat.roomSpaceAvatar} size={48} className="conv-row__avatar--party" />;
+    return <Avatar id={chat.spaceId} name={chat.roomSpaceName ?? chat.title} url={chat.roomSpaceAvatar} size={48} className="conv-row__avatar--party avatar--logo" />;
   }
 
   // THE ORANGE BRAIN IS THE ROOM (founder 2026-08-18): a help room's row
@@ -539,7 +539,7 @@ function GroupAvatar({ chat, me }: { chat: ChatVM; me: string }) {
       const answerers = chat.members.filter((m) => m.profile_id !== party.visitorId);
       const one = answerers.length === 1 ? answerers[0] : null;
       return (
-        <Avatar id={party.id} name={party.name} url={party.avatarUrl} size={48} className="conv-row__avatar--party"
+        <Avatar id={party.id} name={party.name} url={party.avatarUrl} size={48} className="conv-row__avatar--party avatar--logo"
           stewardFace={one ? { id: one.profile_id, name: one.name, url: one.avatarUrl } : undefined} />
       );
     }

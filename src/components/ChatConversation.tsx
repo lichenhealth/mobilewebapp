@@ -612,7 +612,7 @@ function spacePartyView(chat: ChatInfo, members: MemberInfo[], me: string): { av
   if (iAmVisitor) {
     const one = answerers.length === 1 ? answerers[0] : null;
     return {
-      avatar: <Avatar id={party.id} name={party.name} url={party.avatarUrl} size={38}
+      avatar: <Avatar id={party.id} name={party.name} url={party.avatarUrl} size={38} className="avatar--logo"
         stewardFace={one ? { id: one.profile_id, name: one.name, url: one.avatarUrl } : undefined} />,
       sub: isSuggestion
         ? `Your suggestions for ${party.name} — its stewards and Claude are here`
@@ -660,12 +660,12 @@ function ChatHeader({ chat, title, members, me, onBack, onMenu, onInfo, onDrive 
         <div className="thread__head-avatar">
           {partyView ? (
             <div className="thread__head-party">{partyView.avatar}</div>
-          ) : chat.roomSpace?.avatarUrl && ['organization', 'community', 'group', 'place'].includes(chat.kind) ? (
+          ) : chat.roomSpace && ['organization', 'community', 'group', 'place'].includes(chat.kind) ? (
             /* A SPACE'S OWN ROOM WEARS THE SPACE'S LOGO (founder 2026-08-25):
                the face-stack minus yourself is EMPTY in a solo room — a blank
                circle — and even full, the room's identity is the space. */
             <div className="thread__head-party">
-              <Avatar id={chat.roomSpace.id} name={chat.roomSpace.name} url={chat.roomSpace.avatarUrl} size={38} />
+              <Avatar id={chat.roomSpace.id} name={chat.roomSpace.name} url={chat.roomSpace.avatarUrl} size={38} className="avatar--logo" />
             </div>
           ) : chat.kind === 'help' ? (
             /* All three parties, tiered lower→higher like the inbox stacks
@@ -752,6 +752,11 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
       >
         {partyView ? (
           <div className="thread__intro-party">{partyView.avatar}</div>
+        ) : chat.roomSpace && ['organization', 'community', 'group', 'place'].includes(chat.kind) ? (
+          /* A space's own room introduces the SPACE, never one member's face. */
+          <div className="thread__intro-party">
+            <Avatar id={chat.roomSpace.id} name={chat.roomSpace.name} url={chat.roomSpace.avatarUrl} size={64} className="avatar--logo" />
+          </div>
         ) : chat.kind === 'help' ? (
           /* Every party, side by side and legible — not a clump (founder
              2026-08-18: "move the 3 profile icons out farther"). */

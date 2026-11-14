@@ -473,3 +473,6 @@ img.conv-row__group-bub { object-fit: cover; }
 .chat__lens.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
 .conv-row__medium { display: inline-flex; vertical-align: -1px; margin-right: 5px; color: var(--ink-faint); }
 .chat__emptylink { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+/* Breathing room before the divider (founder 2026-11-14): the Email lens,
+   the Organizations tab and row times ran flush into the thread pane. */
+@media (min-width: 1024px) { .chat__list-pane { padding-right: var(--s-5); } }

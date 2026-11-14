@@ -29,3 +29,7 @@
   justify-content: center; color: var(--bone-warm);
   font-family: var(--font-display); font-style: italic;
 }
+/* A SPACE'S LOGO SITS ON A WHITE DISC (founder 2026-11-14, "the logo is all
+   messed up"): transparent logos floated loose and oversized beside the
+   round member faces. A logo is contained, never cropped, inside one ring. */
+img.avatar.avatar--logo { background: #fff; border: 1px solid var(--bone-edge); object-fit: contain; padding: 3px; box-sizing: border-box; }

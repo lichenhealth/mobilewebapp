@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
+import FilterRow from '../components/FilterRow';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import './AdminCategories.css';
@@ -14,6 +15,8 @@ type Suggestion = {
 
 const DOMAINS = ['good', 'service', 'place', 'identity'] as const;
 type Domain = (typeof DOMAINS)[number];
+type Cat = { id: string; name: string; domain: string; parent_id: string | null };
+const KIND_LABEL: Record<Domain, string> = { good: 'Goods', service: 'Services', place: 'Places', identity: 'Identities' };
 
 export default function AdminCategories() {
   const { loading, user, isAdmin } = useAuth();
@@ -35,12 +38,55 @@ export default function AdminCategories() {
   };
   const [mapping, setMapping] = useState<string | null>(null);
   const [mapQ, setMapQ] = useState('');
-  const [allCats, setAllCats] = useState<{ id: string; name: string; domain: string }[]>([]);
-
-  useEffect(() => {
-    void supabase.from('categories').select('id, name, domain').order('name')
-      .then(({ data }) => setAllCats((data as { id: string; name: string; domain: string }[] | null) ?? []));
+  const [allCats, setAllCats] = useState<Cat[]>([]);
+  const loadCats = useCallback(() => {
+    void supabase.from('categories').select('id, name, domain, parent_id').order('name')
+      .then(({ data }) => setAllCats((data as Cat[] | null) ?? []));
   }, []);
+  useEffect(() => { loadCats(); }, [loadCats]);
+
+  // ADD DIRECTLY (founder 2026-11-14): admins grow the vocabulary themselves,
+  // not only by approving a member's suggestion.
+  const [addName, setAddName] = useState('');
+  const [addKinds, setAddKinds] = useState<Domain[]>(['identity']);
+  const [addParent, setAddParent] = useState('');
+  const [addBusy, setAddBusy] = useState(false);
+  const [addNote, setAddNote] = useState('');
+  const parentKind = addKinds.length === 1 && addKinds[0] !== 'identity' ? addKinds[0] : null;
+  const parentOpts = parentKind ? allCats.filter((c) => c.domain === parentKind && !c.parent_id) : [];
+  const dupes = addName.trim().length >= 2
+    ? allCats.filter((c) => addKinds.includes(c.domain as Domain) && c.name.toLowerCase() === addName.trim().toLowerCase())
+    : [];
+  async function addCategory() {
+    const name = addName.trim();
+    if (name.length < 2 || addKinds.length === 0) return;
+    setAddBusy(true); setAddNote(''); setError('');
+    const { error } = await supabase.rpc('admin_add_category', {
+      p_name: name, p_domains: addKinds, p_parent: parentKind && addParent ? addParent : null,
+    });
+    setAddBusy(false);
+    if (error) { setError(error.message); return; }
+    setAddNote(`“${name}” is in ${addKinds.map((k) => KIND_LABEL[k]).join(' and ')} ✓`);
+    setAddName(''); setAddParent('');
+    loadCats();
+  }
+
+  // THE VOCABULARY, BROWSABLE — identities included (founder 2026-11-14).
+  const [vocabTab, setVocabTab] = useState<string>('Identities');
+  const [vocabQ, setVocabQ] = useState('');
+  const vocabDomain = (Object.keys(KIND_LABEL) as Domain[]).find((k) => KIND_LABEL[k] === vocabTab) ?? 'identity';
+  const vocab = (() => {
+    const q = vocabQ.trim().toLowerCase();
+    const inDom = allCats.filter((c) => c.domain === vocabDomain);
+    if (q) return inDom.filter((c) => c.name.toLowerCase().includes(q)).map((c) => ({ c, child: !!c.parent_id }));
+    const roots = inDom.filter((c) => !c.parent_id);
+    const out: { c: Cat; child: boolean }[] = [];
+    for (const r of roots) {
+      out.push({ c: r, child: false });
+      for (const ch of inDom.filter((x) => x.parent_id === r.id)) out.push({ c: ch, child: true });
+    }
+    return out;
+  })();
 
   /** Answer a suggestion by mapping it onto a category that already exists. */
   async function mapTo(suggestionId: string, categoryId: string) {
@@ -106,14 +152,52 @@ export default function AdminCategories() {
   return (
     <div className="adminc">
       <header className="adminc__head">
-        <h1 className="adminc__title">Category suggestions</h1>
+        <h1 className="adminc__title">Categories &amp; identities</h1>
         <p className="adminc__sub">
-          Members proposed these. Approving as-is adds it to the vocabulary and to their
-          profile; an edited name or &ldquo;Same as&hellip;&rdquo; asks them first. Every
-          decision sends them a bell.
+          The shared vocabulary for goods, services, places and identities. Add to it
+          here, or answer what members suggest.
         </p>
       </header>
 
+      <section className="adminc__add">
+        <h2 className="adminc__title adminc__title--section">Add to the vocabulary</h2>
+        <div className="adminc__addrow">
+          <input className="adminc__addname" value={addName} maxLength={60}
+            placeholder="Name — e.g. Psychotherapist, Saddles, Retreat centers"
+            onChange={(e) => { setAddName(e.target.value); setAddNote(''); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') void addCategory(); }} />
+          <button type="button" className="adminc__btn adminc__btn--approve"
+            disabled={addBusy || addName.trim().length < 2 || addKinds.length === 0}
+            onClick={() => void addCategory()}>{addBusy ? 'Adding…' : 'Add'}</button>
+        </div>
+        <div className="adminc__domains">
+          <span className="adminc__domains-lead">Add to</span>
+          {DOMAINS.map((d) => {
+            const on = addKinds.includes(d);
+            return (
+              <button key={d} type="button" className={'adminc__domain' + (on ? ' is-on' : '')}
+                onClick={() => { setAddKinds((ks) => on ? ks.filter((k) => k !== d) : [...ks, d]); setAddParent(''); }}>
+                {on ? '✓ ' : ''}{KIND_LABEL[d]}
+              </button>
+            );
+          })}
+        </div>
+        {parentOpts.length > 0 && (
+          <label className="adminc__parent">
+            <span className="adminc__domains-lead">Nest under</span>
+            <select value={addParent} onChange={(e) => setAddParent(e.target.value)}>
+              <option value="">Nothing — its own category</option>
+              {parentOpts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+        )}
+        {dupes.length > 0 && (
+          <p className="adminc__edithint">Already in {dupes.map((c) => KIND_LABEL[c.domain as Domain]).join(' and ')} — adding again just keeps that one.</p>
+        )}
+        {addNote && <p className="adminc__addnote">{addNote}</p>}
+      </section>
+
+      <h2 className="adminc__title adminc__title--section">Suggested by members</h2>
       {error && <p className="adminc__error">{error}</p>}
 
       {loaded && items.length === 0 && (
@@ -227,6 +311,24 @@ export default function AdminCategories() {
           </li>
         ))}
       </ul>
+
+      <section className="adminc__vocab">
+        <h2 className="adminc__title adminc__title--section">The vocabulary</h2>
+        <FilterRow options={DOMAINS.map((d) => KIND_LABEL[d])} value={vocabTab} onChange={setVocabTab} />
+        <input className="adminc__map-q adminc__vocabq" value={vocabQ}
+          placeholder={`Search ${vocabTab.toLowerCase()}`} onChange={(e) => setVocabQ(e.target.value)} />
+        <p className="adminc__muted">{allCats.filter((c) => c.domain === vocabDomain).length} {vocabTab.toLowerCase()}</p>
+        <ul className="adminc__vocablist">
+          {vocab.map(({ c, child }) => (
+            <li key={c.id} className={'adminc__vocabitem' + (child ? ' is-child' : '')}>
+              {c.domain === 'identity'
+                ? <Link className="link-cue" to={`/identities/${c.id}`}>{c.name}</Link>
+                : c.name}
+            </li>
+          ))}
+          {vocab.length === 0 && <li className="adminc__muted">Nothing matches.</li>}
+        </ul>
+      </section>
     </div>
   );
 }
