@@ -50,7 +50,7 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'drive_folder',
-    description: 'Their private Drive folders: create (name), add a post (by its exact title — one of their own posts, a post they saved, or the post shared into this conversation), or remove a post. Folders hold posts by reference — for a document, spreadsheet or presentation use drive_doc.',
+    description: 'Their private Drive folders: create (name), add a post (by its exact title — one of their own posts, a post they saved, or the post shared into this conversation), or remove a post. Folders hold posts by reference — to put a document, spreadsheet or presentation in a folder use drive_doc op add_to_folder.',
     input_schema: {
       type: 'object',
       properties: {
@@ -169,20 +169,23 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'drive_doc',
-    description: 'Their PERSONAL Drive files (the same Docs, Spreadsheets and Presentations Drive\'s + makes — private to them). op: list (their files), read (one by exact title), create, update. kind: doc (body = the words) | sheet (rows = an array of rows, each an array of cell strings; the first row is usually headers) | slides (slides = [{title, body}], body one point per line). update by exact title: new_title, body (replaces), append_text (adds to the end), rows (replaces the whole sheet), append_rows (adds rows at the bottom), slides (replaces), append_slides. Use this to BUILD what they ask for — an expense sheet from their mail receipts, a plan, a deck — then hand the Open door. Read before updating; never invent figures — only what they said or what you read (their mail, their Lichen data).',
+    description: 'Their PERSONAL Drive files — Lichen\'s own Docs, Sheets and Slides (the same files Drive\'s + makes, private to them). op: list, read (one by exact title), create, update, add_to_folder (put the file in one of their Drive folders by exact folder name — created if missing). kind: doc (body = the words; light markdown works: # Heading, ## Subheading, **bold**, *italic*, - bullets, 1. numbered, - [ ] checklist, > quote) | sheet (rows = an array of rows, each an array of cell strings; the first row is usually headers; cells may hold real FORMULAS like =SUM(B2:B9), =AVERAGE(C:C), =B2*C2, =IF(D2>100,"over","ok"), =VLOOKUP(...), =SUMIF(...), cross-tab refs like =Expenses!B10 — prefer a formula over a number you computed yourself) | slides (slides = [{title, body, layout, notes}], body one point per line; layout one of title, bullets, text, two (uses body2 for the right column), section, quote, big; theme one of paper, ink, moss, peach, sky, clay, mono). Sheets can have several tabs: pass tab (a tab name) with rows/append_rows to write that tab (created if missing); read returns every tab. update by exact title: new_title, body (replaces), append_text, rows (replaces that tab), append_rows, slides (replaces), append_slides, theme. folder on create also files it. Use this to BUILD what they ask for — an expense sheet from their mail receipts, a plan, a deck — then hand the Open door. Read before updating; never invent figures — only what they said or what you read (their mail, their Lichen data).',
     input_schema: {
       type: 'object',
       properties: {
-        op: { type: 'string', enum: ['list', 'read', 'create', 'update'] },
+        op: { type: 'string', enum: ['list', 'read', 'create', 'update', 'add_to_folder'] },
         kind: { type: 'string', enum: ['doc', 'sheet', 'slides'] },
         title: { type: 'string' },
         new_title: { type: 'string' },
+        folder: { type: 'string', description: 'Exact name of one of their Drive folders (created if missing).' },
         body: { type: 'string' },
         append_text: { type: 'string' },
+        tab: { type: 'string', description: 'Sheet tab name for rows/append_rows.' },
         rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
         append_rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
-        slides: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' } } } },
-        append_slides: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' } } } },
+        theme: { type: 'string', enum: ['paper', 'ink', 'moss', 'peach', 'sky', 'clay', 'mono'] },
+        slides: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' }, body2: { type: 'string' }, layout: { type: 'string' }, notes: { type: 'string' } } } },
+        append_slides: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' }, body2: { type: 'string' }, layout: { type: 'string' }, notes: { type: 'string' } } } },
       },
       required: ['op'],
     },
@@ -367,14 +370,56 @@ export async function runLifeTool(
   }
 
   if (name === 'drive_doc') {
-    type DocRow = { id: string; kind: string; title: string; body: string | null; data: { cells?: string[][]; slides?: { title: string; body: string }[] } | null; updated_at: string };
+    type Tab = { name: string; cells: string[][]; fmt?: Record<string, unknown>; frozen?: number };
+    type SlideT = { title: string; body: string; body2?: string; layout?: string; notes?: string };
+    type DocRow = { id: string; kind: string; title: string; body: string | null; data: { cells?: string[][]; sheets?: Tab[]; slides?: SlideT[]; html?: string; theme?: string } | null; updated_at: string };
     const KIND_WORD: Record<string, string> = { doc: 'doc', sheet: 'spreadsheet', slides: 'presentation' };
-    const cleanRows = (v: unknown): string[][] => (Array.isArray(v) ? v : []).slice(0, 500)
-      .map((r) => (Array.isArray(r) ? r : [r]).slice(0, 26).map((c) => String(c ?? '').slice(0, 500)));
-    const cleanSlides = (v: unknown) => (Array.isArray(v) ? v : []).slice(0, 60)
-      .map((s) => ({ title: String((s as { title?: unknown })?.title ?? '').slice(0, 200), body: String((s as { body?: unknown })?.body ?? '').slice(0, 3000) }));
-    const square = (rows: string[][]) => { const w = Math.max(1, ...rows.map((r) => r.length)); return rows.map((r) => [...r, ...Array(w - r.length).fill('')]); };
+    const LAYOUTS = ['title', 'bullets', 'text', 'two', 'section', 'quote', 'big'];
+    const THEMES = ['paper', 'ink', 'moss', 'peach', 'sky', 'clay', 'mono'];
+    const cleanRows = (v: unknown): string[][] => (Array.isArray(v) ? v : []).slice(0, 1000)
+      .map((r) => (Array.isArray(r) ? r : [r]).slice(0, 52).map((c) => String(c ?? '').slice(0, 1000)));
+    const cleanSlides = (v: unknown): SlideT[] => (Array.isArray(v) ? v : []).slice(0, 80).map((x) => {
+      const o = (x ?? {}) as Record<string, unknown>;
+      const sl: SlideT = { title: String(o.title ?? '').slice(0, 200), body: String(o.body ?? '').slice(0, 3000) };
+      if (o.body2) sl.body2 = String(o.body2).slice(0, 3000);
+      if (typeof o.layout === 'string' && LAYOUTS.includes(o.layout)) sl.layout = o.layout;
+      if (o.notes) sl.notes = String(o.notes).slice(0, 3000);
+      return sl;
+    });
+    const tabsOf = (d: DocRow['data']): Tab[] => (d?.sheets?.length ? d.sheets : [{ name: 'Sheet1', cells: d?.cells ?? [['']] }]);
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const inl = (t: string) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g, '$1<i>$2</i>').replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>');
+    const mdToHtml = (md: string) => {
+      const out: string[] = []; let list = '';
+      const close = () => { if (list) { out.push(list === 'ol' ? '</ol>' : '</ul>'); list = ''; } };
+      for (const l of md.replace(/\r/g, '').split('\n')) {
+        let m: RegExpExecArray | null;
+        if ((m = /^(#{1,3})\s+(.*)$/.exec(l))) { close(); out.push(`<h${m[1].length}>${inl(m[2])}</h${m[1].length}>`); continue; }
+        if ((m = /^\s*[-*•]\s+\[( |x)\]\s+(.*)$/i.exec(l))) { if (list !== 'chk') { close(); out.push('<ul class="chk">'); list = 'chk'; } out.push(`<li data-checked="${m[1].toLowerCase() === 'x'}">${inl(m[2])}</li>`); continue; }
+        if ((m = /^\s*[-*•]\s+(.*)$/.exec(l))) { if (list !== 'ul') { close(); out.push('<ul>'); list = 'ul'; } out.push(`<li>${inl(m[1])}</li>`); continue; }
+        if ((m = /^\s*\d+[.)]\s+(.*)$/.exec(l))) { if (list !== 'ol') { close(); out.push('<ol>'); list = 'ol'; } out.push(`<li>${inl(m[1])}</li>`); continue; }
+        if (/^\s*(---|\*\*\*)\s*$/.test(l)) { close(); out.push('<hr>'); continue; }
+        if ((m = /^>\s?(.*)$/.exec(l))) { close(); out.push(`<blockquote>${inl(m[1])}</blockquote>`); continue; }
+        close(); out.push(l.trim() ? `<p>${inl(l)}</p>` : '<p><br></p>');
+      }
+      close(); return out.join('');
+    };
+    const plain = (md: string) => md.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,3}\s+/gm, '');
     const door = (d: { id: string; title: string }) => ({ path: `/docs/${d.id}`, label: `Open ${d.title.slice(0, 40)} →` });
+    const toFolder = async (docId: string, folderName: string): Promise<string | null> => {
+      const fn = folderName.trim().slice(0, 80);
+      if (!fn) return null;
+      let col = ((await (await sb(`collections?owner_id=eq.${me}&space_id=is.null&name=ilike.${enc(fn)}&select=id,name&limit=2`)).json()) ?? []) as { id: string; name: string }[];
+      if (col.length > 1) return `Several folders are named "${fn}" — skipped the folder.`;
+      if (!col.length) {
+        const r = await sb('collections', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ owner_id: me, name: fn, is_public: false, kind: 'collection' }) });
+        col = ((await r.json().catch(() => null)) ?? []) as { id: string; name: string }[];
+        if (!col[0]) return 'couldn\'t make that folder';
+      }
+      const cnt = ((await (await sb(`collection_items?collection_id=eq.${col[0].id}&select=target_id`)).json()) ?? []) as unknown[];
+      await sb('collection_items', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify({ collection_id: col[0].id, target_type: 'doc', target_id: docId, position: cnt.length }) });
+      return `filed it in the folder "${col[0].name}"`;
+    };
     const op = String(input.op ?? '');
     if (op === 'list') {
       const rows = ((await (await sb(`chat_docs?created_by=eq.${me}&chat_id=is.null&select=title,kind,updated_at&order=updated_at.desc&limit=60`)).json()) ?? []) as DocRow[];
@@ -384,14 +429,29 @@ export async function runLifeTool(
       const kind = String(input.kind ?? 'doc');
       if (!['doc', 'sheet', 'slides'].includes(kind)) return { ok: false, error: 'kind is doc, sheet or slides.' };
       const title = String(input.title ?? '').trim().slice(0, 120) || `Untitled ${KIND_WORD[kind]}`;
-      const data = kind === 'sheet' ? { cells: square(cleanRows(input.rows).length ? cleanRows(input.rows) : [['', '', '']]) }
-        : kind === 'slides' ? { slides: cleanSlides(input.slides).length ? cleanSlides(input.slides) : [{ title: '', body: '' }] } : {};
+      let data: Record<string, unknown> = {};
+      let body: string | null = null;
+      if (kind === 'sheet') {
+        const rows = cleanRows(input.rows).length ? cleanRows(input.rows) : [['']];
+        const tabName = String(input.tab ?? '').trim().slice(0, 40) || 'Sheet1';
+        const fmt: Record<string, unknown> = {};
+        if (rows.length > 1) rows[0].forEach((_, c) => { fmt[`0,${c}`] = { b: true }; });
+        const t: Tab = { name: tabName, cells: rows, fmt, frozen: rows.length > 1 ? 1 : 0 };
+        data = { sheets: [t], cells: rows };
+      } else if (kind === 'slides') {
+        const sl = cleanSlides(input.slides);
+        data = { theme: THEMES.includes(String(input.theme)) ? input.theme : 'paper', slides: sl.length ? sl : [{ title, body: '', layout: 'title' }] };
+      } else {
+        const md = String(input.body ?? '').slice(0, 60000);
+        body = plain(md); data = { html: mdToHtml(md) };
+      }
       const r = await sb('chat_docs', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
-        chat_id: null, kind, title, body: kind === 'doc' ? String(input.body ?? '').slice(0, 60000) : null, data, created_by: me, updated_by: me,
+        chat_id: null, kind, title, body, data, created_by: me, updated_by: me,
       }) });
       const row = (await r.json().catch(() => null)) as DocRow[] | null;
       if (!r.ok || !row?.[0]) return { ok: false, error: 'Drive didn\'t take it — try again.' };
-      return { ok: true, change: `created the ${KIND_WORD[kind]} "${title}" in their Drive`, door: door(row[0]) };
+      const filed = input.folder ? await toFolder(row[0].id, String(input.folder)) : null;
+      return { ok: true, change: `created the ${KIND_WORD[kind]} "${title}" in their Drive${filed ? `, ${filed}` : ''}`, door: door(row[0]) };
     }
     const t0 = String(input.title ?? '').trim();
     if (!t0) return { ok: false, error: 'Which file? Give its exact title (op list shows them).' };
@@ -402,40 +462,62 @@ export async function runLifeTool(
       return {
         ok: true, title: d.title, kind: KIND_WORD[d.kind] ?? d.kind,
         ...(d.kind === 'doc' ? { body: (d.body ?? '').slice(0, 20000) } : {}),
-        ...(d.kind === 'sheet' ? { rows: (d.data?.cells ?? []).slice(0, 300) } : {}),
-        ...(d.kind === 'slides' ? { slides: d.data?.slides ?? [] } : {}),
+        ...(d.kind === 'sheet' ? { tabs: tabsOf(d.data).map((t) => ({ name: t.name, rows: t.cells.slice(0, 300) })) } : {}),
+        ...(d.kind === 'slides' ? { theme: d.data?.theme ?? 'paper', slides: d.data?.slides ?? [] } : {}),
         door: door(d),
       };
     }
-    if (op !== 'update') return { ok: false, error: 'op is list, read, create or update.' };
+    if (op === 'add_to_folder') {
+      const filed = await toFolder(d.id, String(input.folder ?? ''));
+      if (!filed) return { ok: false, error: 'Which folder? Give its name.' };
+      return { ok: true, change: `${filed} — "${d.title}"`, door: door(d) };
+    }
+    if (op !== 'update') return { ok: false, error: 'op is list, read, create, update or add_to_folder.' };
     const patch: Record<string, unknown> = { updated_by: me, updated_at: new Date().toISOString() };
     const did: string[] = [];
     const newTitle = String(input.new_title ?? '').trim().slice(0, 120);
     if (newTitle) { patch.title = newTitle; did.push(`renamed it "${newTitle}"`); }
     if (d.kind === 'doc') {
-      if (typeof input.body === 'string') { patch.body = input.body.slice(0, 60000); did.push('rewrote its words'); }
-      else if (typeof input.append_text === 'string' && input.append_text.trim()) { patch.body = `${(d.body ?? '').trimEnd()}\n\n${input.append_text}`.trimStart().slice(0, 60000); did.push('added to the end'); }
-    } else if (d.kind === 'sheet') {
-      let cells = d.data?.cells ?? [];
-      if (cleanRows(input.rows).length) { cells = cleanRows(input.rows); did.push(`set ${cells.length} rows`); }
-      const add = cleanRows(input.append_rows);
-      if (add.length) {
-        const blank = (r: string[]) => r.every((c) => !c.trim());
-        while (cells.length && blank(cells[cells.length - 1])) cells = cells.slice(0, -1);
-        cells = [...cells, ...add]; did.push(`added ${add.length} row${add.length === 1 ? '' : 's'}`);
+      const html0 = d.data?.html ?? mdToHtml(d.body ?? '');
+      if (typeof input.body === 'string') { patch.body = plain(input.body).slice(0, 60000); patch.data = { ...(d.data ?? {}), html: mdToHtml(input.body) }; did.push('rewrote its words'); }
+      else if (typeof input.append_text === 'string' && input.append_text.trim()) {
+        patch.body = `${(d.body ?? '').trimEnd()}\n\n${plain(input.append_text)}`.trimStart().slice(0, 60000);
+        patch.data = { ...(d.data ?? {}), html: html0 + mdToHtml(input.append_text) };
+        did.push('added to the end');
       }
-      if (did.length && (input.rows || input.append_rows)) patch.data = { ...(d.data ?? {}), cells: square(cells).slice(0, 1000) };
+    } else if (d.kind === 'sheet') {
+      const tabs = tabsOf(d.data).map((t) => ({ ...t, cells: t.cells.map((r) => [...r]) }));
+      const tabName = String(input.tab ?? '').trim().slice(0, 40);
+      let ti = tabName ? tabs.findIndex((t) => t.name.toLowerCase() === tabName.toLowerCase()) : 0;
+      if (ti < 0 && (input.rows || input.append_rows)) { tabs.push({ name: tabName, cells: [['']] }); ti = tabs.length - 1; did.push(`added the tab "${tabName}"`); }
+      if (ti >= 0) {
+        let cells = tabs[ti].cells;
+        if (cleanRows(input.rows).length) { cells = cleanRows(input.rows); did.push(`set ${cells.length} rows`); }
+        const add = cleanRows(input.append_rows);
+        if (add.length) {
+          const blank = (r: string[]) => r.every((c) => !String(c).trim());
+          while (cells.length && blank(cells[cells.length - 1])) cells = cells.slice(0, -1);
+          cells = [...cells, ...add]; did.push(`added ${add.length} row${add.length === 1 ? '' : 's'}`);
+        }
+        tabs[ti] = { ...tabs[ti], cells: cells.slice(0, 2000) };
+        if (input.rows || input.append_rows) patch.data = { ...(d.data ?? {}), sheets: tabs, cells: tabs[0].cells };
+      }
     } else if (d.kind === 'slides') {
       let sl = d.data?.slides ?? [];
       if (cleanSlides(input.slides).length) { sl = cleanSlides(input.slides); did.push(`set ${sl.length} slides`); }
       const add = cleanSlides(input.append_slides);
-      if (add.length) { sl = [...sl.filter((s) => s.title.trim() || s.body.trim()), ...add]; did.push(`added ${add.length} slide${add.length === 1 ? '' : 's'}`); }
-      if (input.slides || input.append_slides) patch.data = { ...(d.data ?? {}), slides: sl.slice(0, 100) };
+      if (add.length) { sl = [...sl.filter((x) => x.title.trim() || x.body.trim()), ...add]; did.push(`added ${add.length} slide${add.length === 1 ? '' : 's'}`); }
+      const theme = THEMES.includes(String(input.theme)) ? String(input.theme) : null;
+      if (theme) did.push(`switched the theme to ${theme}`);
+      if (input.slides || input.append_slides || theme) patch.data = { ...(d.data ?? {}), slides: sl.slice(0, 120), ...(theme ? { theme } : {}) };
     }
-    if (!did.length) return { ok: false, error: 'Nothing to change — pass body/append_text, rows/append_rows, slides/append_slides or new_title.' };
-    const r = await sb(`chat_docs?id=eq.${d.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
-    if (!r.ok) return { ok: false, error: 'Drive didn\'t save that — try again.' };
-    return { ok: true, change: `${did.join(', ')} in "${newTitle || d.title}"`, door: door({ id: d.id, title: newTitle || d.title }) };
+    const filed = input.folder ? await toFolder(d.id, String(input.folder)) : null;
+    if (!did.length && !filed) return { ok: false, error: 'Nothing to change — pass body/append_text, rows/append_rows (+tab), slides/append_slides/theme, new_title or folder.' };
+    if (did.length) {
+      const r = await sb(`chat_docs?id=eq.${d.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+      if (!r.ok) return { ok: false, error: 'Drive didn\'t save that — try again.' };
+    }
+    return { ok: true, change: `${[...did, ...(filed ? [filed] : [])].join(', ')} in "${newTitle || d.title}"`, door: door({ id: d.id, title: newTitle || d.title }) };
   }
 
   if (name === 'save_or_hide_post') {

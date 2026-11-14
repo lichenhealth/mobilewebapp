@@ -1,14 +1,20 @@
 import { trashDoc } from '../lib/trashApi';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { Icon } from '../components/Icon';
 import { PollBody, DocAiMark } from '../components/ChatDocCard';
 import {
-  loadChatDoc, saveChatDoc, setChatDocAi, deleteChatDoc,
+  loadChatDoc, saveChatDoc, setChatDocAi, deleteChatDoc, createPersonalDoc,
   DOC_KIND_LABEL, DOC_KIND_ICON, type ChatDocRow, type Slide,
 } from '../lib/chatDocsApi';
+import type { SheetTab } from '../lib/formula';
+import { textToHtml } from '../lib/richText';
+import { useCollect } from '../collections/CollectPrompt';
+import SheetEditor from '../components/office/SheetEditor';
+import DocEditor from '../components/office/DocEditor';
+import SlidesEditor from '../components/office/SlidesEditor';
 import { aiDoorOn } from '../components/AssistantDoor';
 import { PageHead } from '../components/PageHead';
 import './ChatDocs.css';
@@ -23,19 +29,25 @@ export default function ChatDocPage() {
   const { docId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openPicker } = useCollect();
   const me = user?.id ?? '';
   const [doc, setDoc] = useState<ChatDocRow | null | 'gone'>(null);
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
   const [title, setTitle] = useState('');
+  const [html, setHtml] = useState('');
   const [body, setBody] = useState('');
-  const [cells, setCells] = useState<string[][]>([]);
+  const [tabs, setTabs] = useState<SheetTab[]>([]);
   const [slides, setSlides] = useState<Slide[]>([]);
-  const [presenting, setPresenting] = useState<number | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [theme, setTheme] = useState('paper');
+  const [status, setStatus] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved');
   const [msg, setMsg] = useState('');
+  const [fileMenu, setFileMenu] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+  type Patch = { title?: string; body?: string | null; data?: ChatDocRow['data'] };
+  const pending = useRef<Patch | null>(null);
+  const docRef = useRef<string | null>(null);
+  const timer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!docId || !me) return;
@@ -45,12 +57,15 @@ export default function ChatDocPage() {
       if (!active) return;
       if (!d) { setDoc('gone'); return; }
       setDoc(d);
+      docRef.current = d.id;
       setTitle(d.title);
       setBody(d.body ?? '');
-      setCells((d.data?.cells ?? [['', '', ''], ['', '', ''], ['', '', '']]).map((r) => [...r]));
-      setSlides((d.data?.slides ?? [{ title: '', body: '' }]).map((s) => ({ ...s })));
-      // A PERSONAL doc (founder 2026-10-21, Drive's +) has no room — it
-      // lives in your Drive alone, and nothing else loads.
+      setHtml(d.data?.html ?? textToHtml(d.body ?? ''));
+      setTabs(d.data?.sheets?.length
+        ? d.data.sheets.map((t) => ({ ...t, cells: t.cells.map((r) => [...r]) }))
+        : [{ name: 'Sheet1', cells: (d.data?.cells ?? [['']]).map((r) => [...r]), frozen: 0 }]);
+      setSlides((d.data?.slides ?? [{ title: '', body: '', layout: 'title' }]).map((x) => ({ ...x })));
+      setTheme(d.data?.theme ?? 'paper');
       if (!d.chat_id) { setRoom(null); return; }
       const [{ data: c }, { data: m }] = await Promise.all([
         supabase.from('chats')
@@ -74,16 +89,37 @@ export default function ChatDocPage() {
     return () => { active = false; };
   }, [docId, me]);
 
+  // AUTOSAVE — the Google posture: every change is saved a beat later, and a
+  // pending save flushes when the tab hides or the page unmounts.
+  const flush = useCallback(async () => {
+    if (timer.current) { window.clearTimeout(timer.current); timer.current = null; }
+    const patch = pending.current; pending.current = null;
+    const id = docRef.current;
+    if (!patch || !id) return;
+    setStatus('saving');
+    try {
+      await saveChatDoc(id, patch);
+      setDoc((cur) => (cur && cur !== 'gone' ? { ...cur, ...patch, updated_by: user?.id ?? cur.updated_by, updated_at: new Date().toISOString() } : cur));
+      setStatus((s) => (s === 'saving' ? 'saved' : s));
+    }
+    catch (e) { setStatus('error'); setMsg(e instanceof Error ? e.message : 'That didn’t save.'); }
+  }, [user?.id]);
+  const queue = (patch: Patch) => {
+    pending.current = { ...(pending.current ?? {}), ...patch }; setStatus('dirty'); setMsg('');
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => { void flush(); }, 900);
+  };
   useEffect(() => {
-    if (presenting == null) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPresenting(null);
-      else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') setPresenting((i) => (i == null ? i : Math.min(i + 1, slides.length - 1)));
-      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') setPresenting((i) => (i == null ? i : Math.max(i - 1, 0)));
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [presenting, slides.length]);
+    const hide = () => { if (document.visibilityState === 'hidden') void flush(); };
+    document.addEventListener('visibilitychange', hide);
+    window.addEventListener('pagehide', () => void flush());
+    return () => { document.removeEventListener('visibilitychange', hide); void flush(); };
+  }, [flush]);
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => { if (pending.current) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, []);
 
   if (!me) return null;
   if (doc === 'gone') {
@@ -95,36 +131,37 @@ export default function ChatDocPage() {
   }
   if (!doc) return <div className="cdocp"><p className="cdocp__missing">Loading…</p></div>;
 
-  const save = async () => {
-    setBusy(true); setMsg('');
-    try {
-      await saveChatDoc(doc.id, {
-        title: title.trim() || doc.title,
-        ...(doc.kind === 'doc' ? { body } : {}),
-        ...(doc.kind === 'sheet' ? { data: { ...(doc.data ?? {}), cells } } : {}),
-        ...(doc.kind === 'slides' ? { data: { ...(doc.data ?? {}), slides } } : {}),
-      });
-      setDirty(false); setMsg('Saved ✓');
-      const nextData = doc.kind === 'sheet' ? { ...(doc.data ?? {}), cells } : doc.kind === 'slides' ? { ...(doc.data ?? {}), slides } : doc.data;
-      setDoc({ ...doc, title: title.trim() || doc.title, body, data: nextData, updated_by: me, updated_at: new Date().toISOString() });
-    } catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t save.'); }
-    setBusy(false);
+  const saveWith = (patch: Patch) => queue(patch);
+  const dataNow = (over: Partial<NonNullable<ChatDocRow['data']>>) => ({ ...(doc.data ?? {}), ...over });
+  const onTitle = (v: string) => {
+    setTitle(v);
+    if (v.trim()) queue({ title: v.trim() });
   };
+  const onDoc = (h: string, text: string) => { setHtml(h); setBody(text); saveWith({ body: text, data: dataNow({ html: h }) }); };
+  const onSheet = (t: SheetTab[]) => { setTabs(t); saveWith({ data: dataNow({ sheets: t, cells: t[0]?.cells ?? [['']] }) }); };
+  const onSlides = (sl: Slide[], th: string) => { setSlides(sl); setTheme(th); saveWith({ data: dataNow({ slides: sl, theme: th }) }); };
 
   const flipAi = async (on: boolean) => {
     setMsg('');
-    try {
-      await setChatDocAi(doc.id, on);
-      setDoc({ ...doc, ai_enabled: on });
-    } catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t save.'); }
+    try { await setChatDocAi(doc.id, on); setDoc({ ...doc, ai_enabled: on }); }
+    catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t save.'); }
+  };
+  const makeCopy = async () => {
+    setFileMenu(false);
+    await flush();
+    if (doc.kind === 'poll') return;
+    const data = doc.kind === 'doc' ? dataNow({ html }) : doc.kind === 'sheet' ? dataNow({ sheets: tabs, cells: tabs[0]?.cells }) : dataNow({ slides, theme });
+    const row = await createPersonalDoc(doc.kind, `Copy of ${title}`.slice(0, 120), { body: doc.kind === 'doc' ? body : null, data });
+    navigate(`/docs/${row.id}`);
   };
 
-  const editedBy = doc.updated_by ? (names[doc.updated_by] ?? 'a member') : null;
+  const editedBy = doc.updated_by ? (names[doc.updated_by] ?? (doc.updated_by === me ? 'you' : 'a member')) : null;
   const when = new Date(doc.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const statusWord = status === 'saving' ? 'Saving…' : status === 'dirty' ? 'Unsaved changes…' : status === 'error' ? 'Couldn’t save' : 'All changes saved';
 
   return (
-    <div className="cdocp">
-      <PageHead onBack={() => navigate(doc.chat_id ? `/chat/${doc.chat_id}` : '/drive')} />
+    <div className={'cdocp' + (doc.kind !== 'poll' ? ' cdocp--office' : '')}>
+      <PageHead onBack={() => { void flush(); navigate(doc.chat_id ? `/chat/${doc.chat_id}` : '/drive'); }} />
       <div className="cdocp__head">
         <span className="cdocp__kind"><Icon name={DOC_KIND_ICON[doc.kind]} size={14} /> {DOC_KIND_LABEL[doc.kind]}</span>
         {doc.chat_id && !doc.ai_enabled && <DocAiMark />}
@@ -145,92 +182,36 @@ export default function ChatDocPage() {
         </>
       ) : (
         <>
-          <input
-            className="cdocp__title" value={title} maxLength={120}
-            onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
-            aria-label="Title"
-          />
-          {doc.kind === 'doc' && (
-            <textarea
-              className="cdocp__body" value={body}
-              placeholder={doc.chat_id ? "Write here — everyone in the room can read and edit this." : "Write here — this lives in your Drive, yours alone."}
-              onChange={(e) => { setBody(e.target.value); setDirty(true); }}
+          <div className="cdocp__titlerow">
+            <input
+              className="cdocp__title" value={title} maxLength={120}
+              onChange={(e) => onTitle(e.target.value)}
+              onBlur={() => { if (!title.trim()) setTitle(doc.title); }}
+              aria-label="Title"
             />
-          )}
-          {doc.kind === 'sheet' && (
-            <div className="cdocp__sheetwrap">
-              <table className="cdocp__sheet">
-                <tbody>
-                  {cells.map((rowArr, r) => (
-                    <tr key={r}>
-                      {rowArr.map((cell, cIdx) => (
-                        <td key={cIdx}>
-                          <input
-                            value={cell}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setCells((cur) => cur.map((rr, ri) => (ri === r ? rr.map((cc, ci) => (ci === cIdx ? v : cc)) : rr)));
-                              setDirty(true);
-                            }}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="cdocp__sheet-grow">
-                <button onClick={() => { setCells((cur) => [...cur, cur[0].map(() => '')]); setDirty(true); }}>+ Row</button>
-                <button onClick={() => { setCells((cur) => cur.map((r) => [...r, ''])); setDirty(true); }}>+ Column</button>
-              </div>
-            </div>
-          )}
-          {doc.kind === 'slides' && (
-            <div className="cdocp__slides">
-              <button className="btn" onClick={() => setPresenting(0)}><Icon name="slides" size={14} /> Present</button>
-              {slides.map((s, i) => (
-                <div className="cdocp__slide" key={i}>
-                  <div className="cdocp__slide-top">
-                    <span className="cdocp__slide-n">{i + 1}</span>
-                    <button disabled={i === 0} aria-label="Move up" onClick={() => { setSlides((cur) => { const n = [...cur]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; }); setDirty(true); }}>↑</button>
-                    <button disabled={i === slides.length - 1} aria-label="Move down" onClick={() => { setSlides((cur) => { const n = [...cur]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; return n; }); setDirty(true); }}>↓</button>
-                    {slides.length > 1 && <button aria-label="Remove slide" onClick={() => { setSlides((cur) => cur.filter((_, j) => j !== i)); setDirty(true); }}>×</button>}
-                  </div>
-                  <input className="cdocp__slide-title" placeholder="Slide title" value={s.title}
-                    onChange={(e) => { const v = e.target.value; setSlides((cur) => cur.map((x, j) => (j === i ? { ...x, title: v } : x))); setDirty(true); }} />
-                  <textarea className="cdocp__slide-body" placeholder="One point per line" value={s.body}
-                    onChange={(e) => { const v = e.target.value; setSlides((cur) => cur.map((x, j) => (j === i ? { ...x, body: v } : x))); setDirty(true); }} />
+            <div className="cdocp__file">
+              <button className="cdocp__filebtn" onClick={() => setFileMenu((v) => !v)} aria-expanded={fileMenu}>File ▾</button>
+              {fileMenu && (
+                <div className="sheet__menu cdocp__filemenu" onMouseLeave={() => setFileMenu(false)}>
+                  <button onClick={() => void makeCopy()}>Make a copy</button>
+                  {!doc.chat_id && <button onClick={() => { setFileMenu(false); openPicker(doc.id, 'doc'); }}>Add to a folder…</button>}
+                  <button onClick={() => { setFileMenu(false); window.print(); }}>Print / save as PDF</button>
+                  <button className="is-danger" onClick={() => { setFileMenu(false); setConfirmDel(true); }}>{doc.chat_id ? 'Delete…' : 'Move to trash…'}</button>
                 </div>
-              ))}
-              <div className="cdocp__sheet-grow">
-                <button onClick={() => { setSlides((cur) => [...cur, { title: '', body: '' }]); setDirty(true); }}>+ Slide</button>
-              </div>
+              )}
             </div>
-          )}
-          {presenting != null && slides[presenting] && (
-            <div className="cdocp__present" role="dialog" aria-label="Presentation"
-              onClick={() => setPresenting((i) => (i == null ? i : Math.min(i + 1, slides.length - 1)))}>
-              <button className="cdocp__present-x" aria-label="Stop presenting" onClick={(e) => { e.stopPropagation(); setPresenting(null); }}><Icon name="close" size={18} /></button>
-              <div className="cdocp__present-card">
-                <h1>{slides[presenting].title || title}</h1>
-                {slides[presenting].body.trim() && (
-                  <ul>{slides[presenting].body.split('\n').filter((l) => l.trim()).map((l, k) => <li key={k}>{l.replace(/^[-•*]\s*/, '')}</li>)}</ul>
-                )}
-              </div>
-              <div className="cdocp__present-nav" onClick={(e) => e.stopPropagation()}>
-                <button disabled={presenting === 0} onClick={() => setPresenting(presenting - 1)} aria-label="Previous"><Icon name="chevron-left" size={18} /></button>
-                <span>{presenting + 1} / {slides.length}</span>
-                <button disabled={presenting === slides.length - 1} onClick={() => setPresenting(presenting + 1)} aria-label="Next"><Icon name="chevron-right" size={18} /></button>
-              </div>
-            </div>
-          )}
-          <div className="cdocp__foot">
-            <button className="btn btn-primary" disabled={busy || !dirty} onClick={() => void save()}>
-              {busy ? 'Saving…' : 'Save'}
-            </button>
-            {msg && <span className="cdocp__msg">{msg}</span>}
-            {editedBy && !dirty && <span className="cdocp__edited">Edited by {editedBy} · {when}</span>}
           </div>
+          <div className="cdocp__status" aria-live="polite">
+            <span className={'cdocp__saved is-' + status}>{statusWord}</span>
+            {msg && <span className="cdocp__msg">{msg}</span>}
+            {editedBy && status === 'saved' && <span className="cdocp__edited">· Last edit by {editedBy} · {when}</span>}
+          </div>
+          {doc.kind === 'doc' && (
+            <DocEditor html={html} title={title} onChange={onDoc}
+              placeholder={doc.chat_id ? 'Write here — everyone in the room can read and edit this.' : 'Write here — this lives in your Drive, yours alone.'} />
+          )}
+          {doc.kind === 'sheet' && <SheetEditor tabs={tabs} onChange={onSheet} title={title} />}
+          {doc.kind === 'slides' && <SlidesEditor slides={slides} theme={theme} onChange={onSlides} title={title} />}
         </>
       )}
       <div className="cdocp__settings">
@@ -246,17 +227,18 @@ export default function ChatDocPage() {
             : 'Private to you. Drive AI is off, so no assistant reads it.'}</span>
         )}
         {confirmDel ? (
-          <button className="cdocp__del is-sure" onClick={async () => {
+          <button className="cdocp__del is-sure" onBlur={() => setConfirmDel(false)} autoFocus onClick={async () => {
             try {
+              pending.current = null;
               await (doc.chat_id ? deleteChatDoc(doc.id) : trashDoc(doc.id));
               navigate(doc.chat_id ? `/chat/${doc.chat_id}/drive` : '/drive');
             }
             catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t work.'); setConfirmDel(false); }
           }}>
-            {doc.chat_id ? 'Delete it for the whole room?' : 'Delete it for good?'}
+            {doc.chat_id ? 'Delete it for the whole room?' : 'Move it to the trash?'}
           </button>
         ) : (
-          <button className="cdocp__del" onClick={() => setConfirmDel(true)}>Delete</button>
+          <button className="cdocp__del" onClick={() => setConfirmDel(true)}>{doc.chat_id ? 'Delete' : 'Move to trash'}</button>
         )}
       </div>
     </div>

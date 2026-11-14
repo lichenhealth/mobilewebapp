@@ -255,3 +255,4 @@
 .drive__lensrow { display: flex; align-items: center; gap: 8px; padding-right: var(--s-5); }
 .drive__lensrow .filter-row { flex: 1; min-width: 0; }
 .drive__trashdoor { margin: var(--s-6) 0 0; text-align: center; font-size: 13px; color: var(--ink-muted); }
+.drive__row-folder { margin-right: 6px; color: var(--peach-deep); }

@@ -486,3 +486,16 @@
   .colp__sessrow .colp__sessdur { grid-column: 1; }
   .colp__sessrow .colp__sessx { justify-self: end; }
 }
+
+/* Files & docs inside a folder (founder 2026-11-14). */
+.colp__files { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.colp__files-h { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); font-weight: 500; margin: 0 0 2px; }
+.colp__file { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: 12px; cursor: pointer; }
+.colp__file:hover { border-color: var(--peach); }
+.colp__file.is-locked { cursor: default; opacity: .7; }
+.colp__file-icon { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--bone); color: var(--peach-deep); flex-shrink: 0; }
+.colp__file-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.colp__file-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.colp__file-meta { font-size: 12px; color: var(--ink-muted); }
+.colp__file-x { border: 0; background: none; color: var(--ink-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.colp__file-x:hover { color: var(--peach-deep); }
