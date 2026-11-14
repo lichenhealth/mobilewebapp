@@ -100,7 +100,7 @@ export default function DocRefCard({ docId, me, names }: { docId: string; me: st
         <PollBody doc={doc} me={me} names={names} />
       ) : (
         <button className="cdoc__open" onClick={() => navigate(`/docs/${doc.id}`)}>
-          Open {doc.kind === 'sheet' ? 'the spreadsheet' : 'the doc'} ›
+          Open {doc.kind === 'sheet' ? 'the spreadsheet' : doc.kind === 'slides' ? 'the presentation' : 'the doc'} ›
         </button>
       )}
     </div>

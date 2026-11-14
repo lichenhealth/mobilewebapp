@@ -59,6 +59,8 @@ export type IconName =
   | 'newsfeed'
   | 'more-horizontal'
   | 'grip'
+  | 'sheet'
+  | 'slides'
   | 'palette'
   | 'paperclip'
   | 'phone'
@@ -381,6 +383,18 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0.75 0 24 24',
     strokeWidth: 1.6,
     content: <><path d="M3 6h12M3 12h9M3 18h12" strokeLinecap="round"/><path d="M20 4v16M20 4l-2.5 3M20 4l2.5 3M20 20l-2.5-3M20 20l2.5-3" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  // A spreadsheet: a ruled grid (2026-11-14 — the grip dots stood in before).
+  'sheet': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 4.5v15" strokeLinecap="round"/></>,
+  },
+  // A presentation: a screen on a stand (2026-11-14, Drive's new Presentation).
+  'slides': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><rect x="3.5" y="4" width="17" height="11.5" rx="1.5"/><path d="M12 15.5V20M8.5 20h7M7.5 8.5h6M7.5 11.5h9" strokeLinecap="round"/></>,
   },
   // Drag handle: two columns of dots — grab a row and pull it where it goes.
   'grip': {
