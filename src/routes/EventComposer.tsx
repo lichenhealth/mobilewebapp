@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase';
 import { colorFor, monogramFor } from '../lib/chatApi';
 import { todayISO, formatDateShort, addDays } from '../lib/conciergeApi';
 import { Recurrence, recurrenceLabel, occursOn } from '../lib/recurrence';
-import { createEvent, updateEvent, loadEvent, minToLabel, freeBusy, FreeBusyRow, sendCalendarInvites, updateCalendarInvites, loadCalendarSends, setEventLinkAccess, type CalendarSend } from '../lib/calendarApi';
+import { createEvent, updateEvent, loadEvent, listCalendarDrafts, minToLabel, freeBusy, FreeBusyRow, sendCalendarInvites, updateCalendarInvites, loadCalendarSends, setEventLinkAccess, type CalendarSend } from '../lib/calendarApi';
 import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { LinkifiedText } from '../components/CarePostCard';
@@ -26,6 +26,10 @@ import './Calendar.css';
 
 interface SpaceOpt { id: string; name: string }
 interface MemberOpt { id: string; full_name: string | null }
+
+type DraftState = {
+  invitees?: MemberOpt[]; offGuests?: ListEntry[]; sendCal?: boolean; linkOn?: boolean; linkTier?: LinkTier;
+};
 
 /** Compose a calendar event: title, which calendar, when (date/times/recurrence),
  *  invitees, location + notes. With an :eventId param it edits in place. */
@@ -101,6 +105,23 @@ export default function EventComposer() {
   const [shareLevel, setShareLevel] = useState<'' | 'busy' | 'hidden'>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // ── CALENDAR-EVENT DRAFTS (founder 2026-11-14: "when i click to another tab
+  // and go back to the cal invite compose, the changes seem to be lost… i want
+  // there to be draft cal events somewhere if you leave, navigate out or click
+  // out of a cal compose. if you click out, it should ask you to save draft or
+  // discard"). A new event autosaves as an events row with is_draft=true —
+  // it shows DASHED on the calendar ("Draft · …") and re-opens here. People
+  // and invitations wait in draft_state, unsent, until Save publishes it.
+  const draftRef = useRef<string | null>(null);
+  const [loadedDraft, setLoadedDraft] = useState(false);
+  const liveId = eventId && !loadedDraft ? eventId : null;
+  const savingRef = useRef(false);
+  const loadedOnce = useRef(!eventId);
+  const lastSavedSig = useRef<string | null>(null);
+  const [draftNote, setDraftNote] = useState('');
+  const [myDrafts, setMyDrafts] = useState<{ id: string; title: string; start_date: string }[]>([]);
+  useEffect(() => { if (me && !eventId) void listCalendarDrafts(me).then(setMyDrafts); }, [me, eventId]);
 
   const anchor = range.start ?? todayISO();
 
@@ -329,6 +350,19 @@ export default function EventComposer() {
       setDescription(ev.description);
       setShareLevel(ev.share_level ?? '');
       setInvitees((ev.attendees ?? []).map((a) => ({ id: a.profile_id, full_name: a.profile?.full_name ?? null })));
+      if (ev.is_draft && !ev.draft_id) {
+        // A CALENDAR DRAFT: its unsent people + choices wait in draft_state.
+        const ds = (ev.draft_state ?? {}) as DraftState;
+        setInvitees(ds.invitees ?? []);
+        setOffGuests(ds.offGuests ?? []);
+        setSendCal(!!ds.sendCal);
+        setLinkOn(!!ds.linkOn);
+        if (ds.linkTier) setLinkTier(ds.linkTier);
+        draftRef.current = ev.id;
+        setLoadedDraft(true);
+      }
+      lastSavedSig.current = null;
+      loadedOnce.current = true;
     })();
   }, [eventId]);
 
@@ -457,6 +491,24 @@ export default function EventComposer() {
     for (const sid of gl.space_ids ?? []) void expandSpace(sid);
   }
 
+  // A list is ON when everyone it names is already on this invite.
+  const listOn = (gl: GuestList) => {
+    const members = gl.entries.filter((e) => e.kind === 'member' && e.id !== me) as Extract<ListEntry, { kind: 'member' }>[];
+    const off = gl.entries.filter((e) => e.kind !== 'member');
+    if (!members.length && !off.length) return false;
+    return members.every((m) => invitees.some((i) => i.id === m.id))
+      && off.every((e) => offGuests.some((c) => c.kind === e.kind && 'value' in c && 'value' in e && c.value === e.value));
+  };
+  function removeGuestList(gl: GuestList) {
+    const ids = new Set(gl.entries.filter((e) => e.kind === 'member').map((e) => (e as { id: string }).id));
+    const vals = new Set(gl.entries.filter((e) => e.kind !== 'member').map((e) => (e as { value: string }).value));
+    setInvitees((cur) => cur.filter((m) => !ids.has(m.id)));
+    setOffGuests((cur) => cur.filter((c) => !('value' in c && vals.has(c.value))));
+  }
+  // GUEST LISTS AS A CHECKBOX DROP-DOWN (founder 2026-11-14: "lets have your
+  // guest lists as a drop down with check boxes once you have more than one").
+  const [glOpen, setGlOpen] = useState(false);
+
   function makeFormal(extra?: { kind: 'email'; value: string; name: string } | { kind: 'phone'; value: string; sms: string; name: string }) {
     const q = new URLSearchParams({ area: 'events' });
     if (title.trim()) q.set('title', title.trim());
@@ -499,13 +551,22 @@ export default function EventComposer() {
         inviteeIds: invitees.map((i) => i.id),
         shareLevel: calendar === 'me' ? (shareLevel || null) : null,
       };
-      let id = eventId ?? '';
-      if (eventId) await updateEvent(me, eventId, input);
-      else id = await createEvent(me, input);
+      savingRef.current = true;
+      let id = liveId ?? '';
+      const publishing = kind === 'event' && !liveId && !!draftRef.current;
+      if (liveId) await updateEvent(me, liveId, input);
+      else if (publishing) {
+        // The draft becomes the real event — only NOW are people seated and belled.
+        id = draftRef.current!;
+        const { error: pErr } = await supabase.from('events').update({ is_draft: false, draft_state: null }).eq('id', id);
+        if (pErr) throw pErr;
+        await updateEvent(me, id, input);
+      } else id = await createEvent(me, input);
+      draftRef.current = null;
       let note = '';
       if (kind === 'event' && sendCal) {
         try {
-          if (eventId && calSends.length) await updateCalendarInvites(eventId);
+          if (liveId && calSends.length) await updateCalendarInvites(liveId);
           const already = new Set(calSends.map((c) => c.profile_id ?? c.email));
           const members = invitees.map((i) => i.id).filter((x) => !already.has(x));
           const emails = offEmails.map((g) => g.value.toLowerCase()).filter((x) => !already.has(x));
@@ -515,7 +576,7 @@ export default function EventComposer() {
           }
         } catch (e) { note = `Saved — but the calendar invitations didn’t send: ${(e as Error).message}`; }
       }
-      if (!eventId && linkOn && id) {
+      if (!liveId && linkOn && id) {
         try { await setEventLinkAccess(id, linkTier, []); } catch { /* the panel can set it */ }
         setSaving(false);
         navigate(`/calendar/edit/${id}?link=1`, { replace: true });
@@ -528,7 +589,117 @@ export default function EventComposer() {
       const msg = (e as { message?: string } | null)?.message;
       setError(msg || 'Could not save.');
       setSaving(false);
+      savingRef.current = false;
     }
+  }
+
+  // ── Autosave the draft (new events and calendar drafts; a LIVE event's
+  // edits stay explicit — autosaving those would re-time a real event).
+  const draftable = kind === 'event' && !liveId && !reminderId;
+  const draftRow = () => ({
+    creator_id: me,
+    owner_profile_id: calendar === 'me' ? me : null,
+    owner_space_id: calendar === 'me' ? null : calendar,
+    title: title.trim(),
+    description: description.trim(),
+    location: location.trim(),
+    lat: locGeo?.lat ?? null, lng: locGeo?.lng ?? null,
+    start_date: range.start,
+    end_date: recurrence ? range.start : (range.end ?? range.start),
+    all_day: allDay,
+    start_min: allDay ? null : startMin,
+    end_min: allDay ? null : endMin,
+    recurrence: recurrence ?? null,
+    share_level: calendar === 'me' ? (shareLevel || null) : null,
+    is_draft: true,
+    draft_state: { invitees, offGuests, sendCal, linkOn, linkTier } as DraftState,
+  });
+  const draftSig = draftable && me && title.trim() && range.start ? JSON.stringify(draftRow()) : null;
+  const sigRef = useRef<string | null>(null);
+  sigRef.current = draftSig;
+  const writingRef = useRef<Promise<void> | null>(null);
+  async function writeDraft(): Promise<void> {
+    if (savingRef.current || !loadedOnce.current) return;
+    const sig = sigRef.current;
+    if (!sig || sig === lastSavedSig.current) return;
+    if (writingRef.current) { await writingRef.current; return writeDraft(); }
+    const row = JSON.parse(sig) as Record<string, unknown>;
+    const run = (async () => {
+      if (draftRef.current) {
+        const { error: e } = await supabase.from('events').update(row).eq('id', draftRef.current).eq('is_draft', true);
+        if (e) { setDraftNote('Couldn’t save the draft just now.'); return; }
+      } else {
+        const { data, error: e } = await supabase.from('events').insert(row).select('id').single();
+        if (e || !data) { setDraftNote('Couldn’t save the draft just now.'); return; }
+        draftRef.current = (data as { id: string }).id;
+        // The address now names the draft, so Back / a reload re-opens it —
+        // without remounting the screen mid-typing.
+        try { window.history.replaceState(window.history.state, '', `/calendar/edit/${draftRef.current}`); } catch { /* fine */ }
+      }
+      lastSavedSig.current = sig;
+      setDraftNote('Draft saved ✓ — it waits on your calendar until you save it');
+    })();
+    writingRef.current = run;
+    try { await run; } finally { writingRef.current = null; }
+  }
+  useEffect(() => {
+    if (!draftSig || draftSig === lastSavedSig.current) return;
+    const t = window.setTimeout(() => void writeDraft(), 1200);
+    return () => window.clearTimeout(t);
+  }, [draftSig]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Leaving the tab / app flushes at once (the debounce must never cost words).
+  useEffect(() => {
+    const flush = () => { if (document.visibilityState === 'hidden') void writeDraft(); };
+    const hide = () => void writeDraft();
+    document.addEventListener('visibilitychange', flush);
+    window.addEventListener('pagehide', hide);
+    return () => { document.removeEventListener('visibilitychange', flush); window.removeEventListener('pagehide', hide); void writeDraft(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── "Save draft or discard?" when you click OUT. The app router can't block,
+  // so a capture-phase listener catches taps on the app's own chrome (bottom
+  // nav, side menu, top bar) while there's unpublished work, asks, then
+  // replays the tap.
+  const [leaveAsk, setLeaveAsk] = useState<HTMLElement | null>(null);
+  const bypassRef = useRef(false);
+  const hasWork = draftable && !!title.trim();
+  const hasWorkRef = useRef(false);
+  hasWorkRef.current = hasWork && !savingRef.current;
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (bypassRef.current || !hasWorkRef.current) return;
+      const t = e.target as HTMLElement | null;
+      const el = t?.closest('a, button') as HTMLElement | null;
+      if (!el || !el.closest('.bottom-nav, .side-menu, .top-bar')) return;
+      e.preventDefault(); e.stopPropagation();
+      setLeaveAsk(el);
+    };
+    const onUnload = (e: BeforeUnloadEvent) => {
+      if (hasWorkRef.current && sigRef.current !== lastSavedSig.current) { e.preventDefault(); e.returnValue = ''; }
+    };
+    document.addEventListener('click', onClick, true);
+    window.addEventListener('beforeunload', onUnload);
+    return () => { document.removeEventListener('click', onClick, true); window.removeEventListener('beforeunload', onUnload); };
+  }, []);
+  async function leave(choice: 'keep' | 'discard') {
+    const el = leaveAsk;
+    setLeaveAsk(null);
+    if (choice === 'keep') await writeDraft();
+    else {
+      savingRef.current = true;   // stop any further autosave
+      if (draftRef.current) await supabase.from('events').delete().eq('id', draftRef.current).eq('is_draft', true);
+      draftRef.current = null;
+    }
+    bypassRef.current = true;
+    hasWorkRef.current = false;
+    el?.click();
+    window.setTimeout(() => { bypassRef.current = false; }, 400);
+  }
+  async function discardDraft() {
+    savingRef.current = true;
+    if (draftRef.current) await supabase.from('events').delete().eq('id', draftRef.current).eq('is_draft', true);
+    draftRef.current = null;
+    back();
   }
 
   // Time + repeat controls: rendered in-flow on mobile, in the right column on
@@ -858,13 +1029,42 @@ export default function EventComposer() {
   return (
     <div className="cedit">
       <header className="cedit__head cedit__head--noback">
-        <h1 className="cedit__title">{eventId ? 'Edit event' : 'New event'}</h1>
+        <h1 className="cedit__title">{liveId ? 'Edit event' : loadedDraft ? 'Draft event' : 'New event'}</h1>
         <button className="btn btn-primary cedit__save" onClick={save} disabled={saving}>
           {saving ? 'Saving…' : 'Save'}
         </button>
       </header>
 
       {error && <p className="cedit__error">{error}</p>}
+      {draftable && (draftNote || draftRef.current) && (
+        <p className="calp__draftnote">
+          {draftNote || 'Draft — it waits on your calendar until you save it'}
+          {draftRef.current && <> · <button type="button" className="calp__offlink" onClick={() => void discardDraft()}>Discard draft</button></>}
+        </p>
+      )}
+      {!eventId && myDrafts.length > 0 && !title.trim() && (
+        <div className="calp__drafts">
+          <span className="calp__match-soft">Pick up a draft:</span>
+          {myDrafts.map((d) => (
+            <button key={d.id} className="calp__glist" onClick={() => navigate(`/calendar/edit/${d.id}`)}>
+              {d.title || 'Untitled'} <span className="calp__match-soft">· {formatDateShort(d.start_date)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {leaveAsk && (
+        <div className="calp__leave-veil" role="dialog" aria-modal="true" aria-label="Save this draft?">
+          <div className="calp__leave">
+            <p className="calp__leave-title">Save “{title.trim()}” as a draft?</p>
+            <p className="calp__match-soft">A draft waits on your calendar (dashed) — nobody is invited until you save it for real.</p>
+            <div className="calp__leave-row">
+              <button className="btn btn-primary" onClick={() => void leave('keep')}>Save draft</button>
+              <button className="btn" onClick={() => void leave('discard')}>Discard</button>
+              <button className="btn calp__leave-stay" onClick={() => setLeaveAsk(null)}>Keep editing</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="cedit__cols">
       <div className="cedit__body">
@@ -971,7 +1171,7 @@ export default function EventComposer() {
           {offPhones.length > 0 && (
             <p className="calp__match-soft">
               {offPhones.length === 1 ? 'A phone number' : `${offPhones.length} phone numbers`} can’t receive a calendar invitation.{' '}
-              {kind === 'event' && !eventId
+              {kind === 'event' && !liveId
                 ? <button className="calp__offlink" onClick={() => makeFormal()}>Make it a formal event to text them an invite ›</button>
                 : 'Text them the invite link below instead.'}
             </p>
@@ -981,14 +1181,40 @@ export default function EventComposer() {
             autoCapitalize="none" autoCorrect="off" spellCheck={false}
             value={query} onChange={(e) => setQuery(e.target.value)}
           />
-          {guestLists.length > 0 && !query.trim() && (
+          {guestLists.length === 1 && !query.trim() && (
             <div className="calp__glists">
               <span className="calp__match-soft">Your guest lists:</span>
               {guestLists.map((gl) => (
-                <button key={gl.id} className="calp__glist" onClick={() => addGuestList(gl)}>
-                  <Icon name="user-multiple" size={12} /> {gl.name}
+                <button key={gl.id} className={'calp__glist' + (listOn(gl) ? ' is-on' : '')} aria-pressed={listOn(gl)}
+                  onClick={() => (listOn(gl) ? removeGuestList(gl) : addGuestList(gl))}>
+                  <Icon name="user-multiple" size={12} /> {gl.name}{listOn(gl) ? ' ✓' : ''}
                 </button>
               ))}
+            </div>
+          )}
+          {guestLists.length > 1 && !query.trim() && (
+            <div className="calp__gldrop">
+              <button type="button" className={'calp__gldrop-btn' + (glOpen ? ' is-open' : '')} aria-expanded={glOpen}
+                onClick={() => setGlOpen((o) => !o)}>
+                <Icon name="user-multiple" size={13} />
+                <span>Your guest lists</span>
+                {guestLists.some(listOn) && (
+                  <span className="calp__gldrop-count">{guestLists.filter(listOn).map((g) => g.name).join(', ')}</span>
+                )}
+                <span className="calp__gldrop-caret"><Icon name="chevron-right" size={13} /></span>
+              </button>
+              {glOpen && (
+                <div className="calp__gldrop-menu" role="group" aria-label="Your guest lists">
+                  {guestLists.map((gl) => (
+                    <label key={gl.id} className="calp__gldrop-row">
+                      <input type="checkbox" checked={listOn(gl)}
+                        onChange={(e) => (e.target.checked ? addGuestList(gl) : removeGuestList(gl))} />
+                      <span>{gl.name}</span>
+                      <em>{gl.entries.length + (gl.space_ids?.length ?? 0)}</em>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {circleMatches.map((sp) => (
@@ -1004,7 +1230,7 @@ export default function EventComposer() {
               <span className="calp__match-soft"> — lands in Google, Apple or Outlook</span>
             </button>
           )}
-          {offLichen && kind === 'event' && !eventId && (
+          {offLichen && kind === 'event' && !liveId && (
             <button className="calp__match calp__match--formal"
               onClick={() => { const { label: _l, ...g } = offLichen; void _l; makeFormal(g); }}>
               <Icon name="send" size={14} /> Invite {offLichen.label} from off Lichen
@@ -1072,17 +1298,17 @@ export default function EventComposer() {
           )}
         </div>
 
-        {kind === 'event' && !eventId && (
+        {kind === 'event' && !liveId && (
           <button className="calp__formal" onClick={() => makeFormal()}>
             <span className="calp__formal-title">Make it a formal event ›</span>
             <span className="calp__formal-sub">A pretty invitation, RSVPs, guests on and off Lichen, whole circles and a shareable link — your details come along.</span>
           </button>
         )}
 
-        {kind === 'event' && eventId && me && (
-          <div className="cedit__field"><EventLinkPanel eventId={eventId} me={me} /></div>
+        {kind === 'event' && liveId && me && (
+          <div className="cedit__field"><EventLinkPanel eventId={liveId} me={me} /></div>
         )}
-        {kind === 'event' && !eventId && (
+        {kind === 'event' && !liveId && (
           <div className="cedit__field evlink">
             <label className="calp__sendcal">
               <input type="checkbox" checked={linkOn} onChange={(e) => setLinkOn(e.target.checked)} />
