@@ -4,8 +4,8 @@
  *  ~70 functions most sheets actually use. Pure functions only — the editor
  *  calls computeSheets() on every change and renders the result.
  *
- *  Deliberately not here: array formulas/spill, named ranges, pivot tables,
- *  QUERY, charts. Errors read the Google way (#REF!, #DIV/0!, #NAME?, #VALUE!,
+ *  Deliberately not here: array formulas/spill, named ranges, QUERY
+ *  (charts, rules, filters and pivots live in sheetExtras.ts). Errors read the Google way (#REF!, #DIV/0!, #NAME?, #VALUE!,
  *  #N/A, #CYCLE!). */
 
 export interface CellFmt {
@@ -22,6 +22,10 @@ export interface SheetTab {
   fmt?: Record<string, CellFmt>;
   colW?: number[];
   frozen?: number;
+  charts?: import('./sheetExtras').SheetChart[];
+  cond?: import('./sheetExtras').CondRule[];
+  filter?: import('./sheetExtras').SheetFilter;
+  pivot?: import('./sheetExtras').PivotSpec;
 }
 
 export class FErr { constructor(public code: string) {} toString() { return this.code; } }
@@ -378,7 +382,7 @@ export function computeSheets(tabs: SheetTab[]): Computed[] {
         return hits.length ? hits.reduce((a, b) => a + b, 0) / hits.length : ERR('#DIV/0!');
       }
       case 'COUNTIF': { const { cells, m } = ifs(0, 1); return cells.filter(m).length; }
-      case 'SUMIFS': case 'COUNTIFS': case 'AVERAGEIFS': {
+      case 'SUMIFS': case 'COUNTIFS': case 'AVERAGEIFS': case 'MAXIFS': case 'MINIFS': {
         const start = name === 'COUNTIFS' ? 0 : 1;
         const base = name === 'COUNTIFS' ? flat(A(0) as Val) : flat(A(0) as Val);
         const ok = base.map(() => true);
@@ -389,6 +393,8 @@ export function computeSheets(tabs: SheetTab[]): Computed[] {
         if (name === 'COUNTIFS') return ok.filter(Boolean).length;
         const hits = base.filter((_, j) => ok[j]).map((v) => num(v)).filter((x): x is number => typeof x === 'number');
         if (name === 'SUMIFS') return hits.reduce((a, b) => a + b, 0);
+        if (name === 'MAXIFS') return hits.length ? Math.max(...hits) : 0;
+        if (name === 'MINIFS') return hits.length ? Math.min(...hits) : 0;
         return hits.length ? hits.reduce((a, b) => a + b, 0) / hits.length : ERR('#DIV/0!');
       }
       case 'IF': { const c = bool(S(0)); if (c instanceof FErr) return c; return c ? (args[1] ? A(1) : true) : (args[2] ? A(2) : false); }
@@ -518,7 +524,7 @@ export function computeSheets(tabs: SheetTab[]): Computed[] {
 export const FUNCTIONS: { name: string; hint: string }[] = [
   ['SUM', 'SUM(range) — adds numbers'], ['AVERAGE', 'AVERAGE(range)'], ['MIN', 'MIN(range)'], ['MAX', 'MAX(range)'],
   ['COUNT', 'COUNT(range) — counts numbers'], ['COUNTA', 'COUNTA(range) — counts non-empty'], ['COUNTBLANK', 'COUNTBLANK(range)'],
-  ['COUNTIF', 'COUNTIF(range, ">5")'], ['COUNTIFS', 'COUNTIFS(range1, crit1, …)'], ['SUMIF', 'SUMIF(range, crit, [sum_range])'],
+  ['COUNTIF', 'COUNTIF(range, ">5")'], ['COUNTIFS', 'COUNTIFS(range1, crit1, …)'], ['MAXIFS', 'MAXIFS(max_range, range1, crit1, …)'], ['MINIFS', 'MINIFS(min_range, range1, crit1, …)'], ['SUMIF', 'SUMIF(range, crit, [sum_range])'],
   ['SUMIFS', 'SUMIFS(sum_range, range1, crit1, …)'], ['AVERAGEIF', 'AVERAGEIF(range, crit, [avg_range])'], ['AVERAGEIFS', 'AVERAGEIFS(avg_range, range1, crit1, …)'],
   ['IF', 'IF(test, if_true, if_false)'], ['IFS', 'IFS(test1, value1, …)'], ['IFERROR', 'IFERROR(value, fallback)'], ['IFNA', 'IFNA(value, fallback)'], ['SWITCH', 'SWITCH(expr, case1, value1, …, [default])'],
   ['AND', 'AND(a, b, …)'], ['OR', 'OR(a, b, …)'], ['NOT', 'NOT(a)'], ['XOR', 'XOR(a, b, …)'],

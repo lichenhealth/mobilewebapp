@@ -3,6 +3,9 @@ import {
   computeSheets, display, isNumeric, colName, a1, shiftFormula, offsetFormula, FUNCTIONS,
   literal, DateVal, type SheetTab, type CellFmt, type Scalar,
 } from '../../lib/formula';
+import { condStyles, hiddenRows, buildPivot, rangeText } from '../../lib/sheetExtras';
+import { ChartsStrip, newChart, RulesPanel, FilterMenu, PivotPanel } from './SheetPanels';
+import { cellMark, firstName, type Anchor, type Goto, type Peer } from './collab';
 import './Office.css';
 
 /** THE SPREADSHEET (founder 2026-11-14: "re-create google spreadsheets").
@@ -20,8 +23,9 @@ const clone = (t: SheetTab[]): SheetTab[] => JSON.parse(JSON.stringify(t));
 const COLORS = ['#1f2a30', '#6b7378', '#b4542d', '#c9733d', '#d9a441', '#4f7a4a', '#3f6f8a', '#7a5a8c', '#ffffff'];
 const FILLS = ['#fff7ed', '#fde8d4', '#f6dfc8', '#eaf2e3', '#e3eef4', '#efe6f3', '#fdf3c8', '#f1efe9', ''];
 
-export default function SheetEditor({ tabs, onChange, title }: {
+export default function SheetEditor({ tabs, onChange, title, onAnchor, marks, peers, goto }: {
   tabs: SheetTab[]; onChange: (t: SheetTab[]) => void; title: string;
+  onAnchor?: (a: Anchor) => void; marks?: Set<string>; peers?: Peer[]; goto?: Goto | null;
 }) {
   const [ti, setTi] = useState(0);
   const tab = tabs[Math.min(ti, tabs.length - 1)];
@@ -33,6 +37,9 @@ export default function SheetEditor({ tabs, onChange, title }: {
   const [renaming, setRenaming] = useState<number | null>(null);
   const [tabMenu, setTabMenu] = useState<number | null>(null);
   const [acIdx, setAcIdx] = useState(0);
+  const [panel, setPanel] = useState<'rules' | 'pivot' | null>(null);
+  const [filterCol, setFilterCol] = useState<number | null>(null);
+  const [filterAt, setFilterAt] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const undo = useRef<SheetTab[][]>([]);
   const redo = useRef<SheetTab[][]>([]);
   const clip = useRef<{ tsv: string; raw: string[][]; fmt: (CellFmt | undefined)[][]; origin: Pos; cut: boolean; ti: number } | null>(null);
@@ -45,6 +52,8 @@ export default function SheetEditor({ tabs, onChange, title }: {
 
   const computed = useMemo(() => computeSheets(tabs), [tabs]);
   const vals = computed[Math.min(ti, tabs.length - 1)]?.values ?? [];
+  const cstyles = useMemo(() => condStyles(tab.cond, vals), [tab.cond, vals]);
+  const hidden = useMemo(() => hiddenRows(tab.filter, vals), [tab.filter, vals]);
   const width = Math.max(0, ...tab.cells.map((r) => r.length));
   const nCols = Math.min(52, Math.max(width + 3, 12));
   const nRows = Math.max(tab.cells.length + 15, 40) + extraRows;
@@ -54,6 +63,22 @@ export default function SheetEditor({ tabs, onChange, title }: {
   const inSel = (r: number, c: number) => r >= lo.r && r <= hi.r && c >= lo.c && c <= hi.c;
   const raw = (r: number, c: number) => tab.cells[r]?.[c] ?? '';
   const fmtOf = (r: number, c: number) => tab.fmt?.[key(r, c)];
+
+  // ── collaboration: report where I am, jump where a comment points ──
+  useEffect(() => { onAnchor?.({ kind: 'cell', tab: tab.name, r: sel.r, c: sel.c }); }, [sel.r, sel.c, tab.name, onAnchor]);
+  useEffect(() => {
+    const a = goto?.anchor; if (!a || a.kind !== 'cell') return;
+    const idx = tabs.findIndex((t) => t.name === a.tab);
+    if (idx >= 0 && idx !== ti) setTi(idx);
+    setEdit(null);
+    requestAnimationFrame(() => go(a.r, a.c));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goto?.n]);
+  const peerAt = useMemo(() => {
+    const m = new Map<string, Peer>();
+    for (const p of peers ?? []) if (p.anchor?.kind === 'cell' && p.anchor.tab === tab.name) m.set(key(p.anchor.r, p.anchor.c), p);
+    return m;
+  }, [peers, tab.name]);
 
   // ── mutations (every one is an undo step) ──
   const commit = useCallback((next: SheetTab[]) => {
@@ -121,6 +146,19 @@ export default function SheetEditor({ tabs, onChange, title }: {
     for (const t of all) for (const row of t.cells) for (let c = 0; c < row.length; c++) {
       if (row[c].startsWith('=')) row[c] = shiftFormula(row[c], t.name, name, axis, at, delta);
     }
+    // Charts, rules and the filter row ride the same shift as the formulas.
+    const t = all[ti];
+    const sh = (r: string) => shiftFormula('=' + r, name, name, axis, at, delta).slice(1);
+    if (t.charts) t.charts = t.charts.map((ch) => ({ ...ch, range: sh(ch.range) }));
+    if (t.cond) t.cond = t.cond.map((cr) => ({ ...cr, range: sh(cr.range) })).filter((cr) => !cr.range.includes('#REF'));
+    if (t.filter && axis === 'row' && t.filter.row >= at) {
+      if (delta < 0 && t.filter.row < at - delta) delete t.filter; else t.filter.row += delta;
+    }
+    if (t.filter && axis === 'col') {
+      const h: Record<string, string[]> = {};
+      for (const [c, xs] of Object.entries(t.filter.hidden)) { const n = Number(c); if (delta < 0 && n >= at && n < at - delta) continue; h[String(n >= at ? n + delta : n)] = xs; }
+      t.filter.hidden = h;
+    }
   };
   const shiftFmt = (t: SheetTab, axis: 'row' | 'col', at: number, delta: number) => {
     if (!t.fmt) return;
@@ -155,10 +193,10 @@ export default function SheetEditor({ tabs, onChange, title }: {
     if (t.colW) t.colW.splice(lo.c, n);
     shiftFmt(t, 'col', lo.c, -n); shiftAll(all, 'col', lo.c, -n);
   });
-  const sortBy = (dir: 1 | -1) => mutate((t) => {
-    const c = sel.c;
-    const multi = hi.r > lo.r;
-    const start = multi ? lo.r : frozen;
+  const sortBy = (dir: 1 | -1, col?: number, from?: number) => mutate((t) => {
+    const c = col ?? sel.c;
+    const multi = col == null && hi.r > lo.r;
+    const start = from ?? (multi ? lo.r : frozen);
     const end = multi ? hi.r : t.cells.length - 1;
     if (end <= start) return;
     const comp = computed[ti].values;
@@ -327,6 +365,7 @@ export default function SheetEditor({ tabs, onChange, title }: {
     const re = new RegExp(`(^|[^\\w'])('${esc.replace(/'/g, "''")}'|${esc})!`, 'gi');
     const q = /^[A-Za-z_][\w.]*$/.test(nm) ? nm : `'${nm.replace(/'/g, "''")}'`;
     for (const t of next) for (const row of t.cells) row.forEach((v, c) => { if (v.startsWith('=')) row[c] = v.replace(re, (_m, pre) => `${pre}${q}!`); });
+    for (const t of next) if (t.pivot?.from === old) t.pivot = { ...t.pivot, from: nm };
     commit(next);
   };
 
@@ -385,6 +424,39 @@ export default function SheetEditor({ tabs, onChange, title }: {
     const next = blank ? added : [...clone(tabs), ...added];
     commit(next); setTi(blank ? 0 : tabs.length);
   };
+
+  // ── charts / rules / filters / pivots ──
+  const selRange = rangeText({ r0: lo.r, c0: lo.c, r1: hi.r, c1: hi.c });
+  const dataRange = () => {
+    if (multi) return selRange;
+    // One cell picked: the block of data around it, the Sheets way.
+    const w = Math.max(1, ...tab.cells.map((r) => { let n = r.length; while (n && !r[n - 1]) n--; return n; }));
+    return rangeText({ r0: 0, c0: 0, r1: Math.max(0, tab.cells.length - 1), c1: w - 1 });
+  };
+  const insertChart = () => mutate((t) => { t.charts = [...(t.charts ?? []), newChart(dataRange())]; });
+  const toggleFilter = () => {
+    if (tab.filter) { mutate((t) => { delete t.filter; }); setFilterCol(null); return; }
+    mutate((t) => { t.filter = { row: multi ? lo.r : frozen ? frozen - 1 : 0, hidden: {} }; });
+  };
+  const createPivot = (spec: import('../../lib/sheetExtras').PivotSpec) => {
+    const names = new Set(tabs.map((t) => t.name.toLowerCase()));
+    let n = 1; while (names.has(`pivot table ${n}`)) n++;
+    const cells = buildPivot(tab, spec, vals);
+    const fmt: Record<string, CellFmt> = { '0,0': { b: true }, '0,1': { b: true }, [`${cells.length - 1},0`]: { b: true }, [`${cells.length - 1},1`]: { b: true } };
+    commit([...clone(tabs), { name: `Pivot table ${n}`, cells, fmt, frozen: 1, colW: [180, 160], pivot: spec }]);
+    setTi(tabs.length); setPanel(null);
+  };
+  const refreshPivot = () => {
+    const spec = tab.pivot; if (!spec) return;
+    const si = tabs.findIndex((t) => t.name === spec.from);
+    if (si < 0) return;
+    const cells = buildPivot(tabs[si], spec, computed[si].values);
+    mutate((t) => {
+      t.cells = cells;
+      t.fmt = { '0,0': { b: true }, '0,1': { b: true }, [`${cells.length - 1},0`]: { b: true }, [`${cells.length - 1},1`]: { b: true } };
+    });
+  };
+  const pivotSourceMissing = !!tab.pivot && !tabs.some((t) => t.name === tab.pivot!.from);
 
   // ── readouts ──
   const nums: number[] = [];
@@ -451,6 +523,7 @@ export default function SheetEditor({ tabs, onChange, title }: {
         }}>Σ</button>
         <button title="Sort A → Z by this column" onClick={() => sortBy(1)}>A→Z</button>
         <button title="Sort Z → A by this column" onClick={() => sortBy(-1)}>Z→A</button>
+        <button title={tab.filter ? 'Turn the filter off (shows every row)' : 'Filter: a ▾ on each header to hide values'} className={tab.filter ? 'is-on' : ''} onClick={toggleFilter}>⏷ Filter</button>
         <button title={frozen ? 'Unfreeze the header row' : 'Freeze the top row'} className={frozen ? 'is-on' : ''} onClick={() => mutate((t) => { t.frozen = t.frozen ? 0 : 1; })}>❄</button>
         <span className="sheet__sep" />
         <button title="Insert a row above" onClick={() => insertRows(lo.r)}>+ Row ↑</button>
@@ -460,11 +533,28 @@ export default function SheetEditor({ tabs, onChange, title }: {
         <button title="Delete the selected rows" onClick={deleteRows}>− Row</button>
         <button title="Delete the selected columns" onClick={deleteCols}>− Col</button>
         <span className="sheet__sep" />
+        <button title="Insert a chart from the selected data" onClick={insertChart}>📊 Chart</button>
+        <button title="Conditional formatting: color cells by their values" className={panel === 'rules' ? 'is-on' : ''} onClick={() => setPanel(panel === 'rules' ? null : 'rules')}>🎨 Rules</button>
+        <button title="Pivot table: group and total on a new tab" className={panel === 'pivot' ? 'is-on' : ''} onClick={() => setPanel(panel === 'pivot' ? null : 'pivot')}>⊞ Pivot</button>
+        <span className="sheet__sep" />
         <button title="Import a .xlsx or .csv file as new tabs" onClick={() => fileRef.current?.click()}>Import</button>
         <button title="Download this tab as CSV" onClick={exportCsv}>CSV ↓</button>
         <button title="Download the whole spreadsheet as Excel" onClick={() => void exportXlsx()}>.xlsx ↓</button>
         <input ref={fileRef} type="file" hidden accept=".xlsx,.xls,.csv,.ods" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importFile(f); }} />
       </div>
+
+      {panel === 'rules' && (
+        <RulesPanel rules={tab.cond ?? []} range={dataRange()} onClose={() => setPanel(null)}
+          onChange={(rules) => mutate((t) => { t.cond = rules.length ? rules : undefined; })} />
+      )}
+      {panel === 'pivot' && <PivotPanel tab={tab} vals={vals} range={dataRange()} onCreate={createPivot} onClose={() => setPanel(null)} />}
+      {tab.pivot && (
+        <div className="sheet__pivotnote">
+          {pivotSourceMissing
+            ? <>This pivot table's source tab "{tab.pivot.from}" is gone — its totals can't refresh.</>
+            : <>Pivot table of <b>{tab.pivot.from}</b> {tab.pivot.src}. Totals stay live; new group values appear when you <button onClick={refreshPivot}>Refresh</button></>}
+        </div>
+      )}
 
       <div className="sheet__fx">
         <span className="sheet__namebox">{nameBox}</span>
@@ -515,23 +605,30 @@ export default function SheetEditor({ tabs, onChange, title }: {
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: nRows }, (_, r) => (
+            {Array.from({ length: nRows }, (_, r) => hidden.has(r) ? null : (
               <tr key={r} className={r < frozen ? 'is-frozen' : ''} style={r < frozen ? { top: 26 + r * 27 } : undefined}>
                 <th className={r >= lo.r && r <= hi.r ? 'is-sel' : ''}
                   onMouseDown={(e) => { if (e.shiftKey) setSel({ r, c: nCols - 1 }); else { setAnchor({ r, c: 0 }); setSel({ r, c: nCols - 1 }); } }}>{r + 1}</th>
                 {Array.from({ length: nCols }, (_, c) => {
                   const f = fmtOf(r, c);
+                  const cs = cstyles.get(key(r, c));
+                  const isFilterHead = tab.filter?.row === r && c < Math.max(width, 1);
+                  const filtered = !!tab.filter?.hidden[String(c)]?.length;
+                  const peer = peerAt.get(key(r, c));
+                  const noted = marks?.has(cellMark(tab.name, r, c));
                   const v = vals[r]?.[c] ?? null;
                   const active = sel.r === r && sel.c === c;
                   const editing = active && edit && !edit.bar;
                   const align = f?.align ?? (isNumeric(v) && !(raw(r, c) && !raw(r, c).startsWith('=') && typeof literal(raw(r, c)) === 'string') ? 'right' : typeof v === 'boolean' ? 'center' : 'left');
                   return (
                     <td key={c} data-cell={`${r}-${c}`}
-                      className={(inSel(r, c) ? 'is-in ' : '') + (active ? 'is-active ' : '') + (v instanceof Object && 'code' in (v as object) ? 'is-err ' : '') + (f?.wrap ? 'is-wrap' : '')}
+                      className={(inSel(r, c) ? 'is-in ' : '') + (active ? 'is-active ' : '') + (v instanceof Object && 'code' in (v as object) ? 'is-err ' : '') + (f?.wrap ? 'is-wrap ' : '') + (noted ? 'has-note' : '')}
                       style={{
                         textAlign: align, fontWeight: f?.b ? 700 : undefined, fontStyle: f?.i ? 'italic' : undefined,
                         textDecoration: [f?.u ? 'underline' : '', f?.s ? 'line-through' : ''].join(' ').trim() || undefined,
-                        color: f?.color, background: f?.bg || undefined,
+                        color: cs?.color || f?.color, background: cs?.bg || f?.bg || undefined,
+                        ...(cs?.bold ? { fontWeight: 700 } : {}),
+                        ...(peer && !active ? { boxShadow: `inset 0 0 0 2px ${peer.color}` } : {}),
                       }}
                       onMouseDown={(e) => cellDown(e, r, c)}
                       onMouseEnter={() => cellEnter(r, c)}
@@ -544,6 +641,17 @@ export default function SheetEditor({ tabs, onChange, title }: {
                           onBlur={() => setTimeout(() => { if (document.activeElement !== cellInput.current && !document.activeElement?.closest('.sheet__grid')) finish(null); }, 120)}
                           spellCheck={false} autoCorrect="off" autoCapitalize="none" />
                       ) : showText(r, c)}
+                      {peer && <span className="sheet__peertag" style={{ background: peer.color }}>{firstName(peer.name)}</span>}
+                      {isFilterHead && !editing && (
+                        <button className={'sheet__filterbtn' + (filtered ? ' is-on' : '')} aria-label={`Filter ${colName(c)}`}
+                          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); const b = (e.currentTarget as HTMLElement).getBoundingClientRect(); setFilterAt({ x: Math.max(8, Math.min(b.right - 240, window.innerWidth - 248)), y: b.bottom + 4 }); setFilterCol(filterCol === c ? null : c); }}>{filtered ? '⏷' : '▾'}</button>
+                      )}
+                      {isFilterHead && filterCol === c && (
+                        <FilterMenu at={filterAt} col={c} vals={vals} from={r + 1} hidden={tab.filter!.hidden[String(c)] ?? []}
+                          onSort={(dir) => { sortBy(dir, c, r + 1); setFilterCol(null); }}
+                          onChange={(h) => mutate((t) => { if (t.filter) t.filter.hidden = { ...t.filter.hidden, [String(c)]: h }; })}
+                          onClose={() => setFilterCol(null)} />
+                      )}
                     </td>
                   );
                 })}
@@ -553,6 +661,9 @@ export default function SheetEditor({ tabs, onChange, title }: {
         </table>
         <button className="sheet__more" onClick={() => setExtraRows((n) => n + 50)}>Add 50 more rows</button>
       </div>
+      {hidden.size > 0 && <div className="sheet__filternote">{hidden.size} row{hidden.size === 1 ? '' : 's'} hidden by the filter · <button onClick={() => mutate((t) => { if (t.filter) t.filter.hidden = {}; })}>Show all</button></div>}
+
+      <ChartsStrip charts={tab.charts ?? []} vals={vals} onChange={(charts) => mutate((t) => { t.charts = charts.length ? charts : undefined; })} />
 
       <div className="sheet__foot">
         <div className="sheet__tabs">

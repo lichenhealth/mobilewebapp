@@ -6,7 +6,11 @@
  *  (search, the brain, old clients). */
 
 const TAGS = new Set(['P', 'BR', 'H1', 'H2', 'H3', 'H4', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'DEL', 'A', 'UL', 'OL', 'LI',
-  'BLOCKQUOTE', 'HR', 'SPAN', 'DIV', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TD', 'TH', 'CODE', 'PRE', 'SUB', 'SUP', 'FONT', 'MARK']);
+  'BLOCKQUOTE', 'HR', 'SPAN', 'DIV', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TD', 'TH', 'CODE', 'PRE', 'SUB', 'SUP', 'FONT', 'MARK', 'IMG']);
+/** An image is kept only as a reference into Lichen's own private storage
+ *  (see officeMedia.ts) — its signed src is re-minted on every open, and a
+ *  pasted web image (a stranger's hotlink) never survives. */
+const IMG_REF = /^(drive|chat-media)\/[\w\-./]+$/;
 const STYLE_OK = new Set(['color', 'background-color', 'text-align', 'text-decoration', 'font-weight', 'font-style', 'margin-left', 'font-size']);
 
 export function sanitizeHtml(html: string): string {
@@ -21,6 +25,17 @@ export function sanitizeHtml(html: string): string {
         // Unknown wrappers keep their words.
         walk(child);
         child.replaceWith(...child.childNodes);
+        continue;
+      }
+      if (child.tagName === 'IMG') {
+        const ref = child.getAttribute('data-store') ?? '';
+        if (!IMG_REF.test(ref) || ref.includes('..')) { child.remove(); continue; }
+        const w = /width:\s*(\d{1,3})%/.exec(child.getAttribute('style') ?? '')?.[1];
+        const alt = child.getAttribute('alt') ?? '';
+        for (const a of [...child.attributes]) child.removeAttribute(a.name);
+        child.setAttribute('data-store', ref);
+        if (alt) child.setAttribute('alt', alt.slice(0, 200));
+        if (w) child.setAttribute('style', `width: ${Math.min(100, Math.max(10, +w))}%`);
         continue;
       }
       for (const attr of [...child.attributes]) {

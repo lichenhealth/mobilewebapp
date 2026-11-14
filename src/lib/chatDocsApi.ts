@@ -11,7 +11,7 @@ import type { SheetTab } from './formula';
  *  read path (none reads chat_docs today; keep it that way without one). */
 
 export type ChatDocKind = 'doc' | 'poll' | 'sheet' | 'slides';
-export interface Slide { title: string; body: string; body2?: string; layout?: string; notes?: string }
+export interface Slide { title: string; body: string; body2?: string; layout?: string; notes?: string; image?: string }
 
 export interface ChatDocRow {
   id: string;

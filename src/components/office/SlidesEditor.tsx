@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Slide } from '../../lib/chatDocsApi';
+import { uploadOfficeImage, useSignedImgs, signImgRefs } from '../../lib/officeMedia';
+import { firstName, type Anchor, type Goto, type Peer } from './collab';
 import './Office.css';
 
 /** THE PRESENTATION (founder 2026-11-14: "re-create google … presos"). Google
@@ -7,10 +9,11 @@ import './Office.css';
  *  place, layouts, themes, speaker notes, a full-screen Present with a
  *  speaker-notes view, PDF (print) and PowerPoint download. */
 
-export type SlideLayout = 'title' | 'bullets' | 'section' | 'two' | 'quote' | 'big' | 'text';
+export type SlideLayout = 'title' | 'bullets' | 'section' | 'two' | 'quote' | 'big' | 'text' | 'image' | 'imagetext';
 export const LAYOUTS: { id: SlideLayout; label: string }[] = [
   { id: 'title', label: 'Title slide' }, { id: 'bullets', label: 'Title & bullets' }, { id: 'text', label: 'Title & text' },
   { id: 'two', label: 'Two columns' }, { id: 'section', label: 'Section header' }, { id: 'quote', label: 'Quote' }, { id: 'big', label: 'Big number' },
+  { id: 'image', label: 'Title & image' }, { id: 'imagetext', label: 'Image & text' },
 ];
 export const THEMES: Record<string, { label: string; bg: string; ink: string; accent: string; font: string }> = {
   paper: { label: 'Paper', bg: '#fbf7f0', ink: '#1f2a30', accent: '#c9733d', font: "'Cormorant Garamond', Georgia, serif" },
@@ -26,9 +29,10 @@ const lines = (t: string) => t.split('\n').map((l) => l.replace(/^\s*[-•*]\s*/
 
 /** One slide, read-only or editable in place. Sizes are container-relative
  *  (cqw), so the same render is a thumbnail, the canvas, or the whole screen. */
-export function SlideView({ s, i, theme, edit }: {
+export function SlideView({ s, i, theme, edit, img, onPickImage }: {
   s: Slide; i: number; theme: string;
   edit?: (patch: Partial<Slide>) => void;
+  img?: Record<string, string>; onPickImage?: () => void;
 }) {
   const th = THEMES[theme] ?? THEMES.paper;
   const L = layoutOf(s, i);
@@ -45,7 +49,17 @@ export function SlideView({ s, i, theme, edit }: {
     <div className={`slx__slide slx__slide--${L}`} style={{ background: th.bg, color: th.ink, ['--sl-accent' as string]: th.accent, ['--sl-font' as string]: th.font }}>
       {L === 'section' && <span className="slx__band" />}
       {L === 'quote' && <span className="slx__qmark">“</span>}
-      {L === 'two' ? (
+      {(L === 'image' || L === 'imagetext') ? (() => {
+        const url = s.image ? img?.[s.image] : undefined;
+        const pic = url ? <div className="slx__img"><img src={url} alt="" /></div>
+          : edit ? <button className="slx__img slx__img--empty" onClick={onPickImage}>＋ Add an image</button>
+          : s.image ? <div className="slx__img" /> : null;
+        return L === 'image' ? (
+          <>{E({ field: 'title', cls: 'slx__t', ph: 'Click to add a title' })}{pic}</>
+        ) : (
+          <>{pic}<div className="slx__txt">{E({ field: 'title', cls: 'slx__t', ph: 'Click to add a title' })}{E({ field: 'body', cls: 'slx__b', ph: 'Click to add text', multi: true })}</div></>
+        );
+      })() : L === 'two' ? (
         <>
           {E({ field: "title", cls: "slx__t", ph: "Click to add a title", })}
           <div className="slx__cols">
@@ -86,9 +100,13 @@ function EditableText({ value, onChange, className, placeholder, multi, bullets 
   );
 }
 
-export default function SlidesEditor({ slides, theme, onChange, title }: {
-  slides: Slide[]; theme: string; onChange: (slides: Slide[], theme: string) => void; title: string;
+export default function SlidesEditor({ slides, theme, onChange, title, chatId, onAnchor, marks, peers, goto }: {
+  slides: Slide[]; theme: string; onChange: (slides: Slide[], theme: string) => void; title: string; chatId?: string | null;
+  onAnchor?: (a: Anchor) => void; marks?: Set<number>; peers?: Peer[]; goto?: Goto | null;
 }) {
+  const imgs = useSignedImgs(slides.map((x) => x.image));
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
   const [cur, setCur] = useState(0);
   const [present, setPresent] = useState<number | null>(null);
   const [notesView, setNotesView] = useState(false);
@@ -97,11 +115,24 @@ export default function SlidesEditor({ slides, theme, onChange, title }: {
   const i = Math.min(cur, slides.length - 1);
   const s = slides[i];
 
+  useEffect(() => { onAnchor?.({ kind: 'slide', index: i }); }, [i, onAnchor]);
+  useEffect(() => { const a = goto?.anchor; if (a?.kind === 'slide') setCur(Math.min(a.index, slides.length - 1)); }, [goto?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (next: Slide[], th = theme) => onChange(next, th);
   const patch = (p: Partial<Slide>) => set(slides.map((x, j) => (j === i ? { ...x, ...p } : x)));
   const add = (layout: SlideLayout) => { const n = [...slides]; n.splice(i + 1, 0, { title: '', body: '', layout }); set(n); setCur(i + 1); setMenu(null); };
   const dup = () => { const n = [...slides]; n.splice(i + 1, 0, { ...slides[i] }); set(n); setCur(i + 1); };
   const del = () => { if (slides.length < 2) return; set(slides.filter((_, j) => j !== i)); setCur(Math.max(0, i - 1)); };
+  const pickImage = () => fileRef.current?.click();
+  const takeImage = async (f: File | undefined) => {
+    if (!f) return;
+    setBusy(true);
+    try {
+      const ref = await uploadOfficeImage(f, chatId ?? null);
+      const L = layoutOf(s, i);
+      patch({ image: ref, ...(L === 'image' || L === 'imagetext' ? {} : { layout: s.body?.trim() ? 'imagetext' : 'image' }) });
+    } catch { window.alert("That image didn't upload — try again in a moment."); }
+    finally { setBusy(false); }
+  };
   const move = (d: -1 | 1) => { const j = i + d; if (j < 0 || j >= slides.length) return; const n = [...slides]; [n[i], n[j]] = [n[j], n[i]]; set(n); setCur(j); };
 
   const startPresent = (from: number) => {
@@ -129,13 +160,32 @@ export default function SlidesEditor({ slides, theme, onChange, title }: {
     pptx.layout = 'LAYOUT_WIDE';
     pptx.title = title;
     const hex = (c: string) => c.replace('#', '');
+    // Images ride into the .pptx as data, read through fresh signed links.
+    const urls = await signImgRefs(slides.map((x) => x.image ?? ''));
+    const pics: Record<string, string> = {};
+    await Promise.all(Object.entries(urls).map(async ([ref, u]) => {
+      try {
+        const b = await (await fetch(u)).blob();
+        pics[ref] = await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.readAsDataURL(b); });
+      } catch { /* the slide keeps its words */ }
+    }));
     slides.forEach((sl, k) => {
       const L = layoutOf(sl, k);
       const p = pptx.addSlide();
       p.background = { color: hex(th.bg) };
       const face = th.font.includes('Archivo') ? 'Arial' : 'Georgia';
       const tx = { color: hex(th.ink), fontFace: face };
-      if (L === 'title' || L === 'section') {
+      if ((L === 'image' || L === 'imagetext') && sl.image && pics[sl.image]) {
+        const data = pics[sl.image];
+        if (L === 'image') {
+          p.addText(sl.title || ' ', { ...tx, x: 0.6, y: 0.3, w: 12, h: 0.9, fontSize: 32, bold: true });
+          p.addImage({ data, x: 0.6, y: 1.4, w: 12.1, h: 5.7, sizing: { type: 'cover', w: 12.1, h: 5.7 } });
+        } else {
+          p.addImage({ data, x: 0.5, y: 0.5, w: 6, h: 6.5, sizing: { type: 'cover', w: 6, h: 6.5 } });
+          p.addText(sl.title || ' ', { ...tx, x: 6.9, y: 1.2, w: 5.9, h: 1.2, fontSize: 32, bold: true });
+          if (sl.body) p.addText(sl.body, { ...tx, x: 6.9, y: 2.5, w: 5.9, h: 4, fontSize: 20, valign: 'top' });
+        }
+      } else if (L === 'title' || L === 'section') {
         if (L === 'section') p.addShape('rect', { x: 0.6, y: 3.0, w: 1.2, h: 0.08, fill: { color: hex(th.accent) } });
         p.addText(sl.title || ' ', { ...tx, x: 0.6, y: L === 'title' ? 2.2 : 3.2, w: 12, h: 1.4, fontSize: 44, bold: true, align: L === 'title' ? 'center' : 'left' });
         if (sl.body) p.addText(sl.body, { ...tx, x: 0.6, y: L === 'title' ? 3.7 : 4.6, w: 12, h: 1, fontSize: 22, align: L === 'title' ? 'center' : 'left', color: hex(th.accent) });
@@ -183,6 +233,9 @@ export default function SlidesEditor({ slides, theme, onChange, title }: {
             </div>
           )}
         </div>
+        <button title="Add an image to this slide" disabled={busy} onClick={pickImage}>{busy ? 'Uploading…' : '🖼 Image'}</button>
+        {s.image && <button title="Remove this slide's image" onClick={() => patch({ image: undefined })}>Remove image</button>}
+        <input ref={fileRef} type="file" hidden accept="image/*,.heic,.heif" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void takeImage(f); }} />
         <span className="sheet__sep" />
         <button title="Duplicate slide" onClick={dup}>⧉ Duplicate</button>
         <button title="Move slide up" onClick={() => move(-1)} disabled={i === 0}>↑</button>
@@ -199,27 +252,31 @@ export default function SlidesEditor({ slides, theme, onChange, title }: {
           {slides.map((sl, k) => (
             <button key={k} className={'slx__thumb' + (k === i ? ' is-on' : '')} onClick={() => setCur(k)} aria-label={`Slide ${k + 1}`}>
               <span className="slx__n">{k + 1}</span>
-              <SlideView s={sl} i={k} theme={theme} />
+              {marks?.has(k) && <span className="slx__note" aria-label="Has comments">💬</span>}
+              {(peers ?? []).filter((p) => p.anchor?.kind === 'slide' && p.anchor.index === k).map((p) => (
+                <span key={p.uid} className="slx__peer" style={{ background: p.color }} title={`${p.name} is here`}>{firstName(p.name)[0]}</span>
+              ))}
+              <SlideView s={sl} i={k} theme={theme} img={imgs} />
             </button>
           ))}
           <button className="slx__thumb slx__thumb--add" onClick={() => add('bullets')} aria-label="Add a slide">+</button>
         </div>
         <div className="slx__main">
-          <div className="slx__canvas"><SlideView key={i} s={s} i={i} theme={theme} edit={patch} /></div>
+          <div className="slx__canvas"><SlideView key={i} s={s} i={i} theme={theme} edit={patch} img={imgs} onPickImage={pickImage} /></div>
           <textarea className="slx__notes" placeholder="Speaker notes — only you see these while presenting" value={s.notes ?? ''}
             onChange={(e) => patch({ notes: e.target.value })} />
         </div>
       </div>
 
       <div className="office-print slx__print" aria-hidden>
-        {slides.map((sl, k) => <div className="slx__printpage" key={k}><SlideView s={sl} i={k} theme={theme} /></div>)}
+        {slides.map((sl, k) => <div className="slx__printpage" key={k}><SlideView s={sl} i={k} theme={theme} img={imgs} /></div>)}
       </div>
 
       {present != null && slides[present] && (
         <div className="slx__deck" ref={deckRef} role="dialog" aria-label="Presenting"
           onClick={() => setPresent((p) => (p == null ? p : Math.min(p + 1, slides.length - 1)))}>
           <div className={'slx__stage' + (notesView ? ' with-notes' : '')}>
-            <div className="slx__fit"><SlideView s={slides[present]} i={present} theme={theme} /></div>
+            <div className="slx__fit"><SlideView s={slides[present]} i={present} theme={theme} img={imgs} /></div>
             {notesView && (
               <div className="slx__speaker" onClick={(e) => e.stopPropagation()}>
                 <strong>Speaker notes</strong>
