@@ -25,6 +25,7 @@ export type IconName =
   | 'building'
   | 'calendar'
   | 'chat'
+  | 'inbox'
   | 'check'
   | 'groups'
   | 'member-heart'
@@ -162,6 +163,14 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '143 836 33 28',
     strokeWidth: 2.06,
     content: <><path d="M154.688 858.167H154C148.5 858.167 145.75 857 145.75 851.167V845.333C145.75 840.667 148.5 838.333 154 838.333H165C170.5 838.333 173.25 840.667 173.25 845.333V851.167C173.25 855.833 170.5 858.167 165 858.167H164.313C163.886 858.167 163.474 858.342 163.213 858.633L161.15 860.967C160.243 861.993 158.758 861.993 157.85 860.967L155.788 858.633C155.568 858.377 155.059 858.167 154.688 858.167Z" stroke="currentColor" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/></>,
+  },
+  // THE INBOX MARK (founder 2026-11-14): a letter with a chat bubble on top,
+  // up and to the right — everything you send and receive, organized by who.
+  // The letter's lines stop short of the bubble so it reads as sitting ON it.
+  'inbox': {
+    viewBox: '0 -1 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M10.4 8H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5.6" /><path d="M2.6 9.3 9.5 14l2-1.4" /><path d="M14.5 2h5A2.5 2.5 0 0 1 22 4.5v3A2.5 2.5 0 0 1 19.5 10H16l-3 2.4V10a2 2 0 0 1-1-1.8V4.5A2.5 2.5 0 0 1 14.5 2z" /></>,
   },
   'check': {
     viewBox: '0 0 24 24',

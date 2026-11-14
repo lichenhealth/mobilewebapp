@@ -53,7 +53,7 @@ export interface ReactionRow {
 /** A space that is a PARTY to a chat (kind 'space_dm' — founder 2026-08-17:
  *  a space can be a chat member). The visitor sees its logo; its admins see
  *  the visitor. `visitorId` comes off the direct_key ('space:<sid>:<visitor>[:responder]'). */
-export interface PartySpace { id: string; name: string; avatarUrl: string | null; visitorId: string | null }
+export interface PartySpace { id: string; name: string; avatarUrl: string | null; visitorId: string | null; kind?: string | null }
 export interface ChatVM {
   id: string;
   kind: ChatKind;
@@ -246,7 +246,7 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
   const [cRes, mRes, msgRes] = await Promise.all([
     // care-team rooms live in Concierge; event rooms live on their event page
     supabase.from('chats')
-      .select('id, kind, title, created_at, direct_key, space_id, topic, assistant_enabled, party:spaces!chats_party_space_id_fkey(id, name, avatar_url), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)')
+      .select('id, kind, title, created_at, direct_key, space_id, topic, assistant_enabled, party:spaces!chats_party_space_id_fkey(id, name, avatar_url, kind), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)')
       .not('kind', 'in', '("care_team","event")'),
     supabase.from('chat_members').select('chat_id, profile_id, profiles(full_name, avatar_url)'),
     supabase.from('chat_messages')
@@ -269,12 +269,12 @@ export async function loadChatList(me: string): Promise<ChatVM[]> {
 
   type ChatRaw = { id: string; kind: ChatKind; title: string | null; direct_key: string | null; space_id: string | null;
     topic: string | null; assistant_enabled: boolean;
-    party: { id: string; name: string; avatar_url: string | null } | null;
+    party: { id: string; name: string; avatar_url: string | null; kind?: string | null } | null;
     room_space: { id: string; name: string; avatar_url: string | null } | null };
   const vms: ChatVM[] = ((cRes.data as unknown as ChatRaw[] | null) ?? []).map((c) => {
     const members = membersByChat.get(c.id) ?? [];
     const party: PartySpace | undefined = c.party
-      ? { id: c.party.id, name: c.party.name, avatarUrl: c.party.avatar_url, visitorId: visitorIdOfKey(c.direct_key) }
+      ? { id: c.party.id, name: c.party.name, avatarUrl: c.party.avatar_url, visitorId: visitorIdOfKey(c.direct_key), kind: c.party.kind ?? null }
       : undefined;
     const helpMemberId = c.kind === 'help' ? helpMemberOfKey(c.direct_key) : null;
     return {
