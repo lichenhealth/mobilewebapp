@@ -304,6 +304,34 @@ the WeavePitch template.
   offerings, hour-equality resolution): the `currentcy-architecture` memory
   file in the builder Claude's memory is the deep source.
 
+### Mail hosting — cost picture (PENDING DECISION, founder 2026-11-14)
+The founder asked what hosting mail ourselves would cost and how hard it is
+to build. Rough estimates only, not quotes:
+- **For the founder alone:** the machinery is a few dollars a month
+  (inbound ~10¢ per 1,000 messages, ~5–20 GB of storage under $1/mo). But
+  her inboxes carry THERAPY mail, and storing clinical email puts Lichen on
+  the Supabase HIPAA upgrade + BAAs (~$900+/mo, honesty rule 6). Google
+  Workspace is ~$7–14/user/mo and signs a BAA at no extra cost, so Google
+  stays the mailbox for clinical mail.
+- **At scale (e.g. 1,000 members, ~10 GB each):** infrastructure is
+  ~$200–300/mo plus small send/receive fees, i.e. well under $1/member/mo.
+  The real cost is PEOPLE: spam/virus filtering, sending reputation
+  (deliverability), abuse handling, legal requests, retention, support.
+- **Build tiers:** (1) receive forwarded mail on a sub-domain
+  (in.lichen.health) into the Inbox, filed by person: days to a couple of
+  weeks, cheap, no HIPAA change if clinical mail stays out. (2) personal
+  "from" addresses: small, Resend already sends. (3) a full Gmail
+  replacement (phone mail apps, search across years, attachments, spam,
+  per-member domains): months plus ongoing operations. If members ever get
+  Lichen addresses, PARTNER with an existing mailbox provider (a few
+  dollars per user) and put Lichen's Inbox on top. Don't run our own mail
+  server.
+- **Recommendation on the table:** keep Google Workspace as the mailbox;
+  connect every account to Lichen Mail (her four are being connected);
+  build tier 1 when she wants it; leave tiers 2–3 until members ask.
+  Cancelling Workspace needs tier 1 + storage + an import of each account's
+  history, AND the HIPAA upgrade for any clinical inbox. A founder money call.
+
 ## Subsidy policy — state as of 2026-09-01
 
 Live at lichen.health/subsidy-policy. **Eva (accountant, Eva 990 &

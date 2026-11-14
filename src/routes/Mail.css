@@ -56,3 +56,5 @@
 .mail__acct-email { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
 .mail__acct-warn { font-style: normal; color: var(--red-deep); font-size: 12px; }
 .mail__acct-acts { display: flex; gap: 6px; margin-left: auto; }
+.mail__lens--add { border-style: dashed; color: var(--peach-deep); }
+.mail__lens--add:hover { border-color: var(--peach); }
