@@ -151,7 +151,7 @@ export default function Calendar() {
   // (founder 2026-08-14: the chip row must tell the truth about every source
   // on the grid — Google used to ride Mine invisibly).
   const [calendars, setCalendars] = useState<{ id: string; name: string }[]>([]);
-  const [extCals, setExtCals] = useState<{ id: string; name: string; url: string }[]>([]);
+  const [extCals, setExtCals] = useState<{ id: string; name: string; url: string; subs: Record<string, { name: string }> }[]>([]);
   // The Bookings door earns its slot: only once you've set up something
   // bookable (founder 2026-08-14). The hub stays reachable from profiles.
   const [hasBookables, setHasBookables] = useState(false);
@@ -164,7 +164,7 @@ export default function Calendar() {
   const [selectedCals, setSelectedCals] = useState<string[]>(['me']);
   useEffect(() => {
     if (!me) return;
-    (async () => setExtCals((await listExternalCalendars(me)).map((c) => ({ id: c.id, name: c.name, url: c.url }))))();
+    (async () => setExtCals((await listExternalCalendars(me)).map((c) => ({ id: c.id, name: c.name, url: c.url, subs: (c.sub_settings ?? {}) as Record<string, { name: string }> }))))();
   }, [me]);
   // The CARE PLAN can overlay like an imported calendar (founder 2026-09-24:
   // "overlay your care plan on your lichen calendar, just like you can
@@ -310,7 +310,7 @@ export default function Calendar() {
             start_date: b.span_start, end_date: b.span_end, all_day: true,
             start_min: null, end_min: null, recurrence: null,
             created_at: '', external: true, spanBar: true, tint: b.color || colorFor('extcal:' + b.calendar_id),
-            sourceUrl: b.source_url ?? null, extCalId: b.calendar_id,
+            sourceUrl: b.source_url ?? null, extCalId: b.calendar_id, subCal: b.sub_cal ?? null,
           });
           continue;
         }
@@ -320,7 +320,7 @@ export default function Calendar() {
           start_date: b.on_date, end_date: b.on_date, all_day: b.all_day,
           start_min: b.start_min, end_min: b.end_min, recurrence: null,
           created_at: '', external: true, tint: b.color || colorFor('extcal:' + b.calendar_id),
-          sourceUrl: b.source_url ?? null, extCalId: b.calendar_id,
+          sourceUrl: b.source_url ?? null, extCalId: b.calendar_id, subCal: b.sub_cal ?? null,
         });
       }
     }
@@ -696,6 +696,18 @@ export default function Calendar() {
    *  base64 of "<eventId> <calendarId>", so the calendar it belongs to is
    *  right there — hand it to Google as `authuser` and it looks in the right
    *  place. Anything unexpected falls through to the original link. */
+  /** A Google calendar id is an ACCOUNT only when it reads as a real email.
+   *  Secondary/subscribed calendars carry ids like "x@group.calendar.google.com",
+   *  which the eid SHORTENS to "x@g" / "x@i" — never an account a browser can
+   *  be signed into (founder 2026-11-14: "what's the deal with that weird,
+   *  long address in bold?"). */
+  const realGoogleAccount = (id: string | null | undefined): string | null => {
+    if (!id || !id.includes('@')) return null;
+    const dom = id.split('@')[1] ?? '';
+    if (!dom.includes('.') || /calendar\.google\.com$/i.test(dom)) return null;
+    return id;
+  };
+
   const googleAuthUser = (url: string): string => {
     try {
       const u = new URL(url);
@@ -712,7 +724,8 @@ export default function Calendar() {
       // URL, 2026-08-16: ".../u/0/r?msg=Could+not+find+the+requested+event").
       const out = new URL('https://calendar.google.com/calendar/event');
       out.searchParams.set('eid', eid);
-      if (calId && calId.includes('@')) out.searchParams.set('authuser', calId);
+      const acct = realGoogleAccount(calId);
+      if (acct) out.searchParams.set('authuser', acct);
       return out.toString();
     } catch { return url; }
   };
@@ -745,7 +758,16 @@ export default function Calendar() {
       } catch { return null; }
     })();
     const base = `https://calendar.google.com/calendar/r/day/${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-    return cal ? `${base}?authuser=${encodeURIComponent(cal)}` : base;
+    const acct = realGoogleAccount(cal);
+    return acct ? `${base}?authuser=${encodeURIComponent(acct)}` : base;
+  };
+
+  /** The Google sub-calendar's own name ("Gabe's shifts"), from the sync's
+   *  sub_settings — what to call where an imported event lives. */
+  const extSubName = (e: EventRow): string | null => {
+    if (!e.subCal || !e.extCalId) return null;
+    const n = extCals.find((c) => c.id === e.extCalId)?.subs?.[e.subCal]?.name;
+    return n && n.trim() ? n.trim() : null;
   };
 
   /** Where an imported block came from, and what to call the way back. The
@@ -764,7 +786,7 @@ export default function Calendar() {
         // it's really the wrong account. Naming it makes the failure legible
         // and tells you what to do about it. We can't know which account the
         // browser is using, so we say which one the event is IN.
-        account: host === 'google' ? (googleCalIdOf(e) ?? undefined) : undefined,
+        account: host === 'google' ? (realGoogleAccount(googleCalIdOf(e)) ?? undefined) : undefined,
       };
     }
     const host = extHostOf(e);
@@ -1384,10 +1406,14 @@ export default function Calendar() {
                     <Icon name="arrow-right" size={13} /> {externalDoor(selected)!.label}
                   </a>
                 )}
-                {externalDoor(selected)?.account && (
+                {externalDoor(selected)?.account ? (
                   <p className="calp__sheet-extnote">
                     Lives in <strong>{externalDoor(selected)!.account}</strong> — open it in a
                     browser signed into that account.
+                  </p>
+                ) : extSubName(selected) && (
+                  <p className="calp__sheet-extnote">
+                    From your <strong>{extSubName(selected)}</strong> calendar in Google.
                   </p>
                 )}
                 {/* The deep link depends on Google resolving an event id
