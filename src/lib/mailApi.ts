@@ -40,10 +40,11 @@ async function call<T>(fn: string, body: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
-/** Off to Google's consent screen; it returns to /mail. */
-export async function connectMail(hint?: string): Promise<void> {
+/** Off to Google's consent screen; it returns to /mail — or to `returnPath`
+ *  (an in-app path, e.g. the brain conversation that asked for it). */
+export async function connectMail(hint?: string, returnPath?: string): Promise<void> {
   const origin = window.location.origin;
-  const { url } = await call<{ url: string }>('mail-oauth-start', { returnTo: origin, hint });
+  const { url } = await call<{ url: string }>('mail-oauth-start', { returnTo: origin, hint, returnPath });
   window.location.assign(url);
 }
 

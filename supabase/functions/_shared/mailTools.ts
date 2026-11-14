@@ -53,6 +53,11 @@ export const MAIL_TOOLS = [
     },
   },
   {
+    name: 'mail_reconnect',
+    description: 'Hand the member a Reconnect card IN THIS CONVERSATION: one button per inbox that opens Google\'s own consent screen for that address (pre-filled) and brings them straight back here, plus a "carry on" button once they\'re done. Use it whenever an inbox needs reconnecting (an expired connection, or a new permission such as filters) — never tell them to go find the Mail screen. accounts = the addresses to reconnect (empty = all their inboxes). You cannot sign into Google for them; this card makes it one tap each, and when they say they\'re back, finish the job you were doing.',
+    input_schema: { type: 'object', properties: { accounts: { type: 'array', items: { type: 'string' } } } },
+  },
+  {
     name: 'mail_filters',
     description: 'Gmail FILTERS (standing rules for future mail) on one of their inboxes. op "list" shows them; op "create" makes one — match by from / to / subject / query (Gmail search grammar), then any of: skip_inbox (archive it on arrival), mark_read, star, trash, label (a label name, created if missing), never_spam; op "delete" removes one by filter_id from list. Create or delete ONLY a rule the member asked for in their own words, and say plainly what it now does to future mail. A filter never forwards. If Gmail refuses for missing permission, tell them to tap Reconnect beside that inbox on the Mail screen once.',
     input_schema: {
@@ -86,7 +91,18 @@ export async function runMailTool(profileId: string, name: string, input: Record
       if (s('account') && !one) return { ok: false, error: `Not one of their inboxes. Connected: ${list}.` };
       const lists = await Promise.all((one ? [one] : accts).map((a) => listThreads(profileId, a, s('query'), 12).catch((e) => [{ error: `${a.email}: ${e instanceof Error ? e.message : e}` }])));
       const flat = lists.flat();
-      return { ok: true, inboxes: list, threads: flat.slice(0, 40) };
+      // An expired inbox comes back with the Reconnect card already attached.
+      const stale = flat.flatMap((x) => {
+        const err = (x as { error?: string }).error;
+        return err && /reconnect/i.test(err) ? [err.split(':')[0]] : [];
+      });
+      return { ok: true, inboxes: list, threads: flat.slice(0, 40), ...(stale.length ? { reconnect: stale, note: 'Some inboxes need reconnecting; a Reconnect card is attached to this reply.' } : {}) };
+    }
+    if (name === 'mail_reconnect') {
+      const want = Array.isArray(input.accounts) ? (input.accounts as unknown[]).map((x) => String(x).trim().toLowerCase()).filter(Boolean) : [];
+      const chosen = want.length ? accts.filter((a) => want.includes(a.email.toLowerCase())) : accts;
+      if (!chosen.length) return { ok: false, error: `Not one of their inboxes. Connected: ${list}.` };
+      return { ok: true, reconnect: chosen.map((a) => a.email), note: 'A Reconnect card with one button per inbox is attached to this reply.' };
     }
     const acct = pick(accts, s('account'));
     if (!acct) return { ok: false, error: `Name the inbox by its exact address. Connected: ${list}.` };
@@ -153,7 +169,7 @@ export async function runMailTool(profileId: string, name: string, input: Record
       const scopeHint = (e: unknown) => {
         const m = e instanceof Error ? e.message : String(e);
         return /403|insufficient|scope/i.test(m)
-          ? { ok: false, error: `${acct.email} needs one Reconnect on the Mail screen before filters work (a new Google permission).`, door: { path: '/mail', label: 'Open Mail' } }
+          ? { ok: false, error: `${acct.email} needs one Reconnect before filters work (a new Google permission). A Reconnect card is already on its way to them in this reply — tell them to tap it and say when they're back, then you'll finish.`, reconnect: [acct.email] }
           : { ok: false, error: m };
       };
       const b = (k: string) => input[k] === true;
@@ -184,6 +200,10 @@ export async function runMailTool(profileId: string, name: string, input: Record
     }
     return { ok: false, error: 'Unknown mail tool.' };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    const m = e instanceof Error ? e.message : String(e);
+    if (/reconnect/i.test(m) && s('account')) {
+      return { ok: false, error: `${s('account')} needs reconnecting. A Reconnect card is attached to this reply — they tap it, come back here, and you carry on.`, reconnect: [s('account')] };
+    }
+    return { ok: false, error: m };
   }
 }
