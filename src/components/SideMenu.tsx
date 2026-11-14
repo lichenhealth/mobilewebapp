@@ -48,7 +48,7 @@ const LEAD: { to: string; label: string; icon: IconName }[] = [
 
 const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/concierge', label: 'Concierge', icon: 'concierge' },
-  { to: '/chat',      label: 'Chat',      icon: 'chat' },
+  { to: '/chat',      label: 'Inbox',     icon: 'inbox' },
   { to: '/calendar',  label: 'Calendar',  icon: 'calendar' },
   { to: '/events',    label: 'Events',    icon: 'rsvp' },
   { to: '/drive',     label: 'Drive',     icon: 'drive' },

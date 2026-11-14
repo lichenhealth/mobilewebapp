@@ -1,3 +1,4 @@
+import FilterRow from '../components/FilterRow';
 import { useEffect, useMemo, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
@@ -94,15 +95,31 @@ export default function Chat() {
       : chats
   ), [chats, asSpace]);
 
+  // THE INBOX TABS (founder 2026-11-14: "organized by person, group,
+  // community, place, organization… kinda like gmail tabs"): every
+  // conversation files under WHO it's with — a DM or help room under People,
+  // a space's room (or a conversation where a space is the party) under that
+  // space's kind. Tabs are presence-gated: only kinds you actually have show.
+  const [tab, setTab] = useState('All');
+  const scopedTabs = useMemo(() => {
+    if (asSpace) return [] as string[];
+    const have = new Set(scoped.map(inboxGroupOf));
+    const t = INBOX_TABS.filter((x) => have.has(x));
+    return t.length > 1 ? ['All', ...t] : [];
+  }, [scoped, asSpace]);
+  const tabbed = useMemo(() => (
+    tab === 'All' || !scopedTabs.includes(tab) ? scoped : scoped.filter((c) => inboxGroupOf(c) === tab)
+  ), [scoped, tab, scopedTabs]);
+
   const hits = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return scoped;
-    return scoped.filter((c) =>
+    if (!q) return tabbed;
+    return tabbed.filter((c) =>
       c.title.toLowerCase().includes(q) ||
       (c.last?.body?.toLowerCase().includes(q) ?? false) ||
       c.members.some((m) => m.name.toLowerCase().includes(q)),
     );
-  }, [query, scoped]);
+  }, [query, tabbed]);
 
   return (
     <div className="chat">
@@ -112,7 +129,7 @@ export default function Chat() {
           why is it to the left?" — Drive's .myc__head grammar, the same
           centered title + explanation /currentcy adopted). */}
       <header className="myc__head chat__headc">
-        <h1 className="myc__title"><span className="display-italic">Messages</span></h1>
+        <h1 className="myc__title"><span className="display-italic">Inbox</span></h1>
         <p className="myc__sub">
           {asSpace ? `${spaceName} · ` : ''}{scoped.length} {scoped.length === 1 ? 'thread' : 'threads'}
         </p>
@@ -139,6 +156,9 @@ export default function Chat() {
         )}
         <AssistantDoor section="chat" label="Your assistant — who's waiting on you" />
       </div>
+      {scopedTabs.length > 0 && (
+        <div className="chat__tabs"><FilterRow options={scopedTabs} value={scopedTabs.includes(tab) ? tab : 'All'} onChange={setTab} /></div>
+      )}
 
       {searchOpen && (
       <div className="chat__search">
@@ -282,6 +302,15 @@ export default function Chat() {
       )}
     </div>
   );
+}
+
+const INBOX_TABS = ['People', 'Groups', 'Communities', 'Places', 'Organizations'];
+const KIND_TAB: Record<string, string> = { group: 'Groups', community: 'Communities', place: 'Places', organization: 'Organizations' };
+/** Which inbox tab a conversation files under: who it is WITH. */
+function inboxGroupOf(c: ChatVM): string {
+  if (c.kind in KIND_TAB) return KIND_TAB[c.kind];
+  if ((c.kind === 'space_dm' || c.kind === 'suggestion') && c.party?.kind && c.party.kind in KIND_TAB) return KIND_TAB[c.party.kind];
+  return 'People';
 }
 
 function ConversationRow({ chat, me, highlight, unread = 0, active = false, onClick, inSpaceInbox = false }: { chat: ChatVM; me: string; highlight?: string; unread?: number; active?: boolean; onClick: () => void; inSpaceInbox?: boolean }) {

@@ -19,7 +19,7 @@ const ITEMS: NavItem[] = [
   // web. Naming it Lichen makes that pair legible.
   { to: '/home',      label: 'LICHEN',    icon: 'home' },
   { to: '/concierge', label: 'CONCIERGE', icon: 'concierge' },
-  { to: '/chat',      label: 'CHAT',      icon: 'chat' },
+  { to: '/chat',      label: 'INBOX',     icon: 'inbox' },
   { to: '/calendar',  label: 'CALENDAR',  icon: 'calendar' },
   { to: '/drive',     label: 'DRIVE',     icon: 'drive' },
   { to: '/maps',      label: 'MAPS',      icon: 'maps' },

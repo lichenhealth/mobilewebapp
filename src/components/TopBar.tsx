@@ -46,7 +46,7 @@ const SECTION_LOGOS: SectionLogo[] = [
   { prefix: '/groups',      label: 'Groups',      icon: 'groups'        },
   { prefix: '/organizations', label: 'Organizations', icon: 'globe'     },
   { prefix: '/concierge',   label: 'Concierge',   icon: 'concierge'     },
-  { prefix: '/chat',        label: 'Chat',        icon: 'chat'          },
+  { prefix: '/chat',        label: 'Inbox',       icon: 'inbox'         },
   { prefix: '/calendar',    label: 'Calendar',    icon: 'calendar'      },
   { prefix: '/courses',     label: 'Courses',     icon: 'graduation-cap' },
   { prefix: '/drive',       label: 'Drive',       icon: 'drive'         },
