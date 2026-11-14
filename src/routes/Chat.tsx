@@ -1,5 +1,5 @@
 import FilterRow from '../components/FilterRow';
-import { useEffect, useMemo, useState, ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
@@ -14,6 +14,7 @@ import './Chat.css';
 import { searchMessages, type MessageHit } from '../lib/chatApi';
 import AssistantDoor from '../components/AssistantDoor';
 import ChatConversation from '../components/ChatConversation';
+import { mailEnabled, listMailAccounts, loadInbox, senderName as mailSender, type ThreadSummary } from '../lib/mailApi';
 
 export default function Chat() {
   const [query, setQuery] = useState('');
@@ -95,6 +96,38 @@ export default function Chat() {
       : chats
   ), [chats, asSpace]);
 
+  // THE MEDIUM LENSES (founder 2026-11-14: "an icon that shows mail, phone
+  // and chat bubble, then just chat, then just phone, then just mail… by
+  // default the all is selected and when you select one of the filters, it
+  // de-selects the all"): [] = All. Multi-select; picking all three is All.
+  const [chan, setChan] = useState<Medium[]>([]);
+  const pickChan = (m: Medium | 'all') => {
+    if (m === 'all') { setChan([]); return; }
+    setChan((cur) => {
+      const next = cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m];
+      return next.length === MEDIA.length ? [] : next;
+    });
+  };
+  const shows = (m: Medium) => chan.length === 0 || chan.includes(m);
+  // Mail rides along for members who've connected inboxes (Lichen Mail — a
+  // personal test today). Read live from Google; Lichen stores no content.
+  const [mailRows, setMailRows] = useState<ThreadSummary[]>([]);
+  const [mailState, setMailState] = useState<'off' | 'none' | 'ok' | 'err' | 'loading'>('loading');
+  useEffect(() => {
+    if (!me || !actingReady || asSpace) { setMailState('off'); return; }
+    let live = true;
+    void (async () => {
+      if (!(await mailEnabled(me))) { if (live) setMailState('off'); return; }
+      const accts = await listMailAccounts();
+      if (!accts.length) { if (live) setMailState('none'); return; }
+      try {
+        const r = await loadInbox(null, '');
+        if (live) { setMailRows(r.threads); setMailState('ok'); }
+      } catch { if (live) setMailState('err'); }
+    })();
+    return () => { live = false; };
+  }, [me, actingReady, asSpace]);
+
   // THE INBOX TABS (founder 2026-11-14: "organized by person, group,
   // community, place, organization… kinda like gmail tabs"): every
   // conversation files under WHO it's with — a DM or help room under People,
@@ -104,6 +137,7 @@ export default function Chat() {
   const scopedTabs = useMemo(() => {
     if (asSpace) return [] as string[];
     const have = new Set(scoped.map(inboxGroupOf));
+    if (mailRows.length) have.add('People');
     const t = INBOX_TABS.filter((x) => have.has(x));
     return t.length > 1 ? ['All', ...t] : [];
   }, [scoped, asSpace]);
@@ -120,6 +154,44 @@ export default function Chat() {
       c.members.some((m) => m.name.toLowerCase().includes(q)),
     );
   }, [query, tabbed]);
+
+  // ALL = every correspondence in time order, each row wearing its medium
+  // (founder: "so people can see the interplay of medium and message").
+  type Item = { key: string; t: string; chat?: ChatVM; mail?: ThreadSummary };
+  const items = useMemo<Item[]>(() => {
+    const out: Item[] = [];
+    if (shows('chat')) {
+      for (const c of hits) {
+        if (c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me) continue;
+        out.push({ key: 'c:' + c.id, t: c.last?.created_at ?? '', chat: c });
+      }
+    }
+    const tabOk = tab === 'All' || tab === 'People' || !scopedTabs.includes(tab);
+    if (shows('mail') && tabOk) {
+      const q = query.trim().toLowerCase();
+      for (const m of mailRows) {
+        if (q && !(`${m.from} ${m.subject} ${m.snippet}`.toLowerCase().includes(q))) continue;
+        out.push({ key: 'm:' + m.account_id + ':' + m.thread_id, t: m.date ? new Date(m.date).toISOString() : '', mail: m });
+      }
+    }
+    return out.sort((a, b) => (b.t > a.t ? 1 : b.t < a.t ? -1 : 0));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hits, mailRows, chan, tab, scopedTabs, query, me]);
+
+  // THE PANE IS NEVER EMPTY ON DESKTOP (founder 2026-11-14: "auto select the
+  // top convo and show it on the right, so there's always content in the
+  // box"): once per visit, the newest chat opens beside the list. Once —
+  // closing the pane stays closed.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (autoOpened.current || selectedId || loading || !actingReady) return;
+    if (!window.matchMedia('(min-width: 1024px)').matches) return;
+    const first = items.find((it) => it.chat)?.chat;
+    if (!first) return;
+    autoOpened.current = true;
+    openChat(first.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, selectedId, loading, actingReady]);
 
   return (
     <div className="chat">
@@ -155,6 +227,20 @@ export default function Chat() {
           </button>
         )}
         <AssistantDoor section="chat" label="Your assistant — who's waiting on you" />
+        {!asSpace && (
+          <div className="chat__media" role="group" aria-label="Show by medium">
+            <button className={'chat__lens' + (chan.length === 0 ? ' is-on' : '')} onClick={() => pickChan('all')}
+              aria-pressed={chan.length === 0} aria-label="All correspondence" data-tip="All">
+              <Icon name="comms" size={17} />
+            </button>
+            {MEDIA.map((m) => (
+              <button key={m} className={'chat__lens' + (chan.includes(m) ? ' is-on' : '') + (m === 'mail' ? ' tip-right' : '')}
+                onClick={() => pickChan(m)} aria-pressed={chan.includes(m)} aria-label={MEDIUM_LABEL[m]} data-tip={MEDIUM_LABEL[m]}>
+                <Icon name={MEDIUM_ICON[m]} size={16} />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {scopedTabs.length > 0 && (
         <div className="chat__tabs"><FilterRow options={scopedTabs} value={scopedTabs.includes(tab) ? tab : 'All'} onChange={setTab} /></div>
@@ -233,18 +319,44 @@ export default function Chat() {
           </div>
         )}
 
-        {actingReady && hits.filter((c) => !(c.kind === 'help' && c.helpMemberId && c.helpMemberId !== me)).map((c) => (
+        {actingReady && items.map((it) => it.chat ? (
           <ConversationRow
-            key={c.id}
-            chat={c}
+            key={it.key}
+            chat={it.chat}
             me={me}
             highlight={query}
-            unread={unread.get(c.id) ?? 0}
-            active={c.id === selectedId}
-            onClick={() => openChat(c.id)}
+            unread={unread.get(it.chat.id) ?? 0}
+            active={it.chat.id === selectedId}
+            onClick={() => openChat(it.chat!.id)}
             inSpaceInbox={!!asSpace}
+            medium={!asSpace}
           />
-        ))}
+        ) : it.mail ? (
+          <MailRow key={it.key} m={it.mail} highlight={query}
+            onClick={() => navigate(`/mail?thread=${encodeURIComponent(it.mail!.account_id + ':' + it.mail!.thread_id)}`)} />
+        ) : null)}
+        {actingReady && !loading && items.length === 0 && chan.length > 0 && (
+          <div className="chat__empty">
+            <Icon name={chan.length === 1 ? MEDIUM_ICON[chan[0]] : 'comms'} size={20} />
+            {chan.length === 1 && chan[0] === 'text' ? (
+              <>
+                <p>No texts in your inbox yet</p>
+                <p className="chat__empty-sub">Sharing a text — or a screenshot of a thread — into Lichen, filed under the person it's with, is coming next.</p>
+              </>
+            ) : chan.includes('mail') && mailState !== 'ok' && mailState !== 'loading' ? (
+              <>
+                <p>{mailState === 'none' ? 'No email inbox connected yet' : mailState === 'err' ? 'Couldn’t reach your email just now' : 'Email isn’t in Lichen for members yet'}</p>
+                <p className="chat__empty-sub">
+                  {mailState === 'none' ? <button className="link-cue chat__emptylink" onClick={() => navigate('/mail')}>Connect an inbox in Mail ›</button>
+                    : mailState === 'err' ? 'Try again in a moment, or open Mail directly.'
+                    : 'It’s in a small test right now.'}
+                </p>
+              </>
+            ) : (
+              <p>Nothing here for that filter yet</p>
+            )}
+          </div>
+        )}
         {/* THE DESK, apart from your life (founder 2026-08-19): a steward's
             help rooms sit under their own header, each named for the person
             being helped. Only stewards ever have rows here. */}
@@ -304,6 +416,38 @@ export default function Chat() {
   );
 }
 
+type Medium = 'chat' | 'text' | 'mail';
+const MEDIA: Medium[] = ['chat', 'text', 'mail'];
+const MEDIUM_LABEL: Record<Medium, string> = { chat: 'Chat', text: 'Texts', mail: 'Email' };
+const MEDIUM_ICON: Record<Medium, 'chat' | 'phone' | 'mail'> = { chat: 'chat', text: 'phone', mail: 'mail' };
+
+/** An email thread in the Inbox, read live from the member's own Gmail. */
+function MailRow({ m, highlight, onClick }: { m: ThreadSummary; highlight?: string; onClick: () => void }) {
+  const name = mailSender(m.from) || m.from;
+  return (
+    <button className={'conv-row' + (m.unread ? ' has-unread' : '')} onClick={onClick}>
+      <div className="conv-row__avatar-stack">
+        <Avatar id={m.from} name={name} size={48} />
+      </div>
+      <div className="conv-row__body">
+        <div className="conv-row__top">
+          <span className="conv-row__name">
+            {highlightText(name, highlight)}
+            <span className="conv-row__muted"> · {m.account}</span>
+          </span>
+          <span className="conv-row__time">
+            <span className="conv-row__medium" aria-label="Email"><Icon name="mail" size={12} /></span>
+            {m.date ? formatRelative(new Date(m.date).toISOString()) : ''}
+          </span>
+        </div>
+        <div className="conv-row__bottom">
+          <span className="conv-row__preview">{highlightText(m.subject || '(no subject)', highlight)}{m.snippet ? ' — ' + m.snippet : ''}</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 const INBOX_TABS = ['People', 'Groups', 'Communities', 'Places', 'Organizations'];
 const KIND_TAB: Record<string, string> = { group: 'Groups', community: 'Communities', place: 'Places', organization: 'Organizations' };
 /** Which inbox tab a conversation files under: who it is WITH. */
@@ -313,7 +457,7 @@ function inboxGroupOf(c: ChatVM): string {
   return 'People';
 }
 
-function ConversationRow({ chat, me, highlight, unread = 0, active = false, onClick, inSpaceInbox = false }: { chat: ChatVM; me: string; highlight?: string; unread?: number; active?: boolean; onClick: () => void; inSpaceInbox?: boolean }) {
+function ConversationRow({ chat, me, highlight, unread = 0, active = false, onClick, inSpaceInbox = false, medium = false }: { chat: ChatVM; me: string; highlight?: string; unread?: number; active?: boolean; onClick: () => void; inSpaceInbox?: boolean; medium?: boolean }) {
   const last = chat.last;
   const isDirect = chat.kind === 'direct';
   const isDM = isDirect || chat.kind === 'help'; // help rooms render DM-style (other member's avatar, no sender prefix)
@@ -339,7 +483,10 @@ function ConversationRow({ chat, me, highlight, unread = 0, active = false, onCl
             {!isDirect && chat.kind !== 'space_dm' && <span className="conv-row__muted"> ·{KIND_LABEL[chat.kind].toLowerCase()}</span>}
             {party && !iAmVisitor && !inSpaceInbox && <span className="conv-row__muted"> · via {party.name}</span>}
           </span>
-          <span className="conv-row__time">{last ? formatRelative(last.created_at) : ''}</span>
+          <span className="conv-row__time">
+            {medium && <span className="conv-row__medium" aria-label="Lichen chat"><Icon name="chat" size={12} /></span>}
+            {last ? formatRelative(last.created_at) : ''}
+          </span>
         </div>
         <div className="conv-row__bottom">
           <span className="conv-row__preview">
