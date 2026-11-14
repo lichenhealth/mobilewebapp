@@ -38,6 +38,7 @@ export type FeedAttachment =
    *  the member saw it as the brief card already. */
   | { type: 'brief_ctx'; section: string; text: string }
   | { type: 'mailref'; account_id: string; account: string; thread_id: string; subject: string; from: string }
+  | { type: 'mail_reconnect'; accounts: string[] }
   /** A COPYABLE VALUE (founder 2026-11-02, the feed-URL reply overflowing
    *  its bubble in broken code fences: "just have a copy button and have it
    *  check when its copied"): the reply hands a real Copy button instead of

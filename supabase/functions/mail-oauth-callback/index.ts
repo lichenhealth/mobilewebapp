@@ -17,15 +17,17 @@ async function hmac(payload: string): Promise<string> {
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
   return b64url(String.fromCharCode(...new Uint8Array(sig)));
 }
-const back = (returnTo: string, q: string) => new Response(null, { status: 302, headers: { Location: `${returnTo}/mail?${q}` } });
+let backPath = '/mail';
+const back = (returnTo: string, q: string) => new Response(null, { status: 302, headers: { Location: `${returnTo}${backPath}${backPath.includes('?') ? '&' : '?'}${q}` } });
 
 Deno.serve(async (req) => {
   const params = new URL(req.url).searchParams;
   let returnTo = 'https://lichen.health';
   try {
-    const state = JSON.parse(fromB64url(params.get('state') ?? '')) as { u: string; t: number; r: string; s: string };
-    if ((await hmac(`${state.u}.${state.t}.${state.r}`)) !== state.s) return back(returnTo, 'mail=error');
+    const state = JSON.parse(fromB64url(params.get('state') ?? '')) as { u: string; t: number; r: string; s: string; p?: string };
+    if ((await hmac(state.p ? `${state.u}.${state.t}.${state.r}.${state.p}` : `${state.u}.${state.t}.${state.r}`)) !== state.s) return back(returnTo, 'mail=error');
     returnTo = state.r;
+    if (state.p && state.p.startsWith('/') && !state.p.startsWith('//')) backPath = state.p;
     if (Date.now() - state.t > 15 * 60_000) return back(returnTo, 'mail=expired');
     if (params.get('error') || !params.get('code')) return back(returnTo, 'mail=denied');
     const scope = params.get('scope') ?? '';

@@ -59,7 +59,7 @@ export async function accessTokenFor(profileId: string, accountId: string): Prom
   if (!res.ok) {
     // Testing-mode Google apps expire refresh tokens after 7 days — say so.
     await markError(accountId, 'needs_reconnect');
-    throw new Error('Google asked to reconnect this inbox (testing apps re-ask about once a week). Tap Reconnect on the Mail screen.');
+    throw new Error('Google asked to reconnect this inbox (testing apps re-ask about once a week). It needs one Reconnect.');
   }
   const j = await res.json() as { access_token: string; expires_in: number };
   await fetch(`${SUPABASE_URL}/rest/v1/mail_tokens?account_id=eq.${accountId}`, {

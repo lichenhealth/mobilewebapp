@@ -1441,6 +1441,7 @@ Deno.serve(async (req) => {
   const knockDrafts: KnockDraft[] = [];
   // Calendar invitations drafted this exchange — a Send card the PERSON taps.
   const calInvites: Record<string, unknown>[] = [];
+  const mailReconnect: string[] = [];
   // The space-side twins of readPage/patchMe — scoped to the THREAD's space
   // (or General's verified selection), never a model-supplied id.
   // Draft-first like the member pair above.
@@ -1484,6 +1485,7 @@ Deno.serve(async (req) => {
       const mr = await runMailTool(profile_id, name, input as Record<string, unknown>);
       if (mr.door && !appDoors.some((d) => d.path === mr.door!.path)) appDoors.push(mr.door);
       delete mr.door;
+      for (const e of (mr.reconnect as string[] | undefined) ?? []) if (!mailReconnect.includes(e)) mailReconnect.push(e);
       return mr;
     }
     if (KNOCK_TOOL_NAMES.has(name)) {
@@ -3533,6 +3535,7 @@ Deno.serve(async (req) => {
   for (const d of confirmDoors) replyAttachments.push(d);
   for (const d of knockDrafts) replyAttachments.push(d);
   for (const d of calInvites) replyAttachments.push(d);
+  if (mailReconnect.length) replyAttachments.push({ type: 'mail_reconnect', accounts: mailReconnect });
   // The reply's section tags: the trigger's own (a Maps-brain exchange)
   // plus what the tools touched — minus the filing thread itself, which
   // the row already says. Personal threads only; a space thread is a

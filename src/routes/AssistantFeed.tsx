@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import ConfirmCard from '../components/ConfirmCard';
 import Avatar from '../components/Avatar';
 import MailRefCard from '../components/MailRefCard';
+import MailReconnectCard from '../components/MailReconnectCard';
 import AssistantComposer from '../components/AssistantComposer';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing, type SpaceKind } from '../acting/ActingProvider';
@@ -1498,6 +1499,18 @@ export default function AssistantFeed() {
                   .map((a) => (
                     <div className="afeed__pubrow" key={`${p.id}:calinv:${a.event_id}`}>
                       <CalInviteCard eventId={a.event_id} title={a.title} members={a.members} emails={a.emails} calendar={a.calendar} />
+                    </div>
+                  ))}
+                {/* RECONNECT, ONE TAP EACH (founder 2026-11-14: "i know the
+                    brain can't sign in to google for me - but could we make
+                    this as easy as possible") — Google's own screen, then
+                    straight back to this conversation. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'mail_reconnect' ? [a] : []))
+                  .map((a, i) => (
+                    <div className="afeed__pubrow" key={`${p.id}:mailrc:${i}`}>
+                      <MailReconnectCard accounts={a.accounts} since={p.created_at}
+                        onCarryOn={() => void send('I\u2019ve reconnected \u2014 please carry on.')} />
                     </div>
                   ))}
                 {/* A COPYABLE VALUE (founder 2026-11-02, the feed URL

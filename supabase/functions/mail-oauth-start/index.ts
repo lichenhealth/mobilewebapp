@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
   const user = await userRes.json();
   if (!(await mailTester(user.id))) return json({ error: 'Mail is in a personal test right now.' }, 403);
 
-  let body: { action?: string; accountId?: string; returnTo?: string; hint?: string } = {};
+  let body: { action?: string; accountId?: string; returnTo?: string; hint?: string; returnPath?: string } = {};
   try { body = await req.json(); } catch { /* fine */ }
 
   if (body.action === 'disconnect') {
@@ -54,8 +54,11 @@ Deno.serve(async (req) => {
   }
   const returnTo = ALLOWED_RETURNS.includes(body.returnTo ?? '') ? body.returnTo! : ALLOWED_RETURNS[0];
   const ts = Date.now();
-  const sig = await hmac(`${user.id}.${ts}.${returnTo}`);
-  const state = b64url(JSON.stringify({ u: user.id, t: ts, r: returnTo, s: sig }));
+  // A return PATH (2026-11-14): the brain's Reconnect card sends you back to
+  // the same conversation, not the Mail screen. In-app paths only, signed.
+  const rp = typeof body.returnPath === 'string' && /^\/[A-Za-z0-9/_\-?=&%.:]{0,400}$/.test(body.returnPath) && !body.returnPath.startsWith('//') ? body.returnPath : '';
+  const sig = await hmac(rp ? `${user.id}.${ts}.${returnTo}.${rp}` : `${user.id}.${ts}.${returnTo}`);
+  const state = b64url(JSON.stringify({ u: user.id, t: ts, r: returnTo, s: sig, ...(rp ? { p: rp } : {}) }));
   const hint = typeof body.hint === 'string' && /^[^\s@]+@[^\s@]+$/.test(body.hint) ? `&login_hint=${encodeURIComponent(body.hint)}` : '';
   const url = 'https://accounts.google.com/o/oauth2/v2/auth'
     + `?client_id=${encodeURIComponent(MAIL_CLIENT_ID)}`
