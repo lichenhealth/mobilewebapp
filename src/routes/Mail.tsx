@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import AssistantDoor from '../components/AssistantDoor';
-import { Icon } from '../components/Icon';
+import { Icon, type IconName } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import { ActingGate } from '../components/ActingGate';
@@ -41,6 +41,11 @@ export default function Mail() {
   const [acctFilter, setAcctFilter] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  // Google's categories + filters as bubbles (founder 2026-11-14: "help people
+  // navigate by promotions and other types of mail, like google… search just
+  // lets you apply filters and they show up as bubbles").
+  const [cat, setCat] = useState<MailCat | null>(null);
+  const [filters, setFilters] = useState<string[]>([]);
   const [threads, setThreads] = useState<ThreadSummary[] | null>(null);
   const [inboxErrs, setInboxErrs] = useState<{ account: string; error: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -75,15 +80,21 @@ export default function Mail() {
   const fetchInbox = useCallback(async (query: string) => {
     setLoading(true);
     try {
-      const r = await loadInbox(acctFilter, query);
+      const r = await loadInbox(acctFilter, composeQuery(query, filters, cat));
       setThreads(r.threads); setInboxErrs(r.errors);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'The inbox didn’t load.');
       setThreads([]);
     } finally { setLoading(false); }
-  }, [acctFilter]);
+  }, [acctFilter, filters, cat]);
   useEffect(() => { if (allowed && accounts.length) void fetchInbox(q); /* q runs on submit */ // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allowed, accounts.length, acctFilter]);
+  }, [allowed, accounts.length, acctFilter, filters, cat]);
+  const runSearch = () => {
+    const { ops, rest } = pullOps(q);
+    if (ops.length) { setQ(rest); setFilters((f) => [...new Set([...f, ...ops])]); }   // the effect re-runs
+    else void fetchInbox(q);
+  };
+  const toggleFilter = (op: string) => setFilters((f) => (f.includes(op) ? f.filter((x) => x !== op) : [...f, op]));
 
   useEffect(() => {
     if (!openAcct || !openThread) { setOpen(null); return; }
@@ -227,13 +238,33 @@ export default function Mail() {
               onClick={() => setDraft({ accountId: acctFilter ?? accounts[0].id, to: '', cc: '', subject: '', body: '' })}>
               <Icon name="plus" size={16} /></button>
             <AssistantDoor section="mail" label="Work with AI — your mail" />
+            <span className="mail__cats" role="group" aria-label="Categories">
+              {CATS.map((c, i) => (
+                <button key={c.id} className={'icon-row__btn' + (cat === c.id ? ' icon-row__btn--here' : '') + (i === CATS.length - 1 ? ' tip-right' : '')}
+                  data-tip={c.label} aria-label={c.label} aria-pressed={cat === c.id}
+                  onClick={() => setCat(cat === c.id ? null : c.id)}>
+                  <Icon name={c.icon} size={16} /></button>
+              ))}
+            </span>
           </div>
           {searchOpen && (
-            <form className="mail__search" onSubmit={(e) => { e.preventDefault(); void fetchInbox(q); }}>
-              <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search — from:katie, invoice, has:attachment…" />
+            <form className="mail__search" onSubmit={(e) => { e.preventDefault(); runSearch(); }}>
+              <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search — words, or from:katie, has:attachment…" />
               <button className="btn" type="submit">Search</button>
-              {q && <button type="button" className="mail__quiet" onClick={() => { setQ(''); void fetchInbox(''); }}>Clear</button>}
+              {(q || filters.length > 0) && <button type="button" className="mail__quiet" onClick={() => { setQ(''); setFilters([]); if (!filters.length) void fetchInbox(''); }}>Clear</button>}
+              <div className="mail__quick" aria-label="Add a filter">
+                {QUICK.map((f) => (
+                  <button type="button" key={f.op} className={'mail__chip' + (filters.includes(f.op) ? ' is-on' : '')} onClick={() => toggleFilter(f.op)}>
+                    {filters.includes(f.op) ? '✓ ' : '+ '}{f.label}</button>
+                ))}
+              </div>
             </form>
+          )}
+          {(filters.length > 0 || cat) && (
+            <div className="mail__bubbles" aria-label="Filters on">
+              {cat && <span className="mail__bubble">{CATS.find((c) => c.id === cat)?.label}<button aria-label="Remove" onClick={() => setCat(null)}>×</button></span>}
+              {filters.map((f) => <span key={f} className="mail__bubble">{prettyOp(f)}<button aria-label={`Remove ${prettyOp(f)}`} onClick={() => toggleFilter(f)}>×</button></span>)}
+            </div>
           )}
           {accounts.length > 0 && (
             <div className="mail__lenses" role="tablist">
@@ -253,7 +284,10 @@ export default function Mail() {
           {!openKey && composer}
           {inboxErrs.map((e) => <p key={e.account} className="mail__err">{e.account}: {e.error}</p>)}
           {loading && !threads && <p className="mail__fine">Opening your inboxes…</p>}
-          {threads && threads.length === 0 && !loading && <p className="mail__fine">{q ? 'Nothing matched that search.' : 'Inbox zero. 🌿'}</p>}
+          {threads && threads.length === 0 && !loading && <p className="mail__fine">{
+            q || filters.length ? 'Nothing matched that search.'
+              : cat ? `Nothing in ${CATS.find((c) => c.id === cat)?.label} — some inboxes (often work accounts) don't sort mail into categories.`
+              : 'Inbox zero. 🌿'}</p>}
           {threads && threads.length > 0 && (
             <ul className={'mail__list' + (loading ? ' is-loading' : '')}>
               {threads.map((t) => (
@@ -342,4 +376,42 @@ export default function Mail() {
       )}
     </div>
   );
+}
+
+type MailCat = 'primary' | 'promotions' | 'social' | 'updates' | 'forums';
+const CATS: { id: MailCat; label: string; icon: IconName }[] = [
+  { id: 'primary', label: 'Primary', icon: 'inbox' },
+  { id: 'promotions', label: 'Promotions', icon: 'tag' },
+  { id: 'social', label: 'Social', icon: 'user-multiple' },
+  { id: 'updates', label: 'Updates', icon: 'info' },
+  { id: 'forums', label: 'Forums', icon: 'chat' },
+];
+const QUICK = [
+  { op: 'is:unread', label: 'Unread' }, { op: 'is:starred', label: 'Starred' },
+  { op: 'has:attachment', label: 'Attachments' }, { op: 'is:important', label: 'Important' },
+  { op: 'newer_than:7d', label: 'This week' },
+];
+const OP_RE = /(?:^|\s)((?:from|to|cc|subject|is|has|label|in|older_than|newer_than|after|before|filename|category|larger|smaller):(?:"[^"]+"|\S+))/gi;
+/** Gmail operators typed into the box become bubbles; the rest stays words. */
+function pullOps(text: string): { ops: string[]; rest: string } {
+  const ops = [...text.matchAll(OP_RE)].map((m) => m[1].trim());
+  return { ops, rest: text.replace(OP_RE, ' ').replace(/\s+/g, ' ').trim() };
+}
+const OP_WORD: Record<string, string> = { from: 'From', to: 'To', cc: 'Cc', subject: 'Subject', label: 'Label', in: 'In', filename: 'File', after: 'After', before: 'Before', older_than: 'Older than', newer_than: 'Newer than', larger: 'Larger than', smaller: 'Smaller than', category: 'Category' };
+function prettyOp(op: string): string {
+  const q = QUICK.find((f) => f.op === op); if (q) return q.label;
+  const [k, ...v] = op.split(':'); const val = v.join(':').replace(/^"|"$/g, '');
+  if (k === 'is') return val[0].toUpperCase() + val.slice(1);
+  if (k === 'has') return val === 'attachment' ? 'Attachments' : `Has ${val}`;
+  return `${OP_WORD[k.toLowerCase()] ?? k}: ${val}`;
+}
+/** Words search all mail; filters alone (or a category) stay in the inbox. */
+function composeQuery(text: string, filters: string[], cat: MailCat | null): string {
+  const parts: string[] = [];
+  const scoped = filters.some((f) => /^in:/i.test(f));
+  if (!text.trim() && !scoped) parts.push('in:inbox');
+  if (cat) parts.push(`category:${cat}`);
+  parts.push(...filters);
+  if (text.trim()) parts.push(text.trim());
+  return parts.join(' ');
 }
