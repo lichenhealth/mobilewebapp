@@ -129,3 +129,14 @@ a.adminc__btn { text-decoration: none; display: inline-flex; align-items: center
 }
 .adminc__name-arrow { color: var(--peach-deep); }
 .adminc__edithint { margin: 4px 0 0; font-size: 12px; color: var(--ink-soft); }
+/* Add directly + browse the vocabulary (founder 2026-11-14). */
+.adminc__add, .adminc__vocab { margin-bottom: var(--s-5); }
+.adminc__addrow { display: flex; gap: var(--s-2); margin-bottom: var(--s-3); }
+.adminc__addname { flex: 1; min-width: 0; padding: 10px 14px; border: 1px solid var(--bone-edge); border-radius: var(--r-full); background: #fff; font: inherit; }
+.adminc__parent { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-3); flex-wrap: wrap; }
+.adminc__parent select { padding: 6px 10px; border: 1px solid var(--bone-edge); border-radius: var(--r-full); background: #fff; font: inherit; max-width: 100%; }
+.adminc__addnote { color: var(--green-deep, #4b6b3a); margin-top: var(--s-2); font-size: 14px; }
+.adminc__vocabq { margin: var(--s-3) 0 var(--s-2); width: 100%; }
+.adminc__vocablist { list-style: none; padding: 0; margin: var(--s-2) 0 0; columns: 2 200px; column-gap: var(--s-5); }
+.adminc__vocabitem { padding: 5px 0; break-inside: avoid; font-size: 15px; color: var(--ink); }
+.adminc__vocabitem.is-child { padding-left: var(--s-4); color: var(--ink-soft); font-size: 14px; }

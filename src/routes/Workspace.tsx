@@ -53,7 +53,7 @@ export default function Workspace() {
     { icon: 'user-multiple', label: 'At the door', sub: 'People asking to join', to: '/invite#door', n: knocks },
     { icon: 'groups', label: 'Members & invitations', sub: 'Invite, gift, manage members', to: '/admin/supporters', n: null },
     { icon: 'currentcy', label: 'Payouts', sub: 'Cash-outs waiting to be paid', to: '/admin/supporters#payouts', n: payouts },
-    { icon: 'book', label: 'Categories', sub: 'Suggestions waiting for a decision', to: '/admin/categories', n: cats },
+    { icon: 'book', label: 'Categories & identities', sub: 'Add to the vocabulary, answer suggestions', to: '/admin/categories', n: cats },
   ];
 
   return (

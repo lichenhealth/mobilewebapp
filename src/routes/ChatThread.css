@@ -978,3 +978,7 @@
 /* DRAG IT STRAIGHT IN (founder 2026-11-02): the chat composer catches a
    dropped screenshot/video/audio file — peach dashed ring while hovering. */
 .thread__input-wrap.is-dragover { outline: 2px dashed var(--peach); outline-offset: -3px; }
+/* Inside the header's own 38px slot the party avatar IS the circle — the
+   6px margin pushed it off-centre over the gradient disc (two rings). */
+.thread__head-avatar .thread__head-party { margin-right: 0; }
+.thread__head-avatar:has(.thread__head-party) { background: none; border: 0; }
