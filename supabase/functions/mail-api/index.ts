@@ -7,7 +7,7 @@
 //   send   { accountId, threadId?, to, cc?, subject, body }
 //   draft  { ...same }                         → a Gmail draft
 // Every account is checked against the CALLER's own mail_accounts row.
-import { mailTester, mailAccountsOf, listThreads, readThread, modifyThread, trashThread, sendMail, draftMail, type ThreadSummary } from '../_shared/gmail.ts';
+import { mailTester, mailAccountsOf, listThreads, readThread, modifyThread, trashThread, unsubscribeThread, sendMail, draftMail, type ThreadSummary } from '../_shared/gmail.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -55,6 +55,11 @@ Deno.serve(async (req) => {
       case 'trash': {
         await trashThread(me, s('accountId'), s('threadId'));
         return json({ ok: true });
+      }
+      case 'unsubscribe': {
+        const acct = (await mailAccountsOf(me)).find((a) => a.id === s('accountId'));
+        if (!acct) return json({ error: 'That inbox isn’t connected to your Lichen.' }, 400);
+        return json(await unsubscribeThread(me, acct, s('threadId')));
       }
       case 'send':
       case 'draft': {

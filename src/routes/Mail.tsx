@@ -8,7 +8,7 @@ import { ActingGate } from '../components/ActingGate';
 import { useTopBackFor } from '../lib/topBack';
 import {
   mailEnabled, listMailAccounts, connectMail, disconnectMail, loadInbox, loadMailThread,
-  modifyMailThread, trashMailThread, sendMail, saveMailDraft, senderName, senderAddress,
+  modifyMailThread, trashMailThread, unsubscribeMailThread, sendMail, saveMailDraft, senderName, senderAddress,
   type MailAccount, type ThreadSummary, type MailThread,
 } from '../lib/mailApi';
 import './Mail.css';
@@ -52,6 +52,7 @@ export default function Mail() {
   const [open, setOpen] = useState<MailThread | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [unsubUrl, setUnsubUrl] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [sure, setSure] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -119,7 +120,7 @@ export default function Mail() {
   const mine = useMemo(() => new Set(accounts.map((a) => a.email.toLowerCase())), [accounts]);
 
   function openThreadRow(t: ThreadSummary) {
-    setDraft(null); setMsg(null);
+    setDraft(null); setMsg(null); setUnsubUrl(null);
     const next = new URLSearchParams(params); next.set('thread', `${t.account_id}:${t.thread_id}`);
     setParams(next);
   }
@@ -136,7 +137,7 @@ export default function Mail() {
 
   async function act(kind: 'archive' | 'unread' | 'star' | 'trash') {
     if (!openAcct || !openThread) return;
-    setBusy(kind);
+    setBusy(kind); setUnsubUrl(null);
     try {
       if (kind === 'trash') await trashMailThread(openAcct, openThread);
       if (kind === 'archive') await modifyMailThread(openAcct, openThread, [], ['INBOX']);
@@ -155,6 +156,24 @@ export default function Mail() {
         closeThread();
       }
       setMsg(kind === 'trash' ? 'Moved to Trash — restorable there for 30 days.' : kind === 'archive' ? 'Archived — it’s out of the inbox, still in All Mail.' : kind === 'unread' ? 'Marked unread.' : (open?.starred ? 'Unstarred.' : 'Starred ✓'));
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t go through.'); }
+    finally { setBusy(null); }
+  }
+
+  // UNSUBSCRIBE (founder 2026-11-14) — the sender's own List-Unsubscribe
+  // header, the way Gmail's button works; a page-only sender hands its link
+  // back for the person to open and confirm.
+  async function unsubscribe() {
+    if (!openAcct || !openThread) return;
+    setBusy('unsub'); setUnsubUrl(null);
+    try {
+      const r = await unsubscribeMailThread(openAcct, openThread);
+      const who = senderName(r.from) || 'this sender';
+      if (r.status === 'unsubscribed') setMsg(`Unsubscribed from ${who} ✓ — it can take a few days for their mail to stop.`);
+      else if (r.status === 'emailed') setMsg(`Unsubscribe request emailed to ${who} ✓ (${r.how?.replace(/^sent /, '')}) — it can take a few days.`);
+      else if (r.status === 'needs_you') { setMsg(`${who} only unsubscribes on their own page — open it and confirm there:`); setUnsubUrl(r.url ?? null); }
+      else if (r.status === 'no_option') setMsg(`${who} doesn’t offer an unsubscribe option. Ask the brain to filter their mail straight to Trash instead.`);
+      else setMsg(r.error ? `That didn’t go through: ${r.error}` : 'That didn’t go through.');
     } catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t go through.'); }
     finally { setBusy(null); }
   }
@@ -242,7 +261,7 @@ export default function Mail() {
         </header>
       )}
 
-      {msg && <p className="mail__msg" role="status">{msg}</p>}
+      {msg && <p className="mail__msg" role="status">{msg}{unsubUrl && <> <a className="link-cue" href={unsubUrl} target="_blank" rel="noopener noreferrer">Open their unsubscribe page ↗</a></>}</p>}
 
       {!openKey && accounts.length > 0 && (
         <>
@@ -336,6 +355,7 @@ export default function Mail() {
                 <button className="btn" disabled={!!busy} onClick={() => void act('archive')}>Archive</button>
                 <button className="mail__quiet" disabled={!!busy} onClick={() => void act('trash')}>Trash</button>
                 <button className="mail__quiet" disabled={!!busy} onClick={() => void act('unread')}>Mark unread</button>
+                <button className="mail__quiet" disabled={!!busy} onClick={() => void unsubscribe()}>{busy === 'unsub' ? 'Unsubscribing…' : 'Unsubscribe'}</button>
                 <button className={'mail__star' + (open.starred ? ' is-starred' : '')} disabled={!!busy} aria-pressed={!!open.starred}
                   onClick={() => void act('star')}><Icon name="star" size={15} /> {open.starred ? 'Starred' : 'Star'}</button>
                 {/* An ACTION, not a stateful circle — worded, so it never reads

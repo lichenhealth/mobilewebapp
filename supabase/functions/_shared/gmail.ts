@@ -211,6 +211,64 @@ export async function trashThread(profileId: string, accountId: string, threadId
   await gm(token, `threads/${encodeURIComponent(threadId)}/trash`, { method: 'POST' });
 }
 
+/** UNSUBSCRIBE, THE WAY GMAIL'S OWN BUTTON DOES (founder 2026-11-14: "give
+ *  brain the ability to click thru and unsubscribe for me across accounts").
+ *  Reads the sender's List-Unsubscribe headers (RFC 2369 / RFC 8058) — never a
+ *  link from the email's body, which is a stranger's markup:
+ *  · https + List-Unsubscribe-Post: One-Click → one POST, done (no page);
+ *  · mailto: → an "unsubscribe" email from THAT inbox to THAT address only;
+ *  · https without one-click → a page a person must confirm: handed back.
+ *  Mail already in Trash still carries its headers, so this works after a
+ *  clear-out too. */
+export type UnsubResult = { thread_id: string; from: string; status: 'unsubscribed' | 'emailed' | 'needs_you' | 'no_option' | 'failed'; how?: string; url?: string; error?: string };
+const publicHttps = (u: string) => {
+  try {
+    const x = new URL(u);
+    if (x.protocol !== 'https:' || x.port) return false;
+    const h = x.hostname.toLowerCase();
+    if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal') || /^[\d.]+$/.test(h) || h.includes(':')) return false;
+    return true;
+  } catch { return false; }
+};
+export async function unsubscribeThread(profileId: string, acct: MailAccount, threadId: string): Promise<UnsubResult> {
+  const token = await accessTokenFor(profileId, acct.id);
+  const t = await gm(token, `threads/${encodeURIComponent(threadId)}?format=metadata&metadataHeaders=From&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post`) as { messages?: GMsg[] };
+  const msgs = (t?.messages ?? []).slice().reverse();
+  const m = msgs.find((x) => hdr(x, 'List-Unsubscribe')) ?? msgs[0];
+  const from = m ? hdr(m, 'From') : '';
+  const lu = m ? hdr(m, 'List-Unsubscribe') : '';
+  if (!lu) return { thread_id: threadId, from, status: 'no_option' };
+  const links = [...lu.matchAll(/<([^>]+)>/g)].map((x) => x[1].trim());
+  const https = links.find((l) => l.toLowerCase().startsWith('https:') && publicHttps(l));
+  const mailto = links.find((l) => l.toLowerCase().startsWith('mailto:'));
+  const oneClick = /one-click/i.test(hdr(m, 'List-Unsubscribe-Post'));
+  if (https && oneClick) {
+    try {
+      const r = await fetch(https, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click', signal: AbortSignal.timeout(10000) });
+      if (r.status < 400) return { thread_id: threadId, from, status: 'unsubscribed', how: 'one-click' };
+      if (!mailto) return { thread_id: threadId, from, status: 'needs_you', url: https, error: `their server said ${r.status}` };
+    } catch (e) {
+      if (!mailto) return { thread_id: threadId, from, status: 'needs_you', url: https, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+  if (mailto) {
+    try {
+      const u = new URL(mailto);
+      const to = decodeURIComponent(u.pathname).trim();
+      if (!/^[^\s@<>,]+@[^\s@<>,]+\.[^\s@<>,]+$/.test(to)) throw new Error('not a single address');
+      const subject = (u.searchParams.get('subject') ?? 'unsubscribe').slice(0, 200) || 'unsubscribe';
+      const body = (u.searchParams.get('body') ?? 'unsubscribe').slice(0, 500) || 'unsubscribe';
+      const raw = rawMessage({ from: acct.email, to, subject, body });
+      await gm(token, 'messages/send', { method: 'POST', body: JSON.stringify({ raw }) });
+      return { thread_id: threadId, from, status: 'emailed', how: `sent "unsubscribe" to ${to}` };
+    } catch (e) {
+      if (!https) return { thread_id: threadId, from, status: 'failed', error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+  if (https) return { thread_id: threadId, from, status: 'needs_you', url: https };
+  return { thread_id: threadId, from, status: 'no_option' };
+}
+
 /** Encode an RFC 2822 message (UTF-8 headers via RFC 2047). */
 function rawMessage(o: { from: string; to: string; cc?: string; subject: string; body: string; inReplyTo?: string; references?: string }): string {
   const enc = (s: string) => /[^\x20-\x7E]/.test(s) ? `=?UTF-8?B?${btoa(String.fromCharCode(...new TextEncoder().encode(s)))}?=` : s;

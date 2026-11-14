@@ -80,3 +80,9 @@ export function senderAddress(from: string): string {
   const m = from.match(/<([^>]+)>/);
   return (m ? m[1] : from).trim();
 }
+
+/** Unsubscribe from the sender of a thread — Gmail's own List-Unsubscribe way. */
+export type UnsubResult = { thread_id: string; from: string; status: 'unsubscribed' | 'emailed' | 'needs_you' | 'no_option' | 'failed'; how?: string; url?: string; error?: string };
+export async function unsubscribeMailThread(accountId: string, threadId: string): Promise<UnsubResult> {
+  return call('mail-api', { action: 'unsubscribe', accountId, threadId });
+}
