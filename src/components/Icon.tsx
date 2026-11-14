@@ -178,7 +178,7 @@ const ICONS: Record<IconName, IconEntry> = {
   'inbox': {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
-    content: <><path d="M8.1 9H3.5A2 2 0 0 0 1.5 11V19A2 2 0 0 0 3.5 21H13.5A2 2 0 0 0 15.5 19V14.4" /><path d="M2.3 10.4 8.5 14.8 9.4 14.15" /><path d="M12.5 2H19.5A3 3 0 0 1 22.5 5V10A3 3 0 0 1 19.5 13H15L10.5 16.2 12 13A2.5 2.5 0 0 1 9.5 10.5V5A3 3 0 0 1 12.5 2Z" /></>,
+    content: <><path d="M7.5 9H6L2.5 14v5.5A1.5 1.5 0 0 0 4 21h16a1.5 1.5 0 0 0 1.5-1.5V14L18 9h-1.5" /><path d="M2.5 14H8l1.2 2.5h5.6L16 14h5.5" /><path d="M12 2.5v9" /><path d="m8.5 8 3.5 3.5L15.5 8" /></>,
   },
   'check': {
     viewBox: '0 0 24 24',

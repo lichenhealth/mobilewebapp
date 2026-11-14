@@ -15,6 +15,7 @@ import { searchMessages, type MessageHit } from '../lib/chatApi';
 import AssistantDoor from '../components/AssistantDoor';
 import ChatConversation from '../components/ChatConversation';
 import { mailEnabled, listMailAccounts, loadInbox, senderName as mailSender, type ThreadSummary } from '../lib/mailApi';
+import '../components/IconRow.css';
 
 export default function Chat() {
   const [query, setQuery] = useState('');
@@ -231,14 +232,29 @@ export default function Chat() {
           <div className="chat__media" role="group" aria-label="Show by medium">
             <button className={'chat__lens' + (chan.length === 0 ? ' is-on' : '')} onClick={() => pickChan('all')}
               aria-pressed={chan.length === 0} aria-label="All correspondence" data-tip="All">
-              <Icon name="comms" size={17} />
+              <Icon name="inbox" size={17} />
             </button>
-            {MEDIA.map((m) => (
-              <button key={m} className={'chat__lens' + (chan.includes(m) ? ' is-on' : '') + (m === 'mail' ? ' tip-right' : '')}
-                onClick={() => pickChan(m)} aria-pressed={chan.includes(m)} aria-label={MEDIUM_LABEL[m]} data-tip={MEDIUM_LABEL[m]}>
-                <Icon name={MEDIUM_ICON[m]} size={16} />
-              </button>
-            ))}
+            {MEDIA.map((m) => {
+              const lens = (
+                <button key={m} className={'chat__lens' + (chan.includes(m) ? ' is-on' : '') + (m === 'mail' ? ' tip-right' : '')}
+                  onClick={() => pickChan(m)} aria-pressed={chan.includes(m)} aria-label={MEDIUM_LABEL[m]} data-tip={MEDIUM_LABEL[m]}>
+                  <Icon name={MEDIUM_ICON[m]} size={16} />
+                </button>
+              );
+              /* THE CIRCLE RULE (founder 2026-11-14): a lit medium lens grows
+                 the peach › tab that walks into its own home — Email → Mail.
+                 Chat's home IS this inbox, and texts have no home yet, so
+                 they stay plain filters. */
+              const door = m === 'mail' && chan.includes('mail') && mailState !== 'off';
+              return door ? (
+                <span key={m} className="icon-row__lenswrap">
+                  {lens}
+                  <button className="icon-row__door" onClick={() => navigate('/mail')} aria-label="Open Mail" data-tip="Open Mail">
+                    <Icon name="chevron-right" size={11} />
+                  </button>
+                </span>
+              ) : lens;
+            })}
           </div>
         )}
       </div>
@@ -337,7 +353,7 @@ export default function Chat() {
         ) : null)}
         {actingReady && !loading && items.length === 0 && chan.length > 0 && (
           <div className="chat__empty">
-            <Icon name={chan.length === 1 ? MEDIUM_ICON[chan[0]] : 'comms'} size={20} />
+            <Icon name={chan.length === 1 ? MEDIUM_ICON[chan[0]] : 'inbox'} size={20} />
             {chan.length === 1 && chan[0] === 'text' ? (
               <>
                 <p>No texts in your inbox yet</p>
