@@ -168,9 +168,9 @@ const ICONS: Record<IconName, IconEntry> = {
   // up and to the right — everything you send and receive, organized by who.
   // The letter's lines stop short of the bubble so it reads as sitting ON it.
   'inbox': {
-    viewBox: '0 -1 24 24',
+    viewBox: '0 0 24 24',
     strokeWidth: 1.6,
-    content: <><path d="M10.4 8H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5.6" /><path d="M2.6 9.3 9.5 14l2-1.4" /><path d="M14.5 2h5A2.5 2.5 0 0 1 22 4.5v3A2.5 2.5 0 0 1 19.5 10H16l-3 2.4V10a2 2 0 0 1-1-1.8V4.5A2.5 2.5 0 0 1 14.5 2z" /></>,
+    content: <><path d="M8.1 9H3.5A2 2 0 0 0 1.5 11V19A2 2 0 0 0 3.5 21H13.5A2 2 0 0 0 15.5 19V14.4" /><path d="M2.3 10.4 8.5 14.8 9.4 14.15" /><path d="M12.5 2H19.5A3 3 0 0 1 22.5 5V10A3 3 0 0 1 19.5 13H15L10.5 16.2 12 13A2.5 2.5 0 0 1 9.5 10.5V5A3 3 0 0 1 12.5 2Z" /></>,
   },
   'check': {
     viewBox: '0 0 24 24',
