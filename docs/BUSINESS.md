@@ -331,6 +331,18 @@ to build. Rough estimates only, not quotes:
   build tier 1 when she wants it; leave tiers 2–3 until members ask.
   Cancelling Workspace needs tier 1 + storage + an import of each account's
   history, AND the HIPAA upgrade for any clinical inbox. A founder money call.
+- **Opening Mail to members + other providers** (founder 2026-11-14,
+  agreed): today Mail is a private test (Google Testing mode, ≤100 named
+  testers, weekly re-consent). Opening Gmail access to members needs
+  Google verification PLUS a yearly third-party security audit (CASA) —
+  can run into thousands a year, a founder money call. Provider order if
+  members ask: MICROSOFT next (Graph API — similar build, ~1–2 weeks;
+  lighter publisher verification, no mandatory paid audit; work/school
+  tenants may need their IT admin's approval), then IMAP for iCloud/Yahoo/
+  others only on real demand (no Apple API — app-specific passwords stored
+  encrypted, a heavier security responsibility). @lichen.health addresses
+  stay Google Workspace seats (~$7–14/user/mo); Lichen never mints
+  addresses itself.
 
 ## Subsidy policy — state as of 2026-09-01
 
