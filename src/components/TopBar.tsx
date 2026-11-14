@@ -85,7 +85,7 @@ export default function TopBar({
   const fam = markFamily(pathname);
   const section = fam
     ? SECTION_LOGOS.find((s) => s.prefix === fam)
-    : SECTION_LOGOS.find((s) => pathname.startsWith(s.prefix));
+    : SECTION_LOGOS.find((s) => (pathname === s.prefix || pathname.startsWith(s.prefix + "/") || pathname.startsWith(s.prefix + "?")));
 
   // WHOSE SECTION IS THIS (founder 2026-08-11): a scoped section — Countryman
   // Stables' Marketplace, Melanie's Library — wears its owner's mark over the
