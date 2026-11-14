@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import FeedCard from './FeedCard';
 import { Icon, IconName } from './Icon';
 import { ScopeEmpty } from './ScopeEscape';
-import { aiDoorOn } from './AssistantDoor';
-import { consentOn } from '../lib/assistantConsentApi';
+import { aiDoorOn, setAiDoor } from './AssistantDoor';
+import { consentOn, setConsent } from '../lib/assistantConsentApi';
 import { ensureDirectChat, chatPathForPost } from '../lib/chatApi';
 import { formatDateShort, localDate } from '../lib/conciergeApi';
 import { recurrenceLabel } from '../lib/recurrence';
@@ -21,6 +21,7 @@ import { setHidden } from '../lib/hiddenApi';
 import type { MyceliumSignals } from './EngagementFooter';
 import { postOpenPath, postToCard, weaveProps } from '../lib/feedMapping';
 import './ContributionsFeed.css';
+import './IconRow.css';
 import { loadSpaceNames } from '../lib/postsApi';
 
 // ALL / SOCIAL / ACTIONABLE RETIRED (founder 2026-08-07): the area circles
@@ -157,8 +158,27 @@ export default function ContributionsFeed({ profileId, spaceId, handle, me, lead
   // Off when the owner has opted out, or when the viewer has switched this
   // section — or, on a space's page, THIS space (founder 2026-08-17:
   // per-identity consent) — off for themselves. Either way the door opens.
+  const [, setAiTick] = useState(0);
   const aiOn = !assistantOff && !!assistantSection && aiDoorOn(assistantSection)
     && (!spaceId || consentOn('space', spaceId));
+  const briefPath = assistantSection
+    ? `/assistant?section=${assistantSection}${assistantMember ? `&member=${assistantMember}` : ''}${assistantSpace ? `&space=${assistantSpace}` : ''}`
+    : '';
+  // THE CIRCLE RULE (founder 2026-11-04, re-audited 2026-11-14): the brain
+  // toggles this page's AI on one press; the peach › tab, standing only
+  // while it's on, is the way into the briefing. A space whose stewards
+  // switched AI off can't be toggled from here — that press explains.
+  const toggleAi = () => {
+    if (!assistantSection) return;
+    if (assistantOff) { navigate(briefPath); return; }
+    if (aiOn) {
+      if (spaceId) setConsent('space', spaceId, false); else setAiDoor(assistantSection, false);
+    } else {
+      setAiDoor(assistantSection, true);
+      if (spaceId) setConsent('space', spaceId, true);
+    }
+    setAiTick((n) => n + 1);
+  };
 
   // An entity's area icon opens the REAL section, scoped to it ("Melanie's
   // Courses", "Pine Valley Grange's Marketplace" — founder 2026-07-24/25:
@@ -231,16 +251,16 @@ export default function ContributionsFeed({ profileId, spaceId, handle, me, lead
             </button>
           ))}
           {assistantSection && (
+            <span className="cfeed__aiwrap">
             <button
-              className={'cfeed__area cfeed__area--ai' + (aiOn ? '' : ' is-ai-off')}
-              onClick={() => navigate(`/assistant?section=${assistantSection}${assistantMember ? `&member=${assistantMember}` : ''}${assistantSpace ? `&space=${assistantSpace}` : ''}`)}
+              className={'cfeed__area cfeed__area--ai' + (aiOn ? ' is-ai-on' : ' is-ai-off')}
+              onClick={toggleAi}
+              aria-pressed={aiOn}
               title={aiOn
-                ? 'Your assistant — a briefing for this part of your Lichen life'
+                ? 'AI on — tap to turn off · the arrow opens your briefing'
                 : assistantOff
                   ? 'This one works without the assistant. Your own is still a tap away.'
-                  : spaceId && !consentOn('space', spaceId)
-                    ? 'You’ve switched the assistant off for yourself here. Tap to change that.'
-                    : 'You’ve switched the assistant off for this section. Tap to change that.'}
+                  : 'AI off — tap to turn on'}
             >
               <span className="cfeed__area-circle">
                 <Icon name="brain" size={14} />
@@ -248,6 +268,13 @@ export default function ContributionsFeed({ profileId, spaceId, handle, me, lead
               </span>
               <span className="cfeed__area-label">AI</span>
             </button>
+            {aiOn && (
+              <button className="icon-row__door cfeed__aidoor" onClick={() => navigate(briefPath)}
+                aria-label="Open the briefing" data-tip="Work with AI">
+                <Icon name="chevron-right" size={11} />
+              </button>
+            )}
+            </span>
           )}
           {(leading.length > 0 || assistantSection)
             && (!!feedDoor || afterGap.length > 0 || areasPresent.length > 0 || trailing.length > 0)

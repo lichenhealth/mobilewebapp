@@ -1,10 +1,10 @@
 // LICHEN MAIL, BY WORD (founder 2026-11-11: "having the Ai brain help you with
 // all your email accounts outside of lichen"). Reading is the switch (the
-// Mail AI section); the brain only ever DRAFTS — a draft lands in the
+// Mail AI section); the brain DRAFTS (never sends) and, when asked, TRASHES or ARCHIVES (2026-11-14 — trash is recoverable 30 days) — a draft lands in the
 // account itself (Gmail and Lichen Mail both show it) and the person sends.
 // Every account resolves against the SENDER's own mail_accounts rows; a
 // thread id only ever reaches their own mailbox through their own token.
-import { mailAccountsOf, listThreads, readThread, draftMail, type MailAccount } from './gmail.ts';
+import { mailAccountsOf, listThreads, readThread, draftMail, trashThread, modifyThread, type MailAccount } from './gmail.ts';
 
 type Out = { ok: boolean; [k: string]: unknown };
 
@@ -29,6 +29,18 @@ export const MAIL_TOOLS = [
         to: { type: 'string' }, cc: { type: 'string' }, subject: { type: 'string' }, body: { type: 'string' },
       },
       required: ['account', 'body'],
+    },
+  },
+  {
+    name: 'tidy_mail',
+    description: 'Move email threads to the Trash (recoverable in that account\'s Trash for 30 days — never a permanent delete) or archive them out of the inbox. Use ONLY when the member asked you to delete/clear/archive specific mail in their own words, and ONLY thread_ids you got from my_mail in this conversation (never invent one). action = "trash" | "archive". account = the address that holds them; thread_ids = up to 25. Report exactly what was moved, and say trashed mail can be restored from that account\'s Trash for 30 days.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string' }, action: { type: 'string', enum: ['trash', 'archive'] },
+        thread_ids: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['account', 'action', 'thread_ids'],
     },
   },
 ];
@@ -80,6 +92,27 @@ export async function runMailTool(profileId: string, name: string, input: Record
         door: s('thread_id')
           ? { path: `/mail?thread=${acct.id}:${encodeURIComponent(s('thread_id'))}`, label: 'Open the thread in Mail' }
           : { path: '/mail', label: 'Open Mail' },
+      };
+    }
+    if (name === 'tidy_mail') {
+      const ids = Array.isArray(input.thread_ids) ? (input.thread_ids as unknown[]).map(String).filter(Boolean).slice(0, 25) : [];
+      if (!ids.length) return { ok: false, error: 'Which threads? Find them with my_mail first.' };
+      const trash = s('action') !== 'archive';
+      const done: string[] = []; const failed: string[] = [];
+      for (const id of ids) {
+        try {
+          if (trash) await trashThread(profileId, acct.id, id);
+          else await modifyThread(profileId, acct.id, id, [], ['INBOX']);
+          done.push(id);
+        } catch { failed.push(id); }
+      }
+      return {
+        ok: done.length > 0,
+        note: trash
+          ? `Moved ${done.length} thread${done.length === 1 ? '' : 's'} to ${acct.email}'s Trash — restorable there for 30 days.`
+          : `Archived ${done.length} thread${done.length === 1 ? '' : 's'} out of ${acct.email}'s inbox.`,
+        ...(failed.length ? { failed: `${failed.length} couldn't be moved (a thread id may not belong to that account).` } : {}),
+        door: { path: '/mail', label: 'Open Mail' },
       };
     }
     return { ok: false, error: 'Unknown mail tool.' };

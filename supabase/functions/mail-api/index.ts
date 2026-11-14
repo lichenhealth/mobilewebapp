@@ -7,7 +7,7 @@
 //   send   { accountId, threadId?, to, cc?, subject, body }
 //   draft  { ...same }                         → a Gmail draft
 // Every account is checked against the CALLER's own mail_accounts row.
-import { mailTester, mailAccountsOf, listThreads, readThread, modifyThread, sendMail, draftMail, type ThreadSummary } from '../_shared/gmail.ts';
+import { mailTester, mailAccountsOf, listThreads, readThread, modifyThread, trashThread, sendMail, draftMail, type ThreadSummary } from '../_shared/gmail.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -50,6 +50,10 @@ Deno.serve(async (req) => {
       case 'modify': {
         const arr = (k: string) => (Array.isArray(b[k]) ? (b[k] as unknown[]).map(String) : []);
         await modifyThread(me, s('accountId'), s('threadId'), arr('add'), arr('remove'));
+        return json({ ok: true });
+      }
+      case 'trash': {
+        await trashThread(me, s('accountId'), s('threadId'));
         return json({ ok: true });
       }
       case 'send':

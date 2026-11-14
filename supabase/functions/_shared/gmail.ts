@@ -174,6 +174,13 @@ export async function modifyThread(profileId: string, accountId: string, threadI
   });
 }
 
+/** Move a thread to the account's Trash — recoverable there for 30 days
+ *  (gmail.modify allows trash, never permanent delete). */
+export async function trashThread(profileId: string, accountId: string, threadId: string) {
+  const token = await accessTokenFor(profileId, accountId);
+  await gm(token, `threads/${encodeURIComponent(threadId)}/trash`, { method: 'POST' });
+}
+
 /** Encode an RFC 2822 message (UTF-8 headers via RFC 2047). */
 function rawMessage(o: { from: string; to: string; cc?: string; subject: string; body: string; inReplyTo?: string; references?: string }): string {
   const enc = (s: string) => /[^\x20-\x7E]/.test(s) ? `=?UTF-8?B?${btoa(String.fromCharCode(...new TextEncoder().encode(s)))}?=` : s;

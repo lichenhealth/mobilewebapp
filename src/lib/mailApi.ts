@@ -59,6 +59,10 @@ export async function loadMailThread(accountId: string, threadId: string): Promi
   return call('mail-api', { action: 'thread', accountId, threadId });
 }
 
+export async function trashMailThread(accountId: string, threadId: string): Promise<void> {
+  await call('mail-api', { action: 'trash', accountId, threadId });
+}
+
 export async function modifyMailThread(accountId: string, threadId: string, add: string[], remove: string[]): Promise<void> {
   await call('mail-api', { action: 'modify', accountId, threadId, add, remove });
 }
