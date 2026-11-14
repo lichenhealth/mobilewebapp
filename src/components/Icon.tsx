@@ -26,6 +26,7 @@ export type IconName =
   | 'calendar'
   | 'chat'
   | 'inbox'
+  | 'comms'
   | 'check'
   | 'groups'
   | 'member-heart'
@@ -167,6 +168,13 @@ const ICONS: Record<IconName, IconEntry> = {
   // THE INBOX MARK (founder 2026-11-14): a letter with a chat bubble on top,
   // up and to the right — everything you send and receive, organized by who.
   // The letter's lines stop short of the bubble so it reads as sitting ON it.
+  // ALL CORRESPONDENCE (founder 2026-11-14): phone, chat bubble and letter
+  // together — the Inbox's All lens, beside the three single-medium lenses.
+  'comms': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.5,
+    content: <><path d="M3 3.75H6A1.5 1.5 0 0 1 7.5 5.25V18.25A1.5 1.5 0 0 1 6 19.75H3A1.5 1.5 0 0 1 1.5 18.25V5.25A1.5 1.5 0 0 1 3 3.75Z" /><path d="M4 17.15H5" /><path d="M12.5 2H20A2.5 2.5 0 0 1 22.5 4.5V7.5A2.5 2.5 0 0 1 20 10H14.5L11.2 12.2 12.5 10A2.5 2.5 0 0 1 10 7.5V4.5A2.5 2.5 0 0 1 12.5 2Z" /><path d="M11.5 14H21A1.5 1.5 0 0 1 22.5 15.5V20A1.5 1.5 0 0 1 21 21.5H11.5A1.5 1.5 0 0 1 10 20V15.5A1.5 1.5 0 0 1 11.5 14Z" /><path d="M10.4 14.6 16.25 18.3 22.1 14.6" /></>,
+  },
   'inbox': {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
