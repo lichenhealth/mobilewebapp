@@ -233,13 +233,19 @@ export default function Mail() {
               {q && <button type="button" className="mail__quiet" onClick={() => { setQ(''); void fetchInbox(''); }}>Clear</button>}
             </form>
           )}
-          {accounts.length > 1 && (
+          {accounts.length > 0 && (
             <div className="mail__lenses" role="tablist">
-              <button className={'mail__lens' + (!acctFilter ? ' is-on' : '')} onClick={() => setAcctFilter(null)}>All inboxes</button>
-              {accounts.map((a) => (
+              {accounts.length > 1 && <button className={'mail__lens' + (!acctFilter ? ' is-on' : '')} onClick={() => setAcctFilter(null)}>All inboxes</button>}
+              {accounts.length > 1 && accounts.map((a) => (
                 <button key={a.id} className={'mail__lens' + (acctFilter === a.id ? ' is-on' : '')} title={a.email}
                   onClick={() => setAcctFilter(acctFilter === a.id ? null : a.id)}>{shortAcct(a.email)}</button>
               ))}
+              {/* ADD MAIL rides the lens row (founder 2026-11-14): another
+                  inbox is one tap from where the inboxes are listed. */}
+              <button className="mail__lens mail__lens--add" disabled={busy === 'connect'}
+                onClick={() => { setBusy('connect'); void connectMail().catch((e) => { setMsg(e.message); setBusy(null); }); }}>
+                {busy === 'connect' ? 'Opening Google…' : '+ Add mail'}
+              </button>
             </div>
           )}
           {!openKey && composer}
