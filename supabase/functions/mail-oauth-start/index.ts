@@ -12,7 +12,9 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/mail-oauth-callback`;
 const ALLOWED_RETURNS = ['https://lichen.health', 'http://localhost:5173', 'http://localhost:4173'];
-const SCOPES = 'https://www.googleapis.com/auth/gmail.modify openid email';
+// gmail.settings.basic (2026-11-14): Gmail FILTERS — the brain's "skip the
+// inbox for X" rules. Inboxes connected before need one Reconnect.
+const SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic openid email';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',

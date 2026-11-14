@@ -174,6 +174,35 @@ export async function modifyThread(profileId: string, accountId: string, threadI
   });
 }
 
+// ── FILTERS (2026-11-14) — Gmail's own rules, needs gmail.settings.basic. ──
+export type GFilter = { id: string; criteria?: Record<string, unknown>; action?: { addLabelIds?: string[]; removeLabelIds?: string[]; forward?: string } };
+export async function listFilters(profileId: string, accountId: string): Promise<GFilter[]> {
+  const token = await accessTokenFor(profileId, accountId);
+  return ((await gm(token, 'settings/filters')) as { filter?: GFilter[] } | null)?.filter ?? [];
+}
+export async function createFilter(profileId: string, accountId: string, criteria: Record<string, unknown>, action: { addLabelIds?: string[]; removeLabelIds?: string[] }): Promise<GFilter> {
+  const token = await accessTokenFor(profileId, accountId);
+  return await gm(token, 'settings/filters', { method: 'POST', body: JSON.stringify({ criteria, action }) }) as GFilter;
+}
+export async function deleteFilter(profileId: string, accountId: string, filterId: string) {
+  const token = await accessTokenFor(profileId, accountId);
+  await gm(token, `settings/filters/${encodeURIComponent(filterId)}`, { method: 'DELETE' });
+}
+/** A user label's id by name, created when missing. */
+export async function labelIdFor(profileId: string, accountId: string, name: string): Promise<string> {
+  const token = await accessTokenFor(profileId, accountId);
+  const all = ((await gm(token, 'labels')) as { labels?: { id: string; name: string }[] }).labels ?? [];
+  const hit = all.find((l) => l.name.toLowerCase() === name.toLowerCase());
+  if (hit) return hit.id;
+  const made = await gm(token, 'labels', { method: 'POST', body: JSON.stringify({ name, labelListVisibility: 'labelShow', messageListVisibility: 'show' }) }) as { id: string };
+  return made.id;
+}
+export async function labelNames(profileId: string, accountId: string): Promise<Map<string, string>> {
+  const token = await accessTokenFor(profileId, accountId);
+  const all = ((await gm(token, 'labels')) as { labels?: { id: string; name: string }[] }).labels ?? [];
+  return new Map(all.map((l) => [l.id, l.name]));
+}
+
 /** Move a thread to the account's Trash — recoverable there for 30 days
  *  (gmail.modify allows trash, never permanent delete). */
 export async function trashThread(profileId: string, accountId: string, threadId: string) {

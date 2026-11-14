@@ -321,7 +321,7 @@ export default function Mail() {
                 <span className="mail__acct-email">{a.email}
                   {a.last_error && <em className="mail__acct-warn"> · needs reconnecting</em>}</span>
                 <span className="mail__acct-acts">
-                  {a.last_error && <button className="mail__quiet" onClick={() => void connectMail(a.email).catch((e) => setMsg(e.message))}>Reconnect</button>}
+                  <button className="mail__quiet" onClick={() => void connectMail(a.email).catch((e) => setMsg(e.message))}>Reconnect</button>
                   <button className={'mail__quiet mail__quiet--del' + (sure === a.id ? ' is-sure' : '')}
                     onBlur={() => setSure((s) => (s === a.id ? null : s))}
                     onClick={() => {

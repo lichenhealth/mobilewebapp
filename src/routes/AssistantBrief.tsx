@@ -29,7 +29,7 @@ import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
 import './Snapshot.css';
 import { loadChatList, recentMessagesAcross } from '../lib/chatApi';
-import { mailEnabled, loadInbox, senderName as mailSender } from '../lib/mailApi';
+import { mailEnabled, loadInbox, listMailAccounts, senderName as mailSender } from '../lib/mailApi';
 import { myBalance, myStatement } from '../lib/ledgerApi';
 import { loadMyWeb, loadMyRecommendations } from '../lib/myceliumApi';
 import { listBookableTypes } from '../lib/bookingApi';
@@ -142,6 +142,19 @@ export default function AssistantBrief() {
   // section=chat is its own brief again, wearing the Inbox circle lit.
   const rawSection = params.get('section') ?? 'home';
   const section = rawSection;
+  // BRAIN FILTERS (founder 2026-11-14: "have all the various inboxes up top
+  // in here, too, so the brain can be filtered by mailbox… When you're in the
+  // inbox's brain, filter by text, email, and chat as well"): Mail's brief
+  // narrows by ?mbox=<account id>, the Inbox brief by ?medium=chat|mail|text.
+  const mbox = section === 'mail' ? params.get('mbox') : null;
+  const medium = section === 'chat' ? params.get('medium') : null;
+  const [mailAccts, setMailAccts] = useState<{ id: string; email: string }[]>([]);
+  useEffect(() => {
+    if (section !== 'mail') return;
+    let live = true;
+    void listMailAccounts().then((a) => { if (live) setMailAccts(a); }).catch(() => null);
+    return () => { live = false; };
+  }, [section]);
   const [refs, setRefs] = useState<{ label: string; to: string }[]>(() => cache.get(section)?.refs ?? []);
   // "← Back" says WHERE it goes (founder 2026-09-13: "so people remember
   // where they came from") — chip-friendly names, not FRAMES' sentence titles.
@@ -213,7 +226,8 @@ export default function AssistantBrief() {
   const briefKey = memberId ? `member:${memberId}`
     : spaceParam ? `space:${spaceParam}`
     : collectionId ? `course:${collectionId}`
-    : spacesAll ? `${section}:all` : section;
+    : spacesAll ? `${section}:all`
+    : mbox ? `mail:${mbox}` : medium ? `chat:${medium}` : section;
   const { user } = useAuth();
   const me = user?.id ?? '';
   const { rows } = useNotifications();
@@ -717,7 +731,12 @@ export default function AssistantBrief() {
             .gte('created_at', weekAgo);
           if (count) extras.new_gatherings_posted_this_week = count;
         }
-        if (section === 'chat' || section === 'home') {
+        if (section === 'chat' && medium) {
+          extras.focus = medium === 'mail' ? 'They filtered this briefing to EMAIL only — speak only to their mail.'
+            : medium === 'text' ? 'They filtered this briefing to TEXTS. Texts aren\'t connected to Lichen yet — say so plainly and briefly.'
+            : 'They filtered this briefing to CHAT only — speak only to their Lichen conversations, not email.';
+        }
+        if ((section === 'chat' && (!medium || medium === 'chat')) || section === 'home') {
           const { data: unread } = await supabase.rpc('chat_unread_counts');
           const rows2 = (unread as { chat_id: string; unread: number }[] | null) ?? [];
           const waitingAll = rows2.filter((r) => r.unread > 0);
@@ -750,7 +769,7 @@ export default function AssistantBrief() {
             }
           }
         }
-        if (section === 'chat') {
+        if (section === 'chat' && (!medium || medium === 'chat')) {
           // The Inbox's own read, whether or not anyone is waiting: recent
           // exchanges across your rooms (and, for Mail testers with the
           // Mail switch on, what's newest in their inboxes).
@@ -794,11 +813,19 @@ export default function AssistantBrief() {
             }
           }
         }
-        if (section === 'mail' && await mailEnabled(me).catch(() => false)) {
+        if (section === 'chat' && medium === 'mail' && aiDoorOn('mail') && await mailEnabled(me).catch(() => false)) {
           const box = await loadInbox(null, 'is:unread').catch(() => null);
           const fresh = (box?.threads ?? []).slice(0, 15);
           extras.unread_mail = fresh.map((th) => ({ from: mailSender(th.from), subject: th.subject, snippet: th.snippet?.slice(0, 160), inbox: th.account }));
           if (!fresh.length) extras.unread_mail_note = 'No unread mail across their connected inboxes.';
+        }
+        if (section === 'mail' && await mailEnabled(me).catch(() => false)) {
+          const box = await loadInbox(mbox, 'is:unread').catch(() => null);
+          const fresh = (box?.threads ?? []).slice(0, 15);
+          extras.unread_mail = fresh.map((th) => ({ from: mailSender(th.from), subject: th.subject, snippet: th.snippet?.slice(0, 160), inbox: th.account }));
+          const one = mbox ? (fresh[0]?.account ?? 'one inbox') : null;
+          if (one) extras.focus = `They filtered this briefing to ONE inbox: ${one}. Speak only to it.`;
+          if (!fresh.length) extras.unread_mail_note = one ? `No unread mail in ${one}.` : 'No unread mail across their connected inboxes.';
         }
         if ((section === 'communities' || section === 'groups' || section === 'organizations' || section === 'places') && desk && deskNames) {
           // The actual queue rows, for up to three busiest desks.
@@ -854,7 +881,7 @@ export default function AssistantBrief() {
     })();
     return () => { live = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, section, doorOn, fingerprint, refreshTick]);
+  }, [me, section, doorOn, fingerprint, refreshTick, mbox, medium]);
 
   // A space briefing's conversation belongs in that space's own thread
   // (founder 2026-08-22), not the section's.
@@ -1175,6 +1202,27 @@ export default function AssistantBrief() {
               </button>
             ))}
           </ScrollHintRow>
+          {(section === 'mail' && mailAccts.length > 1) || section === 'chat' ? (
+            <div className="abrief__filters" role="group" aria-label="Filter this briefing">
+              {(section === 'mail'
+                ? [{ k: null as string | null, label: 'All inboxes' }, ...mailAccts.map((a) => ({ k: a.id as string | null, label: a.email }))]
+                : [{ k: null as string | null, label: 'All' }, { k: 'chat', label: 'Chat' }, { k: 'mail', label: 'Email' }, { k: 'text', label: 'Texts' }]
+              ).map((f) => {
+                const cur = section === 'mail' ? mbox : medium;
+                return (
+                  <button key={f.label} type="button"
+                    className={`abrief__filter${cur === f.k ? ' is-on' : ''}`}
+                    aria-pressed={cur === f.k}
+                    onClick={() => {
+                      const next = new URLSearchParams(params);
+                      const key = section === 'mail' ? 'mbox' : 'medium';
+                      if (f.k) next.set(key, f.k); else next.delete(key);
+                      navigate(`/assistant?${next.toString()}`, { replace: true });
+                    }}>{f.label}</button>
+                );
+              })}
+            </div>
+          ) : null}
         </>
       )}
 
