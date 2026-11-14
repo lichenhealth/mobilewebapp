@@ -59,7 +59,7 @@ export const MAIL_TOOLS = [
   },
   {
     name: 'mail_filters',
-    description: 'Gmail FILTERS (standing rules for future mail) on one of their inboxes. op "list" shows them; op "create" makes one — match by from / to / subject / query (Gmail search grammar), then any of: skip_inbox (archive it on arrival), mark_read, star, trash, label (a label name, created if missing), never_spam; op "delete" removes one by filter_id from list. Create or delete ONLY a rule the member asked for in their own words, and say plainly what it now does to future mail. A filter never forwards. If Gmail refuses for missing permission, tell them to tap Reconnect beside that inbox on the Mail screen once.',
+    description: 'Gmail FILTERS (standing rules for future mail) on one of their inboxes. op "list" shows them; op "create" makes one — match by from / to / subject / query (Gmail search grammar), then any of: skip_inbox (archive it on arrival), mark_read, star, trash, label (a label name, created if missing), never_spam; op "delete" removes one by filter_id from list. Create or delete ONLY a rule the member asked for in their own words, and say plainly what it now does to future mail. A filter never forwards. If Gmail refuses for missing permission, a Reconnect card is attached automatically — tell them to tap it here and say when they\'re back.',
     input_schema: {
       type: 'object',
       properties: {
