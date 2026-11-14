@@ -31,6 +31,8 @@ export interface EventRow {
   zoom_unique?: boolean;
   /** A DRAFT event's time-hold (2026-11-09) — opens back into Compose. */
   is_draft?: boolean;
+  /** A calendar draft's unsent invitees + choices (never seated until Save). */
+  draft_state?: Record<string, unknown> | null;
   draft_id?: string | null;
   /** The event's own cap over calendar sharing: null = follow it. */
   share_level?: 'busy' | 'hidden' | null;
@@ -75,7 +77,7 @@ export interface EventRow {
 
 const EVENT_COLS =
   'id, creator_id, owner_profile_id, owner_space_id, title, description, location, lat, lng, ' +
-  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, is_draft, draft_id, share_level, link_access, link_space_ids, poll_status, poll_deadline, poll_wait_all, poll_auto, poll_rules, poll_suggested, poll_reason, created_at';
+  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, is_draft, draft_id, draft_state, share_level, link_access, link_space_ids, poll_status, poll_deadline, poll_wait_all, poll_auto, poll_rules, poll_suggested, poll_reason, created_at';
 // event_attendees has TWO FKs to profiles (profile_id + invited_by) — the
 // embed must name the one it means (house rule; see CLAUDE.md).
 const ATTENDEE_EMBED =
@@ -728,4 +730,13 @@ export async function cancelCalendarInvites(eventId: string): Promise<void> {
     const sent = await loadCalendarSends(eventId);
     if (sent.length) await calInvite({ event_id: eventId, mode: 'cancel' });
   } catch (e) { console.warn('cancelCalendarInvites:', (e as Error).message); }
+}
+
+/** Your calendar drafts (events saved as is_draft without a Compose draft) —
+ *  what the new-event screen offers to continue. */
+export async function listCalendarDrafts(me: string): Promise<{ id: string; title: string; start_date: string; created_at: string }[]> {
+  const { data } = await supabase.from('events').select('id, title, start_date, created_at')
+    .eq('creator_id', me).eq('is_draft', true).is('draft_id', null)
+    .order('created_at', { ascending: false }).limit(6);
+  return (data as { id: string; title: string; start_date: string; created_at: string }[] | null) ?? [];
 }

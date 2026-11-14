@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
   const hi = plusDays(today, 400);
   const COLS = 'id,title,description,location,start_date,end_date,all_day,start_min,end_min,recurrence';
   const [own, rsvp] = await Promise.all([
-    sb(`events?owner_profile_id=eq.${me}&select=${COLS}&start_date=lte.${hi}&or=(end_date.gte.${lo},start_date.gte.${lo},recurrence.not.is.null)&order=start_date&limit=1000`),
+    sb(`events?owner_profile_id=eq.${me}&is_draft=not.is.true&select=${COLS}&start_date=lte.${hi}&or=(end_date.gte.${lo},start_date.gte.${lo},recurrence.not.is.null)&order=start_date&limit=1000`),
     sb(`event_attendees?profile_id=eq.${me}&status=in.(going,tentative,invited)&select=status,event:events(${COLS})&limit=1000`),
   ]);
 

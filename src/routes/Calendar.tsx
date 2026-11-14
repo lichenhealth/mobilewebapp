@@ -1352,11 +1352,24 @@ export default function Calendar() {
             </p>
             {selected.is_draft && (
               <>
-                <p className="calp__sheet-ext">A draft event, holding this time on your calendar. Others see at most that you&rsquo;re busy. It turns into the real event when you post it.</p>
-                {selected.draft_id && (
+                <p className="calp__sheet-ext">A draft event, holding this time on your calendar. Others see at most that you&rsquo;re busy. {selected.draft_id ? 'It turns into the real event when you post it.' : 'Nobody is invited until you open it and save.'}</p>
+                {selected.draft_id ? (
                   <button className="calp__sheet-extlink" onClick={() => navigate(`/compose?draft=${selected.draft_id}`)}>
                     <Icon name="arrow-right" size={13} /> Open the draft
                   </button>
+                ) : (
+                  <>
+                    <button className="calp__sheet-extlink" onClick={() => navigate(`/calendar/edit/${selected.id}`)}>
+                      <Icon name="arrow-right" size={13} /> Open the draft
+                    </button>
+                    <button className="calp__sheet-extlink calp__sheet-extlink--alt" onClick={async () => {
+                      if (!window.confirm(`Discard the draft “${selected.title}”?`)) return;
+                      await supabase.from('events').delete().eq('id', selected.id).eq('is_draft', true);
+                      setSelected(null); void loadRef.current?.();
+                    }}>
+                      Discard draft
+                    </button>
+                  </>
                 )}
               </>
             )}
