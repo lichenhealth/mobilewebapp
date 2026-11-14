@@ -1,6 +1,6 @@
 import { trashDoc } from '../lib/trashApi';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { Icon } from '../components/Icon';
@@ -17,6 +17,8 @@ import DocEditor from '../components/office/DocEditor';
 import SlidesEditor from '../components/office/SlidesEditor';
 import { aiDoorOn } from '../components/AssistantDoor';
 import { PageHead } from '../components/PageHead';
+import DocComments, { useDocComments } from '../components/office/DocComments';
+import { cellMark, firstName, peerColor, type Anchor, type Goto, type Peer } from '../components/office/collab';
 import './ChatDocs.css';
 
 interface RoomInfo { title: string; spaceName: string | null; spaceId: string | null }
@@ -48,6 +50,22 @@ export default function ChatDocPage() {
   const pending = useRef<Patch | null>(null);
   const docRef = useRef<string | null>(null);
   const timer = useRef<number | null>(null);
+  const [sp] = useSearchParams();
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
+  const [goto, setGoto] = useState<Goto | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(!!sp.get('comment'));
+  const [peers, setPeers] = useState<Peer[]>([]);
+  const [remote, setRemote] = useState<{ html: string; n: number } | null>(null);
+  const [comments, setComments] = useDocComments(typeof doc === 'object' && doc ? doc.id : null);
+  // CLOUD (founder 2026-11-14: "lets have this be cloud, so things auto save"):
+  // what I last sent, what the server last held, and the live state as refs so
+  // the realtime handler always sees the present.
+  const lastSent = useRef<string>('');
+  const baseTabs = useRef<SheetTab[]>([]);
+  const live = useRef({ tabs, doc });
+  live.current = { tabs, doc };
+  const onAnchor = useCallback((a: Anchor | null) => setAnchor(a), []);
+  const jump = useCallback((a: Anchor) => setGoto((g) => ({ anchor: a, n: (g?.n ?? 0) + 1 })), []);
 
   useEffect(() => {
     if (!docId || !me) return;
@@ -66,6 +84,8 @@ export default function ChatDocPage() {
         : [{ name: 'Sheet1', cells: (d.data?.cells ?? [['']]).map((r) => [...r]), frozen: 0 }]);
       setSlides((d.data?.slides ?? [{ title: '', body: '', layout: 'title' }]).map((x) => ({ ...x })));
       setTheme(d.data?.theme ?? 'paper');
+      lastSent.current = stable(d.data ?? null);
+      baseTabs.current = d.data?.sheets?.length ? JSON.parse(JSON.stringify(d.data.sheets)) : [{ name: 'Sheet1', cells: (d.data?.cells ?? [['']]).map((r) => [...r]) }];
       if (!d.chat_id) { setRoom(null); return; }
       const [{ data: c }, { data: m }] = await Promise.all([
         supabase.from('chats')
@@ -98,7 +118,9 @@ export default function ChatDocPage() {
     if (!patch || !id) return;
     setStatus('saving');
     try {
+      if (patch.data) lastSent.current = stable(patch.data);
       await saveChatDoc(id, patch);
+      if (patch.data?.sheets) baseTabs.current = JSON.parse(JSON.stringify(patch.data.sheets));
       setDoc((cur) => (cur && cur !== 'gone' ? { ...cur, ...patch, updated_by: user?.id ?? cur.updated_by, updated_at: new Date().toISOString() } : cur));
       setStatus((s) => (s === 'saving' ? 'saved' : s));
     }
@@ -120,6 +142,68 @@ export default function ChatDocPage() {
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, []);
+
+  // LIVE: a teammate's save streams in; presence says who else is here and
+  // where they're looking. My own echo is recognized and ignored.
+  const docKey = typeof doc === 'object' && doc ? doc.id : null;
+  useEffect(() => {
+    if (!docKey || !me) return;
+    let myName = 'Someone';
+    const ch = supabase.channel(`doc-live:${docKey}`, { config: { presence: { key: me } } });
+    ch.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_docs', filter: `id=eq.${docKey}` }, (pl) => {
+      const row = pl.new as ChatDocRow;
+      const cur = live.current.doc;
+      if (!cur || cur === 'gone') return;
+      const pend = pending.current;
+      const mine = !!row.data && stable(row.data) === lastSent.current;
+      setDoc({ ...row, ...(pend ?? {}), data: pend?.data ?? row.data });
+      if (mine) return;
+      if (!pend?.title && row.title) setTitle(row.title);
+      const d = row.data;
+      if (row.kind === 'doc') {
+        if (!pend?.data) { const h = d?.html ?? textToHtml(row.body ?? ''); setHtml(h); setBody(row.body ?? ''); setRemote((r) => ({ html: h, n: (r?.n ?? 0) + 1 })); }
+      } else if (row.kind === 'sheet') {
+        const theirs: SheetTab[] = d?.sheets?.length ? JSON.parse(JSON.stringify(d.sheets)) : [{ name: 'Sheet1', cells: (d?.cells ?? [['']]).map((r) => [...r]) }];
+        let next = theirs;
+        if (pend?.data) {
+          // Keep MY unsaved cells on top of theirs, cell by cell — two people in
+          // different cells never erase each other.
+          next = rebaseCells(baseTabs.current, live.current.tabs, theirs);
+          pending.current = { ...pend, data: { ...(row.data ?? {}), ...(pend.data ?? {}), sheets: next, cells: next[0]?.cells ?? [['']] } };
+        }
+        baseTabs.current = JSON.parse(JSON.stringify(theirs));
+        setTabs(next);
+      } else if (row.kind === 'slides') {
+        if (!pend?.data) { setSlides((d?.slides ?? []).map((x) => ({ ...x }))); setTheme(d?.theme ?? 'paper'); }
+      }
+    });
+    ch.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_docs', filter: `id=eq.${docKey}` }, () => setDoc('gone'));
+    ch.on('presence', { event: 'sync' }, () => {
+      const st = ch.presenceState<{ uid: string; name: string; anchor?: Anchor | null }>();
+      const out: Peer[] = [];
+      for (const [k, metas] of Object.entries(st)) {
+        if (k === me) continue;
+        const m = metas[metas.length - 1];
+        if (m) out.push({ uid: m.uid, name: m.name, color: peerColor(m.uid), anchor: m.anchor ?? null });
+      }
+      setPeers(out);
+    });
+    let active = true;
+    void (async () => {
+      const { data } = await supabase.from('profiles').select('full_name').eq('id', me).maybeSingle();
+      myName = (data as { full_name: string | null } | null)?.full_name ?? 'Someone';
+      presence.current = (a) => { if (active) void ch.track({ uid: me, name: myName, anchor: a }); };
+    })();
+    ch.subscribe((stt) => { if (stt === 'SUBSCRIBED') presence.current?.(anchorRef.current); });
+    return () => { active = false; presence.current = null; void supabase.removeChannel(ch); };
+  }, [docKey, me]);
+  const presence = useRef<((a: Anchor | null) => void) | null>(null);
+  const anchorRef = useRef<Anchor | null>(null);
+  useEffect(() => {
+    anchorRef.current = anchor;
+    const t = window.setTimeout(() => presence.current?.(anchor), 250);
+    return () => window.clearTimeout(t);
+  }, [anchor]);
 
   if (!me) return null;
   if (doc === 'gone') {
@@ -154,6 +238,10 @@ export default function ChatDocPage() {
     const row = await createPersonalDoc(doc.kind, `Copy of ${title}`.slice(0, 120), { body: doc.kind === 'doc' ? body : null, data });
     navigate(`/docs/${row.id}`);
   };
+
+  const openRoots = comments.filter((c) => !c.parent_id && !c.resolved_at);
+  const cellMarks = new Set(openRoots.flatMap((c) => (c.anchor?.kind === 'cell' ? [cellMark(c.anchor.tab, c.anchor.r, c.anchor.c)] : [])));
+  const slideMarks = new Set(openRoots.flatMap((c) => (c.anchor?.kind === 'slide' ? [c.anchor.index] : [])));
 
   const editedBy = doc.updated_by ? (names[doc.updated_by] ?? (doc.updated_by === me ? 'you' : 'a member')) : null;
   const when = new Date(doc.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -205,13 +293,28 @@ export default function ChatDocPage() {
             <span className={'cdocp__saved is-' + status}>{statusWord}</span>
             {msg && <span className="cdocp__msg">{msg}</span>}
             {editedBy && status === 'saved' && <span className="cdocp__edited">· Last edit by {editedBy} · {when}</span>}
+            <span className="cdocp__collab">
+              {peers.length > 0 && (
+                <span className="cdocp__peers" title={`Also here: ${peers.map((p) => p.name).join(', ')}`}>
+                  {peers.slice(0, 4).map((p) => <span key={p.uid} className="cdocp__peer" style={{ background: p.color }}>{firstName(p.name)[0]}</span>)}
+                  <span className="cdocp__peerword">{peers.length === 1 ? `${firstName(peers[0].name)} is here` : `${peers.length} others here`}</span>
+                </span>
+              )}
+              <button className={'cdocp__cbtn' + (commentsOpen ? ' is-on' : '')} onClick={() => setCommentsOpen((v) => !v)}>
+                💬 Comments{openRoots.length ? ` · ${openRoots.length}` : ''}
+              </button>
+            </span>
           </div>
           {doc.kind === 'doc' && (
-            <DocEditor html={html} title={title} onChange={onDoc}
+            <DocEditor html={html} title={title} onChange={onDoc} chatId={doc.chat_id} onAnchor={onAnchor} goto={goto} remote={remote}
               placeholder={doc.chat_id ? 'Write here — everyone in the room can read and edit this.' : 'Write here — this lives in your Drive, yours alone.'} />
           )}
-          {doc.kind === 'sheet' && <SheetEditor tabs={tabs} onChange={onSheet} title={title} />}
-          {doc.kind === 'slides' && <SlidesEditor slides={slides} theme={theme} onChange={onSlides} title={title} />}
+          {doc.kind === 'sheet' && <SheetEditor tabs={tabs} onChange={onSheet} title={title} onAnchor={onAnchor} marks={cellMarks} peers={peers} goto={goto} />}
+          {doc.kind === 'slides' && <SlidesEditor slides={slides} theme={theme} onChange={onSlides} title={title} chatId={doc.chat_id} onAnchor={onAnchor} marks={slideMarks} peers={peers} goto={goto} />}
+          {commentsOpen && (
+            <DocComments docId={doc.id} me={me} rows={comments} setRows={setComments} anchor={anchor}
+              onGoto={jump} onClose={() => setCommentsOpen(false)} focusId={sp.get('comment')} />
+          )}
         </>
       )}
       <div className="cdocp__settings">
@@ -243,4 +346,38 @@ export default function ChatDocPage() {
       </div>
     </div>
   );
+}
+
+/** Key-sorted JSON — Postgres jsonb reorders keys, so plain stringify can't
+ *  recognize my own echo. */
+function stable(v: unknown): string {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v ?? null);
+  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  const o = v as Record<string, unknown>;
+  return '{' + Object.keys(o).filter((k) => o[k] !== undefined).sort().map((k) => JSON.stringify(k) + ':' + stable(o[k])).join(',') + '}';
+}
+
+/** My unsaved cell edits (mine vs base) laid over a teammate's newer save. */
+function rebaseCells(base: SheetTab[], mine: SheetTab[], theirs: SheetTab[]): SheetTab[] {
+  const out: SheetTab[] = JSON.parse(JSON.stringify(theirs));
+  for (const m of mine) {
+    const b = base.find((t) => t.name === m.name);
+    const t = out.find((x) => x.name === m.name);
+    if (!t) { if (!b) out.push(JSON.parse(JSON.stringify(m))); continue; }
+    m.cells.forEach((row, r) => row.forEach((v, c) => {
+      if ((b?.cells[r]?.[c] ?? '') === v) return;
+      while (t.cells.length <= r) t.cells.push([]);
+      while (t.cells[r].length <= c) t.cells[r].push('');
+      t.cells[r][c] = v;
+    }));
+    if (b) b.cells.forEach((row, r) => row.forEach((v, c) => {
+      // A cell I cleared stays cleared.
+      if (v && !(m.cells[r]?.[c]) && t.cells[r]?.[c] === v) t.cells[r][c] = '';
+    }));
+    if (stable(m.fmt) !== stable(b?.fmt)) t.fmt = m.fmt;
+    if (stable(m.charts) !== stable(b?.charts)) t.charts = m.charts;
+    if (stable(m.cond) !== stable(b?.cond)) t.cond = m.cond;
+    if (stable(m.filter) !== stable(b?.filter)) t.filter = m.filter;
+  }
+  return out;
 }

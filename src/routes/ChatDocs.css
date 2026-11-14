@@ -179,3 +179,9 @@
 .cdocp__status { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--ink-muted); margin-top: -6px; }
 .cdocp__saved.is-saving, .cdocp__saved.is-dirty { color: var(--peach-deep); }
 .cdocp__saved.is-error { color: var(--red-deep, #a8432a); }
+.cdocp__collab { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cdocp__peers { display: inline-flex; align-items: center; gap: 2px; }
+.cdocp__peer { width: 22px; height: 22px; border-radius: 50%; color: #fff; font-size: 11px; line-height: 22px; text-align: center; box-shadow: 0 0 0 2px #fff; }
+.cdocp__peerword { margin-left: 6px; }
+.cdocp__cbtn { border: 1px solid var(--bone-edge); background: #fff; border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12px; cursor: pointer; color: var(--ink-soft); }
+.cdocp__cbtn.is-on, .cdocp__cbtn:hover { border-color: var(--peach); color: var(--peach-deep); }

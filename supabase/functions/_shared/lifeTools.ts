@@ -169,7 +169,7 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'drive_doc',
-    description: 'Their PERSONAL Drive files — Lichen\'s own Docs, Sheets and Slides (the same files Drive\'s + makes, private to them). op: list, read (one by exact title), create, update, add_to_folder (put the file in one of their Drive folders by exact folder name — created if missing). kind: doc (body = the words; light markdown works: # Heading, ## Subheading, **bold**, *italic*, - bullets, 1. numbered, - [ ] checklist, > quote) | sheet (rows = an array of rows, each an array of cell strings; the first row is usually headers; cells may hold real FORMULAS like =SUM(B2:B9), =AVERAGE(C:C), =B2*C2, =IF(D2>100,"over","ok"), =VLOOKUP(...), =SUMIF(...), cross-tab refs like =Expenses!B10 — prefer a formula over a number you computed yourself) | slides (slides = [{title, body, layout, notes}], body one point per line; layout one of title, bullets, text, two (uses body2 for the right column), section, quote, big; theme one of paper, ink, moss, peach, sky, clay, mono). Sheets can have several tabs: pass tab (a tab name) with rows/append_rows to write that tab (created if missing); read returns every tab. update by exact title: new_title, body (replaces), append_text, rows (replaces that tab), append_rows, slides (replaces), append_slides, theme. folder on create also files it. Use this to BUILD what they ask for — an expense sheet from their mail receipts, a plan, a deck — then hand the Open door. Read before updating; never invent figures — only what they said or what you read (their mail, their Lichen data).',
+    description: 'Their PERSONAL Drive files — Lichen\'s own Docs, Sheets and Slides (the same files Drive\'s + makes, private to them). op: list, read (one by exact title), create, update, add_to_folder (put the file in one of their Drive folders by exact folder name — created if missing). kind: doc (body = the words; light markdown works: # Heading, ## Subheading, **bold**, *italic*, - bullets, 1. numbered, - [ ] checklist, > quote) | sheet (rows = an array of rows, each an array of cell strings; the first row is usually headers; cells may hold real FORMULAS like =SUM(B2:B9), =AVERAGE(C:C), =B2*C2, =IF(D2>100,"over","ok"), =VLOOKUP(...), =SUMIF(...), cross-tab refs like =Expenses!B10 — prefer a formula over a number you computed yourself) | slides (slides = [{title, body, layout, notes}], body one point per line; layout one of title, bullets, text, two (uses body2 for the right column), section, quote, big; theme one of paper, ink, moss, peach, sky, clay, mono). Sheets can have several tabs: pass tab (a tab name) with rows/append_rows to write that tab (created if missing); read returns every tab. A sheet can also carry charts ([{type: column|bar|line|pie, range like "A1:B6" — first column labels, first row headers, title}]) and color rules ([{range, op: gt|lt|gte|lte|eq|neq|between|contains|empty|notempty|scale, value, value2, style: green|red|yellow|peach|bold}]) on create or update (they add to that tab). For a pivot-style summary write a new tab with one row per group and =SUMIFS/=COUNTIFS/=AVERAGEIFS/=MAXIFS/=MINIFS formulas over the source — it stays live. update by exact title: new_title, body (replaces), append_text, rows (replaces that tab), append_rows, slides (replaces), append_slides, theme. folder on create also files it. Use this to BUILD what they ask for — an expense sheet from their mail receipts, a plan, a deck — then hand the Open door. Read before updating; never invent figures — only what they said or what you read (their mail, their Lichen data).',
     input_schema: {
       type: 'object',
       properties: {
@@ -185,6 +185,8 @@ export const LIFE_TOOLS = [
         append_rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
         theme: { type: 'string', enum: ['paper', 'ink', 'moss', 'peach', 'sky', 'clay', 'mono'] },
         slides: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' }, body2: { type: 'string' }, layout: { type: 'string' }, notes: { type: 'string' } } } },
+        charts: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: ['column', 'bar', 'line', 'pie'] }, range: { type: 'string' }, title: { type: 'string' } } } },
+        rules: { type: 'array', items: { type: 'object', properties: { range: { type: 'string' }, op: { type: 'string' }, value: { type: 'string' }, value2: { type: 'string' }, style: { type: 'string', enum: ['green', 'red', 'yellow', 'peach', 'bold'] } } } },
         append_slides: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' }, body2: { type: 'string' }, layout: { type: 'string' }, notes: { type: 'string' } } } },
       },
       required: ['op'],
@@ -370,7 +372,28 @@ export async function runLifeTool(
   }
 
   if (name === 'drive_doc') {
-    type Tab = { name: string; cells: string[][]; fmt?: Record<string, unknown>; frozen?: number };
+    type Tab = { name: string; cells: string[][]; fmt?: Record<string, unknown>; frozen?: number; charts?: unknown[]; cond?: unknown[] };
+    // Charts and color rules (founder 2026-11-14 — Sheets' second floor), the
+    // same shapes the sheet editor stores.
+    const RANGE = /^\$?[A-Z]{1,3}\$?\d{1,6}(:\$?[A-Z]{1,3}\$?\d{1,6})?$/;
+    const rid = () => Math.random().toString(36).slice(2, 10);
+    const cleanCharts = (v: unknown) => (Array.isArray(v) ? v : []).slice(0, 6).flatMap((c: { type?: string; range?: string; title?: string }) => {
+      const range = String(c?.range ?? '').toUpperCase().replace(/\s/g, '');
+      if (!RANGE.test(range)) return [];
+      const type = ['column', 'bar', 'line', 'pie'].includes(String(c.type)) ? c.type : 'column';
+      return [{ id: rid(), type, range, title: String(c.title ?? '').slice(0, 80) }];
+    });
+    const STY: Record<string, Record<string, unknown>> = {
+      green: { bg: '#dcefd9', color: '#24572c' }, red: { bg: '#f8dcd6', color: '#8c2a1e' }, yellow: { bg: '#fbefc4', color: '#6b5310' },
+      peach: { bg: '#fde3cf', color: '#8a4517' }, bold: { bold: true },
+    };
+    const OPS = ['gt', 'lt', 'gte', 'lte', 'eq', 'neq', 'between', 'contains', 'empty', 'notempty', 'scale'];
+    const cleanRules = (v: unknown) => (Array.isArray(v) ? v : []).slice(0, 10).flatMap((r: { range?: string; op?: string; value?: string; value2?: string; style?: string }) => {
+      const range = String(r?.range ?? '').toUpperCase().replace(/\s/g, '');
+      if (!RANGE.test(range) || !OPS.includes(String(r.op))) return [];
+      if (r.op === 'scale') return [{ id: rid(), range, op: 'scale', lo: '#ffffff', hi: r.style === 'red' ? '#e8866d' : '#7fb685' }];
+      return [{ id: rid(), range, op: r.op, a: r.value != null ? String(r.value).slice(0, 60) : undefined, b: r.value2 != null ? String(r.value2).slice(0, 60) : undefined, ...(STY[String(r.style)] ?? STY.green) }];
+    });
     type SlideT = { title: string; body: string; body2?: string; layout?: string; notes?: string };
     type DocRow = { id: string; kind: string; title: string; body: string | null; data: { cells?: string[][]; sheets?: Tab[]; slides?: SlideT[]; html?: string; theme?: string } | null; updated_at: string };
     const KIND_WORD: Record<string, string> = { doc: 'doc', sheet: 'spreadsheet', slides: 'presentation' };
@@ -437,6 +460,9 @@ export async function runLifeTool(
         const fmt: Record<string, unknown> = {};
         if (rows.length > 1) rows[0].forEach((_, c) => { fmt[`0,${c}`] = { b: true }; });
         const t: Tab = { name: tabName, cells: rows, fmt, frozen: rows.length > 1 ? 1 : 0 };
+        const ch = cleanCharts(input.charts), cr = cleanRules(input.rules);
+        if (ch.length) t.charts = ch;
+        if (cr.length) t.cond = cr;
         data = { sheets: [t], cells: rows };
       } else if (kind === 'slides') {
         const sl = cleanSlides(input.slides);
@@ -500,7 +526,10 @@ export async function runLifeTool(
           cells = [...cells, ...add]; did.push(`added ${add.length} row${add.length === 1 ? '' : 's'}`);
         }
         tabs[ti] = { ...tabs[ti], cells: cells.slice(0, 2000) };
-        if (input.rows || input.append_rows) patch.data = { ...(d.data ?? {}), sheets: tabs, cells: tabs[0].cells };
+        const ch = cleanCharts(input.charts), cr = cleanRules(input.rules);
+        if (ch.length) { tabs[ti].charts = [...(tabs[ti].charts ?? []), ...ch]; did.push(`added ${ch.length} chart${ch.length === 1 ? '' : 's'}`); }
+        if (cr.length) { tabs[ti].cond = [...(tabs[ti].cond ?? []), ...cr]; did.push(`added ${cr.length} color rule${cr.length === 1 ? '' : 's'}`); }
+        if (input.rows || input.append_rows || ch.length || cr.length) patch.data = { ...(d.data ?? {}), sheets: tabs, cells: tabs[0].cells };
       }
     } else if (d.kind === 'slides') {
       let sl = d.data?.slides ?? [];

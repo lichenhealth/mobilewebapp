@@ -87,7 +87,7 @@
 /* ── Docs ─────────────────────────────────────────────────────────────── */
 .docx { display: flex; flex-direction: column; gap: 8px; }
 .docx__style { height: 30px; border: 1px solid var(--bone-edge); border-radius: 7px; background: #fff; font: inherit; font-size: 13px; padding: 0 6px; }
-.docx__desk { background: var(--bone-deep); border-radius: 12px; padding: clamp(8px, 3vw, 28px); }
+.docx__desk { position: relative; background: var(--bone-deep); border-radius: 12px; padding: clamp(8px, 3vw, 28px); }
 .docx__page {
   background: #fff; max-width: 816px; min-height: 70vh; margin: 0 auto; padding: clamp(20px, 6vw, 72px) clamp(18px, 7vw, 88px);
   box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 6px 20px rgba(0,0,0,.05); outline: 0; font-size: 15px; line-height: 1.6; color: var(--ink);
@@ -191,3 +191,144 @@ ul.slx__b li { margin-bottom: .45em; }
   .sheet__menu, .sheet__swatches { position: fixed; top: auto; left: 16px; right: 16px; bottom: calc(var(--nav-h, 90px) + 12px); }
   .slx__present { margin-left: 8px; }
 }
+
+/* ── Sheets, second floor: charts, rules, filters, pivots ── */
+.sheet__filterbtn {
+  position: absolute; right: 2px; top: 3px; width: 20px; height: 20px; padding: 0; border: 1px solid var(--bone-edge);
+  border-radius: 5px; background: #fff; font-size: 11px; line-height: 1; color: var(--ink-muted); cursor: pointer;
+}
+.sheet__filterbtn.is-on { background: var(--peach-tint, #fde8d4); border-color: var(--peach); color: var(--peach-deep); }
+.sheet__filtermenu {
+  position: fixed; z-index: 60; width: 240px; max-height: 70vh; overflow: auto; padding: 6px;
+  background: #fff; border: 1px solid var(--bone-edge); border-radius: 10px; box-shadow: 0 10px 28px rgba(0,0,0,.16);
+  display: flex; flex-direction: column; gap: 2px; white-space: normal; cursor: default; font-size: 13px;
+}
+.sheet__filtermenu > button { text-align: left; padding: 7px 10px; border: 0; background: none; border-radius: 6px; font: inherit; cursor: pointer; color: var(--ink-soft); }
+.sheet__filtermenu > button:hover { background: var(--bone); }
+.sheet__filtermenu hr { border: 0; border-top: 1px solid var(--bone-edge); margin: 4px 0; width: 100%; }
+.sheet__filtermenu input:not([type]) { border: 1px solid var(--bone-edge); border-radius: 8px; padding: 6px 8px; font: inherit; }
+.sheet__filterlinks { display: flex; gap: 10px; padding: 4px 2px; }
+.sheet__filterlinks button { border: 0; background: none; padding: 0; color: var(--peach-deep); font: inherit; font-size: 12px; cursor: pointer; }
+.sheet__filtervals { display: flex; flex-direction: column; max-height: 220px; overflow: auto; padding: 2px; }
+.sheet__filtervals label { display: flex; gap: 8px; align-items: center; padding: 4px 4px; cursor: pointer; overflow-wrap: anywhere; }
+.sheet__filternote, .sheet__pivotnote {
+  font-size: 13px; color: var(--ink-muted); padding: 6px 10px; background: var(--bone-warm, #f6f3ec); border-radius: 8px; margin: 6px 0;
+}
+.sheet__filternote button, .sheet__pivotnote button { border: 0; background: none; padding: 0; color: var(--peach-deep); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.sheet__panel {
+  margin: 8px 0; padding: 12px 14px; background: #fff; border: 1px solid var(--bone-edge); border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.06); font-size: 13px;
+}
+.sheet__panelhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.sheet__panelhead button { border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: var(--ink-muted); }
+.sheet__panelnote { margin: 0 0 10px; color: var(--ink-muted); }
+.sheet__rules { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sheet__rules li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sheet__rules li > span:nth-child(2) { flex: 1; min-width: 140px; }
+.sheet__rules button, .sheet__charthead button { border: 0; background: none; padding: 2px 4px; font: inherit; cursor: pointer; color: var(--ink-muted); }
+.sheet__rules button:hover, .sheet__charthead button:hover { color: var(--peach-deep); }
+.sheet__rules .is-danger:hover, .sheet__charthead .is-danger:hover { color: var(--red-deep, #a8432a); }
+.sheet__ruleswatch { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 20px; padding: 0 4px; border-radius: 5px; border: 1px solid var(--bone-edge); font-size: 11px; }
+.sheet__ruleform, .sheet__chartform { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.sheet__ruleform label, .sheet__chartform label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-muted); }
+.sheet__ruleform input, .sheet__ruleform select, .sheet__chartform input {
+  border: 1px solid var(--bone-edge); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 13px; color: var(--ink); background: #fff; min-width: 110px;
+}
+.sheet__chips { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.sheet__chips button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--bone-edge); border-radius: 999px;
+  background: #fff; font: inherit; font-size: 12px; cursor: pointer; color: var(--ink-soft);
+}
+.sheet__chips button.is-on { background: var(--peach-tint, #fde8d4); border-color: var(--peach); color: var(--peach-deep); }
+.sheet__primary {
+  padding: 7px 14px; border: 0; border-radius: 999px; background: var(--peach-deep); color: #fff; font: inherit; font-size: 13px; cursor: pointer;
+}
+.sheet__primary:disabled { opacity: .45; cursor: default; }
+.sheet__charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 12px; margin: 12px 0; }
+.sheet__chart { margin: 0; padding: 10px 12px; background: #fff; border: 1px solid var(--bone-edge); border-radius: 12px; }
+.sheet__charthead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.sheet__charthead b { flex: 1; font-size: 14px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.sheet__chartform { margin-bottom: 8px; }
+.sheet__chartempty { color: var(--ink-muted); font-size: 13px; margin: 18px 0; }
+.schart { position: relative; }
+.schart svg { width: 100%; height: auto; display: block; }
+.schart__grid { stroke: #ecebe7; stroke-width: 1; }
+.schart__tick { font-size: 11px; fill: var(--ink-muted); font-family: inherit; }
+.schart__lbl { font-size: 12px; fill: var(--ink-soft); font-family: inherit; }
+.schart rect, .schart circle, .schart path[fill]:not([fill="none"]) { cursor: crosshair; }
+.schart__tip {
+  position: absolute; transform: translate(-50%, calc(-100% - 8px)); pointer-events: none; white-space: nowrap;
+  padding: 4px 8px; border-radius: 6px; background: var(--ink, #1f2a30); color: #fff; font-size: 12px; z-index: 5;
+}
+.office-print .sheet__charts { display: none; }
+
+/* ── images in docs ── */
+.docx__page img { display: block; max-width: 100%; height: auto; margin: 10px auto; border-radius: 6px; cursor: pointer; }
+.docx__page img:hover { outline: 2px solid var(--peach); outline-offset: 2px; }
+.docx__imgbar {
+  position: absolute; z-index: 20; display: flex; gap: 2px; padding: 4px; background: #fff;
+  border: 1px solid var(--bone-edge); border-radius: 10px; box-shadow: 0 8px 22px rgba(0,0,0,.14);
+}
+.docx__imgbar button { border: 0; background: none; padding: 6px 10px; border-radius: 6px; font: inherit; font-size: 13px; cursor: pointer; color: var(--ink-soft); }
+.docx__imgbar button:hover { background: var(--bone); }
+.docx__imgbar .is-danger { color: var(--red-deep, #a8432a); }
+
+/* ── images on slides ── */
+.slx__img { position: relative; overflow: hidden; border-radius: 1.2cqw; background: rgba(0,0,0,.06); }
+.slx__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.slx__img--empty { display: flex; align-items: center; justify-content: center; font-size: 2.2cqw; opacity: .55; border: .25cqw dashed currentColor; background: none; }
+.slx__slide--image { display: flex; flex-direction: column; }
+.slx__slide--image .slx__img { flex: 1; min-height: 0; margin-top: 2cqw; }
+.slx__slide--imagetext { display: grid; grid-template-columns: 1fr 1fr; gap: 4cqw; align-items: center; }
+.slx__slide--imagetext .slx__img { align-self: stretch; }
+.slx__slide--imagetext .slx__txt { display: flex; flex-direction: column; gap: 2cqw; min-width: 0; }
+
+/* ── comments + live co-editing ── */
+.sheet__grid td.has-note::after {
+  content: ''; position: absolute; top: 0; right: 0; border-style: solid; border-width: 0 7px 7px 0;
+  border-color: transparent var(--peach-deep) transparent transparent;
+}
+.sheet__peertag {
+  position: absolute; left: -1px; top: -15px; z-index: 6; padding: 0 5px; border-radius: 4px 4px 4px 0;
+  color: #fff; font-size: 10px; line-height: 15px; pointer-events: none; white-space: nowrap;
+}
+.slx__thumb { position: relative; }
+.slx__note { position: absolute; right: 4px; top: 2px; z-index: 2; font-size: 11px; }
+.slx__peer {
+  position: absolute; right: 4px; bottom: 4px; z-index: 2; width: 18px; height: 18px; border-radius: 50%;
+  color: #fff; font-size: 10px; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px #fff;
+}
+.dcm {
+  position: fixed; z-index: 70; right: 12px; top: calc(var(--top-h, 64px) + 12px); bottom: 12px; width: min(360px, calc(100vw - 24px));
+  display: flex; flex-direction: column; background: #fff; border: 1px solid var(--bone-edge); border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.16); font-size: 13px;
+}
+@media (max-width: 1023px) {
+  .dcm { top: auto; right: 8px; left: 8px; width: auto; bottom: calc(var(--nav-h, 90px) + var(--safe-bot, 0px) + 8px); max-height: 66vh; }
+}
+.dcm__head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 8px; }
+.dcm__head b { font-size: 15px; }
+.dcm__head button { border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: var(--ink-muted); }
+.dcm__new { display: flex; flex-direction: column; gap: 6px; padding: 0 14px 12px; border-bottom: 1px solid var(--bone-edge); }
+.dcm__new textarea { border: 1px solid var(--bone-edge); border-radius: 10px; padding: 8px 10px; font: inherit; resize: vertical; }
+.dcm__new .sheet__primary { align-self: flex-end; }
+.dcm__pin { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; max-width: 100%; padding: 3px 8px; border-radius: 999px; background: var(--peach-tint, #fde8d4); color: var(--peach-deep); font-size: 12px; overflow-wrap: anywhere; }
+.dcm__pin button { border: 0; background: none; padding: 0; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; }
+.dcm__err { color: var(--red-deep, #a8432a); margin: 0; }
+.dcm__list { flex: 1; overflow: auto; padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.dcm__empty { color: var(--ink-muted); margin: 8px 0; }
+.dcm__thread { border: 1px solid var(--bone-edge); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.dcm__thread.is-focus { border-color: var(--peach); box-shadow: 0 0 0 2px var(--peach-tint, #fde8d4); }
+.dcm__thread.is-done { opacity: .7; }
+.dcm__anchor { align-self: flex-start; max-width: 100%; border: 0; background: var(--bone); border-radius: 6px; padding: 2px 7px; font: inherit; font-size: 12px; color: var(--ink-soft); cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.dcm__anchor:disabled { cursor: default; }
+.dcm__anchor:not(:disabled):hover { color: var(--peach-deep); }
+.dcm__msg p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.dcm__who b { font-weight: 600; }
+.dcm__who span { color: var(--ink-faint, #9aa0a4); font-size: 12px; }
+.dcm__reply input { width: 100%; box-sizing: border-box; border: 1px solid var(--bone-edge); border-radius: 8px; padding: 6px 8px; font: inherit; }
+.dcm__acts { display: flex; justify-content: flex-end; }
+.dcm__link { border: 0; background: none; padding: 0; font: inherit; font-size: 12px; color: var(--ink-muted); cursor: pointer; }
+.dcm__link:hover { color: var(--peach-deep); }
+.dcm__link.is-danger:hover { color: var(--red-deep, #a8432a); }
+.dcm__resolvedtoggle { align-self: flex-start; margin-top: 4px; }
