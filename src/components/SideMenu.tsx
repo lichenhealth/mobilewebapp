@@ -71,7 +71,9 @@ const SUPPORT_EMAIL = 'connect@lichen.health';
  *  other mobile home. Desktop sidebar shows everything. */
 // Profile LEFT the bottom nav for the wallet (founder 2026-09-13) — it
 // lives here on mobile now; /currentcy hides because the bottom nav has it.
-const MOBILE_HIDDEN = new Set(['/home', '/concierge', '/chat', '/calendar', '/drive', '/currentcy', '/maps', '/events']);
+// Lichen (/home) STAYS on mobile (founder 2026-11-14): the open menu covers
+// the bottom nav, so Lichen above My-celium is the way home — desktop parity.
+const MOBILE_HIDDEN = new Set(['/concierge', '/chat', '/calendar', '/drive', '/currentcy', '/maps', '/events']);
 const hideOnMobile = (to: string) => MOBILE_HIDDEN.has(to) || to.startsWith('/members/');
 
 /** The four space sections' sub-items are the member's REAL memberships,

@@ -70,3 +70,8 @@
 /* Your relationship with this entity, at the end of its icon row */
 .cfeed__signals { display: inline-flex; align-items: center; margin-left: var(--s-3); }
 .cfeed__signals .mprof__actions--signals { margin: 0; flex-wrap: nowrap; }
+
+/* The circle rule's tab, hugging the AI circle's right edge (2026-11-14). */
+.cfeed__aiwrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.cfeed__aidoor { position: absolute; top: 7px; left: calc(50% + 14px); }
+.cfeed__area.is-ai-on .cfeed__area-circle { border-color: var(--peach); background: var(--peach-tint); color: var(--peach-deep); }

@@ -58,3 +58,6 @@
 .mail__acct-acts { display: flex; gap: 6px; margin-left: auto; }
 .mail__lens--add { border-style: dashed; color: var(--peach-deep); }
 .mail__lens--add:hover { border-color: var(--peach); }
+
+.mail__askbtn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--bone-edge); background: #fff; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; color: var(--peach-deep); cursor: pointer; white-space: nowrap; }
+.mail__askbtn:hover { border-color: var(--peach); }

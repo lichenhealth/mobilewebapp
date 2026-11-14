@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import AssistantDoor from '../components/AssistantDoor';
 import { Icon } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
@@ -7,7 +8,7 @@ import { ActingGate } from '../components/ActingGate';
 import { useTopBackFor } from '../lib/topBack';
 import {
   mailEnabled, listMailAccounts, connectMail, disconnectMail, loadInbox, loadMailThread,
-  modifyMailThread, sendMail, saveMailDraft, senderName, senderAddress,
+  modifyMailThread, trashMailThread, sendMail, saveMailDraft, senderName, senderAddress,
   type MailAccount, type ThreadSummary, type MailThread,
 } from '../lib/mailApi';
 import './Mail.css';
@@ -122,19 +123,20 @@ export default function Mail() {
     setDraft({ accountId: openAcct, threadId: openThread, to, cc, subject: '', body: '' });
   }
 
-  async function act(kind: 'archive' | 'unread' | 'star') {
+  async function act(kind: 'archive' | 'unread' | 'star' | 'trash') {
     if (!openAcct || !openThread) return;
     setBusy(kind);
     try {
+      if (kind === 'trash') await trashMailThread(openAcct, openThread);
       if (kind === 'archive') await modifyMailThread(openAcct, openThread, [], ['INBOX']);
       if (kind === 'unread') await modifyMailThread(openAcct, openThread, ['UNREAD'], []);
       if (kind === 'star') await modifyMailThread(openAcct, openThread, ['STARRED'], []);
       if (kind !== 'star') {
-        setThreads((cur) => kind === 'archive' ? cur?.filter((x) => x.thread_id !== openThread) ?? cur
+        setThreads((cur) => kind === 'archive' || kind === 'trash' ? cur?.filter((x) => x.thread_id !== openThread) ?? cur
           : cur?.map((x) => (x.thread_id === openThread ? { ...x, unread: true } : x)) ?? cur);
         closeThread();
       }
-      setMsg(kind === 'archive' ? 'Archived — it’s out of the inbox, still in All Mail.' : kind === 'unread' ? 'Marked unread.' : 'Starred ✓');
+      setMsg(kind === 'trash' ? 'Moved to Trash — restorable there for 30 days.' : kind === 'archive' ? 'Archived — it’s out of the inbox, still in All Mail.' : kind === 'unread' ? 'Marked unread.' : 'Starred ✓');
     } catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t go through.'); }
     finally { setBusy(null); }
   }
@@ -224,8 +226,7 @@ export default function Mail() {
             <button className="icon-row__btn" data-tip="New email" aria-label="New email"
               onClick={() => setDraft({ accountId: acctFilter ?? accounts[0].id, to: '', cc: '', subject: '', body: '' })}>
               <Icon name="plus" size={16} /></button>
-            <button className="icon-row__btn" data-tip="Work with AI — your mail" aria-label="Ask the brain about your mail" onClick={askBrain}>
-              <Icon name="brain" size={16} /></button>
+            <AssistantDoor section="mail" label="Work with AI — your mail" />
           </div>
           {searchOpen && (
             <form className="mail__search" onSubmit={(e) => { e.preventDefault(); void fetchInbox(q); }}>
@@ -283,10 +284,13 @@ export default function Mail() {
                 <button className="btn" onClick={() => startReply(false)}>Reply</button>
                 <button className="btn" onClick={() => startReply(true)}>Reply all</button>
                 <button className="btn" disabled={!!busy} onClick={() => void act('archive')}>Archive</button>
+                <button className="mail__quiet" disabled={!!busy} onClick={() => void act('trash')}>Trash</button>
                 <button className="mail__quiet" disabled={!!busy} onClick={() => void act('unread')}>Mark unread</button>
                 <button className="mail__quiet" disabled={!!busy} onClick={() => void act('star')}>Star</button>
-                <button className="icon-row__btn mail__brain" data-tip="Ask the brain about this thread" aria-label="Ask the brain about this thread" onClick={askBrain}>
-                  <Icon name="brain" size={16} /></button>
+                {/* An ACTION, not a stateful circle — worded, so it never reads
+                    as the brain toggle (the circle rule, 2026-11-14). */}
+                <button className="mail__askbtn" onClick={askBrain}>
+                  <Icon name="brain" size={13} /> Ask about this thread</button>
               </div>
               {open.messages.map((m) => (
                 <section key={m.id} className="mail__msgcard">
