@@ -1,6 +1,7 @@
 import FilterRow from '../components/FilterRow';
 import { useEffect, useMemo, useRef, useState, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTopBackFor } from '../lib/topBack';
 import { Icon } from '../components/Icon';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../auth/AuthProvider';
@@ -101,7 +102,15 @@ export default function Chat() {
   // and chat bubble, then just chat, then just phone, then just mail… by
   // default the all is selected and when you select one of the filters, it
   // de-selects the all"): [] = All. Multi-select; picking all three is All.
-  const [chan, setChan] = useState<Medium[]>([]);
+  const [chanPick, setChan] = useState<Medium[]>([]);
+  // CHAT, NESTED UNDER INBOX (founder 2026-11-14: "chat arrow should open
+  // chat as we used to have it...its just nested under inbox now"): the lit
+  // Chat lens's › tab opens /chat?only=chat — the classic chat-only view,
+  // titled Chat, no medium lenses, the TopBar ← walking back to the Inbox.
+  const [sp] = useSearchParams();
+  const chatOnly = sp.get('only') === 'chat';
+  const chan: Medium[] = chatOnly ? ['chat'] : chanPick;
+  useTopBackFor(() => navigate('/chat'), chatOnly);
   const pickChan = (m: Medium | 'all') => {
     if (m === 'all') { setChan([]); return; }
     setChan((cur) => {
@@ -202,7 +211,7 @@ export default function Chat() {
           why is it to the left?" — Drive's .myc__head grammar, the same
           centered title + explanation /currentcy adopted). */}
       <header className="myc__head chat__headc">
-        <h1 className="myc__title"><span className="display-italic">Inbox</span></h1>
+        <h1 className="myc__title"><span className="display-italic">{chatOnly ? 'Chat' : 'Inbox'}</span></h1>
         <p className="myc__sub">
           {asSpace ? `${spaceName} · ` : ''}{scoped.length} {scoped.length === 1 ? 'thread' : 'threads'}
         </p>
@@ -228,7 +237,7 @@ export default function Chat() {
           </button>
         )}
         <AssistantDoor section="chat" label="Your assistant — who's waiting on you" />
-        {!asSpace && (
+        {!asSpace && !chatOnly && (
           <div className="chat__media" role="group" aria-label="Show by medium">
             <button className={'chat__lens' + (chan.length === 0 ? ' is-on' : '')} onClick={() => pickChan('all')}
               aria-pressed={chan.length === 0} aria-label="All correspondence" data-tip="All">
@@ -245,11 +254,17 @@ export default function Chat() {
                  the peach › tab that walks into its own home — Email → Mail.
                  Chat's home IS this inbox, and texts have no home yet, so
                  they stay plain filters. */
-              const door = m === 'mail' && chan.includes('mail') && mailState !== 'off';
+              // Email → your consolidated Mail (shown to everyone: non-testers
+              // land on Mail's honest coming-soon page — founder 2026-11-14,
+              // "i'd like to offer that feature to users someday, so build it
+              // into the UI now"); Chat → the classic chat-only view.
+              const doorTo = m === 'mail' ? '/mail' : m === 'chat' ? '/chat?only=chat' : null;
+              const door = doorTo && chan.includes(m);
               return door ? (
                 <span key={m} className="icon-row__lenswrap">
                   {lens}
-                  <button className="icon-row__door" onClick={() => navigate('/mail')} aria-label="Open Mail" data-tip="Open Mail">
+                  <button className="icon-row__door" onClick={() => navigate(doorTo)}
+                    aria-label={m === 'mail' ? 'Open Mail' : 'Open Chat'} data-tip={m === 'mail' ? 'Open Mail' : 'Open Chat'}>
                     <Icon name="chevron-right" size={11} />
                   </button>
                 </span>
