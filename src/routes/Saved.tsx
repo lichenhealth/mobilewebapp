@@ -214,7 +214,7 @@ export default function Saved() {
     const url = signed[row.path];
     if (url) window.open(url, '_blank', 'noopener');
   };
-  const createDoc = async (kind: 'doc' | 'sheet') => {
+  const createDoc = async (kind: 'doc' | 'sheet' | 'slides') => {
     try {
       const d = await createPersonalDoc(kind, '');
       navigate(`/docs/${d.id}`);
@@ -740,7 +740,10 @@ export default function Saved() {
                   <Icon name="book" size={16} /> Doc
                 </button>
                 <button onClick={() => { setAddOpen(false); void createDoc('sheet'); }}>
-                  <Icon name="grip" size={16} /> Spreadsheet
+                  <Icon name="sheet" size={16} /> Spreadsheet
+                </button>
+                <button onClick={() => { setAddOpen(false); void createDoc('slides'); }}>
+                  <Icon name="slides" size={16} /> Presentation
                 </button>
                 <button onClick={() => { setAddOpen(false); filePhotoRef.current?.click(); }}>
                   <Icon name="image" size={16} /> Photo

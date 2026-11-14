@@ -7,8 +7,9 @@ import { Icon } from '../components/Icon';
 import { PollBody, DocAiMark } from '../components/ChatDocCard';
 import {
   loadChatDoc, saveChatDoc, setChatDocAi, deleteChatDoc,
-  DOC_KIND_LABEL, DOC_KIND_ICON, type ChatDocRow,
+  DOC_KIND_LABEL, DOC_KIND_ICON, type ChatDocRow, type Slide,
 } from '../lib/chatDocsApi';
+import { aiDoorOn } from '../components/AssistantDoor';
 import { PageHead } from '../components/PageHead';
 import './ChatDocs.css';
 
@@ -29,6 +30,8 @@ export default function ChatDocPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [cells, setCells] = useState<string[][]>([]);
+  const [slides, setSlides] = useState<Slide[]>([]);
+  const [presenting, setPresenting] = useState<number | null>(null);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -45,6 +48,7 @@ export default function ChatDocPage() {
       setTitle(d.title);
       setBody(d.body ?? '');
       setCells((d.data?.cells ?? [['', '', ''], ['', '', ''], ['', '', '']]).map((r) => [...r]));
+      setSlides((d.data?.slides ?? [{ title: '', body: '' }]).map((s) => ({ ...s })));
       // A PERSONAL doc (founder 2026-10-21, Drive's +) has no room — it
       // lives in your Drive alone, and nothing else loads.
       if (!d.chat_id) { setRoom(null); return; }
@@ -70,6 +74,17 @@ export default function ChatDocPage() {
     return () => { active = false; };
   }, [docId, me]);
 
+  useEffect(() => {
+    if (presenting == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPresenting(null);
+      else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') setPresenting((i) => (i == null ? i : Math.min(i + 1, slides.length - 1)));
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') setPresenting((i) => (i == null ? i : Math.max(i - 1, 0)));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [presenting, slides.length]);
+
   if (!me) return null;
   if (doc === 'gone') {
     return (
@@ -87,9 +102,11 @@ export default function ChatDocPage() {
         title: title.trim() || doc.title,
         ...(doc.kind === 'doc' ? { body } : {}),
         ...(doc.kind === 'sheet' ? { data: { ...(doc.data ?? {}), cells } } : {}),
+        ...(doc.kind === 'slides' ? { data: { ...(doc.data ?? {}), slides } } : {}),
       });
       setDirty(false); setMsg('Saved ✓');
-      setDoc({ ...doc, title: title.trim() || doc.title, body, data: doc.kind === 'sheet' ? { ...(doc.data ?? {}), cells } : doc.data, updated_by: me, updated_at: new Date().toISOString() });
+      const nextData = doc.kind === 'sheet' ? { ...(doc.data ?? {}), cells } : doc.kind === 'slides' ? { ...(doc.data ?? {}), slides } : doc.data;
+      setDoc({ ...doc, title: title.trim() || doc.title, body, data: nextData, updated_by: me, updated_at: new Date().toISOString() });
     } catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t save.'); }
     setBusy(false);
   };
@@ -168,6 +185,45 @@ export default function ChatDocPage() {
               </div>
             </div>
           )}
+          {doc.kind === 'slides' && (
+            <div className="cdocp__slides">
+              <button className="btn" onClick={() => setPresenting(0)}><Icon name="slides" size={14} /> Present</button>
+              {slides.map((s, i) => (
+                <div className="cdocp__slide" key={i}>
+                  <div className="cdocp__slide-top">
+                    <span className="cdocp__slide-n">{i + 1}</span>
+                    <button disabled={i === 0} aria-label="Move up" onClick={() => { setSlides((cur) => { const n = [...cur]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; }); setDirty(true); }}>↑</button>
+                    <button disabled={i === slides.length - 1} aria-label="Move down" onClick={() => { setSlides((cur) => { const n = [...cur]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; return n; }); setDirty(true); }}>↓</button>
+                    {slides.length > 1 && <button aria-label="Remove slide" onClick={() => { setSlides((cur) => cur.filter((_, j) => j !== i)); setDirty(true); }}>×</button>}
+                  </div>
+                  <input className="cdocp__slide-title" placeholder="Slide title" value={s.title}
+                    onChange={(e) => { const v = e.target.value; setSlides((cur) => cur.map((x, j) => (j === i ? { ...x, title: v } : x))); setDirty(true); }} />
+                  <textarea className="cdocp__slide-body" placeholder="One point per line" value={s.body}
+                    onChange={(e) => { const v = e.target.value; setSlides((cur) => cur.map((x, j) => (j === i ? { ...x, body: v } : x))); setDirty(true); }} />
+                </div>
+              ))}
+              <div className="cdocp__sheet-grow">
+                <button onClick={() => { setSlides((cur) => [...cur, { title: '', body: '' }]); setDirty(true); }}>+ Slide</button>
+              </div>
+            </div>
+          )}
+          {presenting != null && slides[presenting] && (
+            <div className="cdocp__present" role="dialog" aria-label="Presentation"
+              onClick={() => setPresenting((i) => (i == null ? i : Math.min(i + 1, slides.length - 1)))}>
+              <button className="cdocp__present-x" aria-label="Stop presenting" onClick={(e) => { e.stopPropagation(); setPresenting(null); }}><Icon name="close" size={18} /></button>
+              <div className="cdocp__present-card">
+                <h1>{slides[presenting].title || title}</h1>
+                {slides[presenting].body.trim() && (
+                  <ul>{slides[presenting].body.split('\n').filter((l) => l.trim()).map((l, k) => <li key={k}>{l.replace(/^[-•*]\s*/, '')}</li>)}</ul>
+                )}
+              </div>
+              <div className="cdocp__present-nav" onClick={(e) => e.stopPropagation()}>
+                <button disabled={presenting === 0} onClick={() => setPresenting(presenting - 1)} aria-label="Previous"><Icon name="chevron-left" size={18} /></button>
+                <span>{presenting + 1} / {slides.length}</span>
+                <button disabled={presenting === slides.length - 1} onClick={() => setPresenting(presenting + 1)} aria-label="Next"><Icon name="chevron-right" size={18} /></button>
+              </div>
+            </div>
+          )}
           <div className="cdocp__foot">
             <button className="btn btn-primary" disabled={busy || !dirty} onClick={() => void save()}>
               {busy ? 'Saving…' : 'Save'}
@@ -185,7 +241,9 @@ export default function ChatDocPage() {
             {!doc.ai_enabled && <span className="cdocp__ai-note">— off: no assistant ever reads it</span>}
           </label>
         ) : (
-          <span className="cdocp__ai-note">No assistant reads what lives only in your Drive.</span>
+          <span className="cdocp__ai-note">{aiDoorOn('saved')
+            ? 'Private to you. Your own assistant can read and build this while Drive AI is on — just ask it.'
+            : 'Private to you. Drive AI is off, so no assistant reads it.'}</span>
         )}
         {confirmDel ? (
           <button className="cdocp__del is-sure" onClick={async () => {

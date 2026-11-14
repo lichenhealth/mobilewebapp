@@ -9,7 +9,8 @@ import type { IconName } from '../components/Icon';
  *  decal in every rendering, and a hard filter for any future assistant
  *  read path (none reads chat_docs today; keep it that way without one). */
 
-export type ChatDocKind = 'doc' | 'poll' | 'sheet';
+export type ChatDocKind = 'doc' | 'poll' | 'sheet' | 'slides';
+export interface Slide { title: string; body: string }
 
 export interface ChatDocRow {
   id: string;
@@ -19,7 +20,7 @@ export interface ChatDocRow {
   kind: ChatDocKind;
   title: string;
   body: string | null;
-  data: { options?: string[]; cells?: string[][] } | null;
+  data: { options?: string[]; cells?: string[][]; slides?: Slide[] } | null;
   ai_enabled: boolean;
   created_by: string;
   created_at: string;
@@ -29,8 +30,8 @@ export interface ChatDocRow {
 
 export interface PollVote { doc_id: string; profile_id: string; option_idx: number }
 
-export const DOC_KIND_LABEL: Record<ChatDocKind, string> = { doc: 'Doc', poll: 'Poll', sheet: 'Spreadsheet' };
-export const DOC_KIND_ICON: Record<ChatDocKind, IconName> = { doc: 'book', poll: 'check', sheet: 'grip' };
+export const DOC_KIND_LABEL: Record<ChatDocKind, string> = { doc: 'Doc', poll: 'Poll', sheet: 'Spreadsheet', slides: 'Presentation' };
+export const DOC_KIND_ICON: Record<ChatDocKind, IconName> = { doc: 'book', poll: 'check', sheet: 'sheet', slides: 'slides' };
 
 const DOC_COLS = 'id, chat_id, space_id, kind, title, body, data, ai_enabled, created_by, created_at, updated_at, updated_by';
 
@@ -135,14 +136,16 @@ export async function retractVote(me: string, docId: string): Promise<void> {
  *  + carries the composer's creators). Owner-only by RLS; polls stay
  *  room-born — a poll with no voters is not a poll. */
 export async function createPersonalDoc(
-  kind: 'doc' | 'sheet',
+  kind: 'doc' | 'sheet' | 'slides',
   title: string,
 ): Promise<ChatDocRow> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
-  const data = kind === 'sheet' ? { cells: [['', '', ''], ['', '', ''], ['', '', '']] } : {};
+  const data = kind === 'sheet' ? { cells: [['', '', ''], ['', '', ''], ['', '', '']] }
+    : kind === 'slides' ? { slides: [{ title: '', body: '' }] } : {};
+  const fallback = kind === 'doc' ? 'Untitled doc' : kind === 'sheet' ? 'Untitled spreadsheet' : 'Untitled presentation';
   const { data: row, error } = await supabase.from('chat_docs')
-    .insert({ chat_id: null, kind, title: title.trim() || (kind === 'doc' ? 'Untitled doc' : 'Untitled spreadsheet'), data, created_by: user.id })
+    .insert({ chat_id: null, kind, title: title.trim() || fallback, data, created_by: user.id })
     .select(DOC_COLS).single();
   if (error) throw error;
   return row as ChatDocRow;
