@@ -1363,7 +1363,7 @@ Deno.serve(async (req) => {
   const lifeRule = canLife
     ? '\n\nTHEIR LIFE, BY WORD (the parity rule — anything they can do by hand on a screen, you do from their words): my_lists then change_task (done, move, rename, delete), budget_line, drive_folder (create, add/remove a post), save_or_hide_post, rsvp, set_candle. Do these directly when asked and report exactly what changed — they are the member\'s own, private, and undoable. Never answer "go do it on the X screen" when one of these fits.'
       + '\n\nACTS THAT NEED THEIR YES (confirm card + Always allow): send_currentcy (money to another member), network_signal (trust / recommend / weave), space_membership (ask to join / leave), set_money_floor (their Current-cy floor — never Always allow). Use the names and figures exactly as they wrote them. Each one PROPOSES — the card under your reply is where THEY decide; never say it happened unless the tool says done. They can tap Always allow to skip the card next time (money stays capped at ⚡100 a send, ⚡300 a day; anything over ⚡500 waits 24 hours, cancellable). You can never grant that allowance yourself.'
-      + '\n\nINVITATIONS & LINKS: add_calendar_event puts an event on their own calendar; invite_to_event invites people to an event they host by name or email (members get it in Lichen and, with calendar=true, as a real Google/Apple/Outlook invitation at their signup email — never say you can see that address; saved contacts on their own lists supply outside emails) — it never sends, the card under your reply is their Send; my_event with make_link=true makes the event\'s invite link and link_access sets who it lets in (anyone / invited [others ask, they approve] / members / circles with exact group names). Never tell them to go do it by hand.'
+      + '\n\nINVITATIONS & LINKS: add_calendar_event puts an event on their own calendar; invite_to_event invites people to an event they host by name or email (members get it in Lichen and, with calendar=true, as a real Google/Apple/Outlook invitation at their signup email — never say you can see that address; saved contacts on their own lists supply outside emails) — it never sends, the card under your reply is their Send; my_event with make_link=true makes the event\'s invite link and link_access sets who it lets in (anyone / invited [others ask, they approve] / members / circles with exact group names). DRAFTS: my_calendar_drafts lists their draft calendar events (with Open doors) and block=true/false makes a draft hold its time or stop holding it — an unblocked draft is a dotted outline that never reads as busy. Never tell them to go do it by hand.'
       + '\n\nREPLYING AT THE DOOR: my_knocks lists people waiting to join that they can answer; draft_knock_reply drafts a personal email back WITHOUT letting them in (their words, their booking link if asked). It never sends — the card under your reply is where they edit and tap Send. If the message already holds their booking link, don\'t add it again.'
     : '';
   const mailRule = canMail
@@ -1490,6 +1490,12 @@ Deno.serve(async (req) => {
         const door = lr.door as { path: string; label: string } | undefined;
         if (door && /^\/calendar\/edit\/[0-9a-f-]{36}$/.test(door.path) && !appDoors.some((d) => d.path === door.path)) appDoors.push(door);
         delete lr.door;
+      }
+      if (name === 'my_calendar_drafts' && lr.ok) {
+        for (const door of (lr.doors as { path: string; label: string }[] | undefined) ?? []) {
+          if ((/^\/calendar\/edit\/[0-9a-f-]{36}$/.test(door.path) || /^\/compose\?draft=[0-9a-f-]{36}$/.test(door.path)) && !appDoors.some((d) => d.path === door.path)) appDoors.push(door);
+        }
+        delete lr.doors;
       }
       if (name === 'my_event' && lr.ok) {
         for (const c of (lr.copies as { text: string; label: string }[] | undefined) ?? []) {

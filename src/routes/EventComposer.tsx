@@ -637,7 +637,7 @@ export default function EventComposer() {
         try { window.history.replaceState(window.history.state, '', `/calendar/edit/${draftRef.current}`); } catch { /* fine */ }
       }
       lastSavedSig.current = sig;
-      setDraftNote('Draft saved ✓ — it waits on your calendar until you save it');
+      setDraftNote('Draft saved ✓ — it waits on your calendar (not blocking your time) until you save it');
     })();
     writingRef.current = run;
     try { await run; } finally { writingRef.current = null; }
@@ -1038,7 +1038,7 @@ export default function EventComposer() {
       {error && <p className="cedit__error">{error}</p>}
       {draftable && (draftNote || draftRef.current) && (
         <p className="calp__draftnote">
-          {draftNote || 'Draft — it waits on your calendar until you save it'}
+          {draftNote || 'Draft — it waits on your calendar (not blocking your time) until you save it'}
           {draftRef.current && <> · <button type="button" className="calp__offlink" onClick={() => void discardDraft()}>Discard draft</button></>}
         </p>
       )}
@@ -1056,7 +1056,7 @@ export default function EventComposer() {
         <div className="calp__leave-veil" role="dialog" aria-modal="true" aria-label="Save this draft?">
           <div className="calp__leave">
             <p className="calp__leave-title">Save “{title.trim()}” as a draft?</p>
-            <p className="calp__match-soft">A draft waits on your calendar (dashed) — nobody is invited until you save it for real.</p>
+            <p className="calp__match-soft">A draft waits on your calendar as a dotted outline — it doesn’t block your time unless you tap Block there, and nobody is invited until you save it for real.</p>
             <div className="calp__leave-row">
               <button className="btn btn-primary" onClick={() => void leave('keep')}>Save draft</button>
               <button className="btn" onClick={() => void leave('discard')}>Discard</button>

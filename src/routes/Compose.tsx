@@ -3073,7 +3073,7 @@ export default function Compose() {
                 {!editing && actor.type !== 'space' && (
                   <label className="cmp__evrow">
                     <input type="checkbox" checked={evHold} onChange={(e) => setEvHold(e.target.checked)} />
-                    Hold this time on my Lichen calendar while it&rsquo;s a draft
+                    Show it on my Lichen calendar while it&rsquo;s a draft — it won&rsquo;t block your time until you tap Block there
                   </label>
                 )}
                 <span className="cmp__evcal-lab">On my calendar, other members see</span>

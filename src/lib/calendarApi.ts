@@ -31,6 +31,8 @@ export interface EventRow {
   zoom_unique?: boolean;
   /** A DRAFT event's time-hold (2026-11-09) — opens back into Compose. */
   is_draft?: boolean;
+  /** A draft that holds its time (the Block button) — unblocked drafts never count as busy. */
+  draft_blocks?: boolean;
   /** A calendar draft's unsent invitees + choices (never seated until Save). */
   draft_state?: Record<string, unknown> | null;
   draft_id?: string | null;
@@ -77,7 +79,7 @@ export interface EventRow {
 
 const EVENT_COLS =
   'id, creator_id, owner_profile_id, owner_space_id, title, description, location, lat, lng, ' +
-  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, is_draft, draft_id, draft_state, share_level, link_access, link_space_ids, poll_status, poll_deadline, poll_wait_all, poll_auto, poll_rules, poll_suggested, poll_reason, created_at';
+  'start_date, end_date, all_day, start_min, end_min, recurrence, timezone, zoom_unique, is_draft, draft_blocks, draft_id, draft_state, share_level, link_access, link_space_ids, poll_status, poll_deadline, poll_wait_all, poll_auto, poll_rules, poll_suggested, poll_reason, created_at';
 // event_attendees has TWO FKs to profiles (profile_id + invited_by) — the
 // embed must name the one it means (house rule; see CLAUDE.md).
 const ATTENDEE_EMBED =
