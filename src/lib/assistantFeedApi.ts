@@ -225,6 +225,8 @@ export const BRAIN_RAIL: BrainRailItem[] = [
   { section: 'courses', icon: 'graduation-cap', label: 'Courses', thread: 'courses' },
   { section: 'calendar', icon: 'calendar', label: 'Calendar', thread: 'calendar' },
   { section: 'concierge', icon: 'concierge', label: 'Concierge', thread: 'concierge' },
+  // The Inbox's own brain (founder 2026-11-14) — brief-only, tags 'chat'.
+  { section: 'chat', icon: 'inbox', label: 'Inbox' },
   // Drive's brain door says section="saved" (Saved.tsx) — the rail matches it.
   { section: 'saved', icon: 'drive', label: 'Drive' },
   { section: 'maps', icon: 'maps', label: 'Maps' },
@@ -242,7 +244,7 @@ const EXTRA_SECTION_ICONS: Record<string, { icon: string; label: string }> = {
   drive: { icon: 'drive', label: 'Drive' },
   saved: { icon: 'drive', label: 'Drive' },
   search: { icon: 'search', label: 'Search' },
-  chat: { icon: 'chat', label: 'Chat' },
+  chat: { icon: 'inbox', label: 'Inbox' },
   library: { icon: 'book', label: 'Library' },
   work: { icon: 'briefcase', label: 'Work' },
   food: { icon: 'fork-spoon', label: 'Food' },

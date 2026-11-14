@@ -168,7 +168,8 @@ export default function Mail() {
     return (
       <div className="mail">
         <header className="myc__head"><h1 className="myc__title">Mail</h1>
-          <p className="myc__sub">Mail is in a personal test right now. It opens to more members once it’s proven.</p></header>
+          <p className="myc__sub">Coming soon — every inbox you have, read and answered in one place, filed by person beside your chats.</p></header>
+        <p className="mail__fine" style={{ textAlign: 'center' }}>Mail is in a small private test right now. It opens to more members once it’s proven.</p>
       </div>
     );
   }

@@ -29,6 +29,7 @@ import { aiDoorOn, setAiDoor } from '../components/AssistantDoor';
 import './AssistantBrief.css';
 import './Snapshot.css';
 import { loadChatList, recentMessagesAcross } from '../lib/chatApi';
+import { mailEnabled, loadInbox, senderName as mailSender } from '../lib/mailApi';
 import { myBalance, myStatement } from '../lib/ledgerApi';
 import { loadMyWeb, loadMyRecommendations } from '../lib/myceliumApi';
 import { listBookableTypes } from '../lib/bookingApi';
@@ -71,7 +72,7 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   home: { title: 'Your Lichen life', frame: 'The whole-life view: surface the biggest things across care, exchanges, groups and calendar.' },
   market: { title: 'The Marketplace', frame: 'You help them offer, seek, buy, sell, trade and gift within the web of people they trust.' },
   calendar: { title: 'Your calendar', frame: 'You help them tend time: what is coming, what is unanswered, what needs scheduling.' },
-  chat: { title: 'Conversations', frame: 'You help them stay in real relationship. You are given recent exchanges across their rooms: say who is waiting on a reply, what each live thread is actually about, and anything that looks time-sensitive. Summarize in your own words — do not quote at length, and treat what people share as theirs.' },
+  chat: { title: 'Inbox', frame: 'You help them stay in real relationship. You are given recent exchanges across their rooms (and any unread email): say who is waiting on a reply, what each live thread is actually about, and anything that looks time-sensitive. Summarize in your own words — do not quote at length, and treat what people share as theirs.' },
   concierge: { title: 'Care', frame: 'You help them tend care — their own and the people they care for.' },
   communities: { title: 'Your communities', frame: 'You help them tend belonging: what their groups and communities need from them.' },
   groups: { title: 'Your groups', frame: 'You help them tend belonging: what their groups need from them. Lead with activity across the groups they are IN; then, for any they STEWARD, one concrete piece of stewardship worth doing — a queue waiting, a quiet room, a member at the door. Practical, never a lecture on running groups.' },
@@ -134,13 +135,17 @@ export default function AssistantBrief() {
   // no prepended chat circle — while the URL keeps section=chat so the
   // bottom nav lights CHAT (navFamily) and the arrow returns to /chat. The
   // chat consent switch stays real (the brain door's off-popup + Privacy).
+  // THE INBOX HAS ITS OWN BRAIN (founder 2026-11-14, superseding the
+  // 11-02 alias above: "inbox brain arrow takes me to the general brain…
+  // build the sub brain in and have that icon in the list and highlighted"):
+  // section=chat is its own brief again, wearing the Inbox circle lit.
   const rawSection = params.get('section') ?? 'home';
-  const section = rawSection === 'chat' ? 'home' : rawSection;
+  const section = rawSection;
   const [refs, setRefs] = useState<{ label: string; to: string }[]>(() => cache.get(section)?.refs ?? []);
   // "← Back" says WHERE it goes (founder 2026-09-13: "so people remember
   // where they came from") — chip-friendly names, not FRAMES' sentence titles.
   const BACK_NAMES: Record<string, string> = {
-    calendar: 'Calendar', market: 'Marketplace', chat: 'Chat', concierge: 'Concierge',
+    calendar: 'Calendar', market: 'Marketplace', chat: 'Inbox', concierge: 'Concierge',
     events: 'Events', maps: 'Maps', saved: 'Drive', profile: 'Profile', home: 'Home',
     communities: 'Communities', groups: 'Groups', organizations: 'Organizations',
     places: 'Places', membership: 'Membership',
@@ -741,38 +746,50 @@ export default function AssistantBrief() {
               const room = byId.get(w.chat_id);
               if (room?.title) found.push({ label: room.title, to: `/chat/${w.chat_id}` });
             });
-            if (section === 'chat') {
-              // The deeper read (founder 2026-07-28): recent exchanges across
-              // your rooms, so the brief can say what threads are actually
-              // about — not just who's waiting. Newest first, capped, and
-              // still only rooms RLS lets you read.
-              const msgs = await recentMessagesAcross(120).catch(() => []);
-              const perRoom = new Map<string, { room: string; lines: string[]; withheld: Set<string> }>();
-              for (const m of msgs) {
-                // An AI-free room's words never enter a prompt (2026-10-21).
-                if (byId.get(m.chat_id)?.assistantEnabled === false) continue;
-                const room = byId.get(m.chat_id)?.title ?? 'a conversation';
-                const slot = perRoom.get(m.chat_id) ?? { room, lines: [], withheld: new Set<string>() };
-                // Consent travels with the words: a member who switched off
-                // "readable by others' assistants" still counts as present in
-                // the thread — the FACT that they wrote is the viewer's — but
-                // their words never leave (founder 2026-07-28).
-                const mine = m.sender_id === me;
-                if (!mine && m.assistantReadable === false) {
-                  slot.withheld.add(m.senderName ?? 'someone');
-                } else if (slot.lines.length < 12) {
-                  slot.lines.push(`${mine ? 'me' : (m.senderName ?? 'someone')}: ${(m.body ?? '').slice(0, 240)}`);
-                }
-                perRoom.set(m.chat_id, slot);
-              }
-              extras.recent_conversations = [...perRoom.values()].slice(0, 8).map((r) => ({
-                room: r.room,
-                recent: r.lines.reverse(),
-                ...(r.withheld.size
-                  ? { private_participants: `${[...r.withheld].join(', ')} keep their messages private from assistants — you can see them in the app, I can't.` }
-                  : {}),
-              }));
             }
+          }
+        }
+        if (section === 'chat') {
+          // The Inbox's own read, whether or not anyone is waiting: recent
+          // exchanges across your rooms (and, for Mail testers with the
+          // Mail switch on, what's newest in their inboxes).
+          const vms = await loadChatList(me).catch(() => []);
+          const byId = new Map(vms.map((v) => [v.id, v]));
+          // The deeper read (founder 2026-07-28): recent exchanges across
+          // your rooms, so the brief can say what threads are actually
+          // about — not just who's waiting. Newest first, capped, and
+          // still only rooms RLS lets you read.
+          const msgs = await recentMessagesAcross(120).catch(() => []);
+          const perRoom = new Map<string, { room: string; lines: string[]; withheld: Set<string> }>();
+          for (const m of msgs) {
+            // An AI-free room's words never enter a prompt (2026-10-21).
+            if (byId.get(m.chat_id)?.assistantEnabled === false) continue;
+            const room = byId.get(m.chat_id)?.title ?? 'a conversation';
+            const slot = perRoom.get(m.chat_id) ?? { room, lines: [], withheld: new Set<string>() };
+            // Consent travels with the words: a member who switched off
+            // "readable by others' assistants" still counts as present in
+            // the thread — the FACT that they wrote is the viewer's — but
+            // their words never leave (founder 2026-07-28).
+            const mine = m.sender_id === me;
+            if (!mine && m.assistantReadable === false) {
+              slot.withheld.add(m.senderName ?? 'someone');
+            } else if (slot.lines.length < 12) {
+              slot.lines.push(`${mine ? 'me' : (m.senderName ?? 'someone')}: ${(m.body ?? '').slice(0, 240)}`);
+            }
+            perRoom.set(m.chat_id, slot);
+          }
+          extras.recent_conversations = [...perRoom.values()].slice(0, 8).map((r) => ({
+            room: r.room,
+            recent: r.lines.reverse(),
+            ...(r.withheld.size
+              ? { private_participants: `${[...r.withheld].join(', ')} keep their messages private from assistants — you can see them in the app, I can't.` }
+              : {}),
+          }));
+          if (aiDoorOn('mail') && await mailEnabled(me).catch(() => false)) {
+            const box = await loadInbox(null, 'is:unread').catch(() => null);
+            const fresh = (box?.threads ?? []).slice(0, 8);
+            if (fresh.length) {
+              extras.unread_mail = fresh.map((th) => ({ from: mailSender(th.from), subject: th.subject, inbox: th.account }));
             }
           }
         }
