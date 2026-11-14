@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import ConfirmCard from '../components/ConfirmCard';
 import Avatar from '../components/Avatar';
+import MailRefCard from '../components/MailRefCard';
 import AssistantComposer from '../components/AssistantComposer';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing, type SpaceKind } from '../acting/ActingProvider';
@@ -1382,6 +1383,12 @@ export default function AssistantFeed() {
                     {shared.title || shared.body.slice(0, 60)}
                   </button>
                 )}
+                {/* An attached email thread rides the bubble as its card. */}
+                {(p.attachments ?? []).flatMap((a) => (a.type === 'mailref' ? [a] : [])).map((a) => (
+                  <div key={a.thread_id} style={{ marginBottom: 6 }}>
+                    <MailRefCard m={a} onOpen={() => navigate(`/mail?thread=${a.account_id}:${encodeURIComponent(a.thread_id)}`)} />
+                  </div>
+                ))}
                 {/* Pasted photos ride the entry (founder 2026-08-22). */}
                 {(p.attachments ?? []).some((a) => a.type === 'photo') && (
                   <div className="afeed__entry-shots">
