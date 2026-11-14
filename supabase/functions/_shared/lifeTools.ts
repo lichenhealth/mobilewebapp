@@ -112,6 +112,17 @@ export const LIFE_TOOLS = [
     },
   },
   {
+    name: 'my_calendar_drafts',
+    description: 'Their DRAFT calendar events (unsaved calendar events, and event drafts from the event composer that sit on their calendar). Lists each with its date/time and whether it blocks their time (an unblocked draft is a dotted outline that helps them plan but never reads as busy; a blocked one holds the time like an event). Hands a door to open each (up to 4). title = exact title to pick one; block=true/false blocks or unblocks that draft (their own calendar — no confirm needed). Never claim a draft is live or that anyone was invited — nobody is until they open it and save.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Exact draft title, or empty to list them all' },
+        block: { type: 'boolean', description: 'With title: true blocks the time, false unblocks it' },
+      },
+    },
+  },
+  {
     name: 'invite_to_event',
     description: 'Invite people to an event they HOST (calendar event or formal event), by name and/or email. It never sends by itself: a card under your reply lists who will be invited and the MEMBER taps Send. people = names; each must match exactly one Lichen member (their invitation reaches them in Lichen and, if calendar=true, as a real calendar invitation at the email they signed up with — Lichen never shows that address) or a name on the member\'s own saved contacts/guest lists (that saved email is used). emails = addresses they typed in THIS conversation (others are refused). calendar=true (default) emails everyone a real Google/Apple/Outlook invitation with Yes/No/Maybe. Say plainly who could not be matched.',
     input_schema: {
@@ -160,7 +171,7 @@ export const LIFE_TOOLS = [
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', invite_to_event: 'calendar', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
+  drive_folder: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -402,6 +413,31 @@ export async function runLifeTool(
     const row = (await r.json().catch(() => null)) as { id: string }[] | null;
     if (!r.ok || !row?.[0]) return { ok: false, error: 'The calendar didn\'t take it — try again.' };
     return { ok: true, change: `added "${title}" to their calendar on ${date}${allDay ? ' (all day)' : ''}`, door: { path: `/calendar/edit/${row[0].id}`, label: `Open ${title} →` } };
+  }
+
+  if (name === 'my_calendar_drafts') {
+    type D = { id: string; title: string; start_date: string; start_min: number | null; end_min: number | null; all_day: boolean; draft_id: string | null; draft_blocks: boolean };
+    const rows = ((await (await sb(`events?creator_id=eq.${me}&is_draft=eq.true&select=id,title,start_date,start_min,end_min,all_day,draft_id,draft_blocks&order=start_date.asc&limit=30`)).json()) ?? []) as D[];
+    const hm = (m: number | null) => { if (m == null) return ''; const h = Math.floor(m / 60), mm = m % 60; const ap = h >= 12 ? 'pm' : 'am'; const h12 = ((h + 11) % 12) + 1; return mm ? `${h12}:${String(mm).padStart(2, '0')}${ap}` : `${h12}${ap}`; };
+    const pathOf = (d: D) => d.draft_id ? `/compose?draft=${d.draft_id}` : `/calendar/edit/${d.id}`;
+    const describe = (d: D) => ({ title: d.title || '(untitled)', date: d.start_date, time: d.all_day ? 'all day' : `${hm(d.start_min)} – ${hm(d.end_min)}`,
+      blocks_time: !!d.draft_blocks, kind: d.draft_id ? 'event-composer draft' : 'calendar draft' });
+    const want = String(input.title ?? '').trim().toLowerCase();
+    if (want) {
+      const hits = rows.filter((d) => (d.title ?? '').trim().toLowerCase() === want);
+      if (hits.length === 0) return { ok: false, error: `No draft titled "${input.title}". Their drafts: ${rows.map((d) => d.title).join(', ') || 'none'}.` };
+      if (hits.length > 1 && typeof input.block === 'boolean') return { ok: false, error: `${hits.length} drafts share that title (${hits.map((d) => d.start_date).join(', ')}) — ask which one.` };
+      const d = hits[0];
+      if (typeof input.block === 'boolean') {
+        const r = await sb(`events?id=eq.${d.id}&creator_id=eq.${me}&is_draft=eq.true`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ draft_blocks: input.block }) });
+        if (!r.ok) return { ok: false, error: 'The draft would not change.' };
+        return { ok: true, change: input.block ? `blocked the time for the draft "${d.title}" (${d.start_date}) — it now holds that time (still a dotted outline, now filled white)` : `unblocked the draft "${d.title}" — it no longer reads as busy (dotted outline, no fill)`,
+          doors: [{ path: pathOf(d), label: `Open ${d.title || 'the draft'} →` }] };
+      }
+      return { ok: true, drafts: hits.map(describe), doors: hits.slice(0, 4).map((x) => ({ path: pathOf(x), label: `Open ${x.title || 'the draft'} →` })) };
+    }
+    if (!rows.length) return { ok: true, drafts: [], note: 'They have no draft calendar events.' };
+    return { ok: true, drafts: rows.map(describe), doors: rows.slice(0, 4).map((x) => ({ path: pathOf(x), label: `Open ${x.title || 'the draft'} →` })) };
   }
 
   if (name === 'invite_to_event') {

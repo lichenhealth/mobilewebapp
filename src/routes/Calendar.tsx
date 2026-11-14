@@ -618,7 +618,7 @@ export default function Calendar() {
     ev.tint ?? (ev.owner_space_id ? colorFor(ev.owner_space_id) : null);
   const blockClass = (ev: EventRow, base: string) => {
     if (ev.external) return `${base} ${base}--external`;
-    if (ev.is_draft) return `${base} ${base}--pending calp__draft`;
+    if (ev.is_draft) return `${base} calp__draft${ev.draft_blocks ? ' calp__draft--blocked' : ''}`;
     const st = ev.creator_id !== me ? myAttend(ev)?.status : undefined;
     return base + (st === 'invited' || st === 'tentative' ? ` ${base}--pending` : st === 'declined' ? ` ${base}--declined` : '');
   };
@@ -1326,6 +1326,9 @@ export default function Calendar() {
                         onClick={(ev) => { ev.stopPropagation(); setSelected(e); }}
                       >
                         {e.is_draft ? "Draft · " : ""}{e.title}
+                        {e.is_draft && !e.draft_blocks && height >= 40 && (
+                          <span className="calp__draft-hint">This time hasn&rsquo;t been blocked on your calendar, yet</span>
+                        )}
                       </button>
                     );
                   }); })()}
@@ -1352,7 +1355,19 @@ export default function Calendar() {
             </p>
             {selected.is_draft && (
               <>
-                <p className="calp__sheet-ext">A draft event, holding this time on your calendar. Others see at most that you&rsquo;re busy. {selected.draft_id ? 'It turns into the real event when you post it.' : 'Nobody is invited until you open it and save.'}</p>
+                {selected.draft_blocks ? (
+                  <p className="calp__sheet-ext">A draft event, blocking this time on your calendar. Others see at most that you&rsquo;re busy, and nobody can book you over it. {selected.draft_id ? 'It turns into the real event when you post it.' : 'Nobody is invited until you open it and save.'}</p>
+                ) : (
+                  <p className="calp__sheet-ext calp__draft-sheethint">This time hasn&rsquo;t been blocked on your calendar, yet. It&rsquo;s here to help you plan — you still read as free, and people can book you over it. {selected.draft_id ? 'It turns into the real event when you post it.' : 'Nobody is invited until you open it and save.'}</p>
+                )}
+                <button className={'calp__draftblock' + (selected.draft_blocks ? ' is-on' : '')} onClick={async () => {
+                  const next = !selected.draft_blocks;
+                  const { error } = await supabase.from('events').update({ draft_blocks: next }).eq('id', selected.id).eq('is_draft', true);
+                  if (error) { window.alert(error.message); return; }
+                  setSelected({ ...selected, draft_blocks: next }); void loadRef.current?.();
+                }}>
+                  {selected.draft_blocks ? 'Blocked ✓ · Unblock' : 'Block'}
+                </button>
                 {selected.draft_id ? (
                   <button className="calp__sheet-extlink" onClick={() => navigate(`/compose?draft=${selected.draft_id}`)}>
                     <Icon name="arrow-right" size={13} /> Open the draft
