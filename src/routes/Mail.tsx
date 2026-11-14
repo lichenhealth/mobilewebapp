@@ -141,13 +141,20 @@ export default function Mail() {
       if (kind === 'trash') await trashMailThread(openAcct, openThread);
       if (kind === 'archive') await modifyMailThread(openAcct, openThread, [], ['INBOX']);
       if (kind === 'unread') await modifyMailThread(openAcct, openThread, ['UNREAD'], []);
-      if (kind === 'star') await modifyMailThread(openAcct, openThread, ['STARRED'], []);
+      // STAR TOGGLES (founder 2026-11-14: "star doesn't seem to do anything and
+      // i don't see a star icon") — it only ever added, with no state shown.
+      const wasStarred = !!open?.starred;
+      if (kind === 'star') {
+        await modifyMailThread(openAcct, openThread, wasStarred ? [] : ['STARRED'], wasStarred ? ['STARRED'] : []);
+        setOpen((cur) => (cur ? { ...cur, starred: !wasStarred } : cur));
+        setThreads((cur) => cur?.map((x) => (x.thread_id === openThread && x.account_id === openAcct ? { ...x, starred: !wasStarred } : x)) ?? cur);
+      }
       if (kind !== 'star') {
         setThreads((cur) => kind === 'archive' || kind === 'trash' ? cur?.filter((x) => x.thread_id !== openThread) ?? cur
           : cur?.map((x) => (x.thread_id === openThread ? { ...x, unread: true } : x)) ?? cur);
         closeThread();
       }
-      setMsg(kind === 'trash' ? 'Moved to Trash — restorable there for 30 days.' : kind === 'archive' ? 'Archived — it’s out of the inbox, still in All Mail.' : kind === 'unread' ? 'Marked unread.' : 'Starred ✓');
+      setMsg(kind === 'trash' ? 'Moved to Trash — restorable there for 30 days.' : kind === 'archive' ? 'Archived — it’s out of the inbox, still in All Mail.' : kind === 'unread' ? 'Marked unread.' : (open?.starred ? 'Unstarred.' : 'Starred ✓'));
     } catch (e) { setMsg(e instanceof Error ? e.message : 'That didn’t go through.'); }
     finally { setBusy(null); }
   }
@@ -167,11 +174,20 @@ export default function Mail() {
     finally { setBusy(null); }
   }
 
+  // THE MAIL BRAIN, WITH THE EMAIL ATTACHED (founder 2026-11-14: it "takes me
+  // to the general brain, not the mail brain; and… that should be like an
+  // attachment in a chat, with the clear space to write additional context,
+  // below it"): the Mail brief opens narrowed to that inbox, the thread rides
+  // as a card above an EMPTY box.
   function askBrain() {
-    const ask = open && openAcct && openThread
-      ? `Read my email thread "${open.subject}" (mail account ${accounts.find((a) => a.id === openAcct)?.email}, thread ${openThread}) — summarize it and suggest a reply.`
-      : 'Look through my inboxes and tell me what needs my attention.';
-    navigate(`/assistant/feed?thread=general&convo=new&ask=${encodeURIComponent(ask)}`);
+    if (!open || !openAcct || !openThread) { navigate('/assistant?section=mail'); return; }
+    const last = open.messages[open.messages.length - 1];
+    const q = new URLSearchParams({
+      section: 'mail', mbox: openAcct, mref: `${openAcct}:${openThread}`,
+      msubj: open.subject.slice(0, 200), mfrom: senderName(last?.from ?? '').slice(0, 120),
+      macct: accounts.find((a) => a.id === openAcct)?.email ?? '',
+    });
+    navigate(`/assistant?${q.toString()}`);
   }
 
   if (!actingReady) return null;
@@ -295,7 +311,7 @@ export default function Mail() {
                   <button className={'mail__row' + (t.unread ? ' is-unread' : '')} onClick={() => openThreadRow(t)}>
                     <span className="mail__row-top">
                       <span className="mail__row-from">{senderName(t.from)}{t.count > 1 && <em> {t.count}</em>}</span>
-                      <span className="mail__row-when">{when(t.date)}</span>
+                      <span className="mail__row-when">{t.starred && <span className="mail__row-star" aria-label="Starred"><Icon name="star" size={12} /></span>}{when(t.date)}</span>
                     </span>
                     <span className="mail__row-subj">{t.subject}</span>
                     <span className="mail__row-snip">{t.snippet}</span>
@@ -320,7 +336,8 @@ export default function Mail() {
                 <button className="btn" disabled={!!busy} onClick={() => void act('archive')}>Archive</button>
                 <button className="mail__quiet" disabled={!!busy} onClick={() => void act('trash')}>Trash</button>
                 <button className="mail__quiet" disabled={!!busy} onClick={() => void act('unread')}>Mark unread</button>
-                <button className="mail__quiet" disabled={!!busy} onClick={() => void act('star')}>Star</button>
+                <button className={'mail__star' + (open.starred ? ' is-starred' : '')} disabled={!!busy} aria-pressed={!!open.starred}
+                  onClick={() => void act('star')}><Icon name="star" size={15} /> {open.starred ? 'Starred' : 'Star'}</button>
                 {/* An ACTION, not a stateful circle — worded, so it never reads
                     as the brain toggle (the circle rule, 2026-11-14). */}
                 <button className="mail__askbtn" onClick={askBrain}>

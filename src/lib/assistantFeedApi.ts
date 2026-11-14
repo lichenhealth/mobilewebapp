@@ -37,6 +37,7 @@ export type FeedAttachment =
    *  was on her screen so the model knows what "it" means. NEVER rendered —
    *  the member saw it as the brief card already. */
   | { type: 'brief_ctx'; section: string; text: string }
+  | { type: 'mailref'; account_id: string; account: string; thread_id: string; subject: string; from: string }
   /** A COPYABLE VALUE (founder 2026-11-02, the feed-URL reply overflowing
    *  its bubble in broken code fences: "just have a copy button and have it
    *  check when its copied"): the reply hands a real Copy button instead of
@@ -379,6 +380,8 @@ export async function postToAssistantFeed(
    *  rides as a brief_ctx attachment so the reply knows what the member was
    *  reading — the client never renders it. */
   briefCtx?: { section: string; text: string },
+  /** An email thread attached from Mail (founder 2026-11-14). */
+  mailRef?: { account_id: string; account: string; thread_id: string; subject: string; from: string },
 ): Promise<FeedPostRow> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
@@ -388,6 +391,7 @@ export async function postToAssistantFeed(
     ...(briefCtx?.text.trim()
       ? [{ type: 'brief_ctx', section: briefCtx.section, text: briefCtx.text.slice(0, 2000) } as const]
       : []),
+    ...(mailRef ? [{ type: 'mailref', ...mailRef, subject: mailRef.subject.slice(0, 200), from: mailRef.from.slice(0, 200) } as const] : []),
   ];
   const { data, error } = await supabase.from('assistant_feed_posts').insert({
     profile_id: user.id, author: 'member', body,

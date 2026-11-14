@@ -84,7 +84,7 @@ const hdr = (m: GMsg, n: string) => m.payload?.headers?.find((h) => h.name.toLow
 
 export type ThreadSummary = {
   account_id: string; account: string; thread_id: string;
-  from: string; subject: string; snippet: string; date: string; unread: boolean; count: number;
+  from: string; subject: string; snippet: string; date: string; unread: boolean; starred: boolean; count: number;
 };
 
 /** Threads for one account — Gmail's own search grammar (default: the inbox). */
@@ -103,7 +103,7 @@ export async function listThreads(profileId: string, acct: MailAccount, q: strin
       account_id: acct.id, account: acct.email, thread_id: t.id,
       from: hdr(last, 'From'), subject: hdr(first, 'Subject') || '(no subject)',
       snippet: decodeEntities(last.snippet ?? ''), date: new Date(Number(last.internalDate ?? 0)).toISOString(),
-      unread: msgs.some((m) => m.labelIds?.includes('UNREAD')), count: msgs.length,
+      unread: msgs.some((m) => m.labelIds?.includes('UNREAD')), starred: msgs.some((m) => m.labelIds?.includes('STARRED')), count: msgs.length,
     });
   }
   return out;
@@ -150,13 +150,14 @@ export type MailMessage = {
 
 /** A whole thread as plain text — never raw HTML (an email's HTML is a
  *  stranger's markup; it never renders inside Lichen). */
-export async function readThread(profileId: string, accountId: string, threadId: string): Promise<{ subject: string; messages: MailMessage[]; unread: boolean }> {
+export async function readThread(profileId: string, accountId: string, threadId: string): Promise<{ subject: string; messages: MailMessage[]; unread: boolean; starred: boolean }> {
   const token = await accessTokenFor(profileId, accountId);
   const t = await gm(token, `threads/${encodeURIComponent(threadId)}?format=full`) as { messages?: GMsg[] };
   const msgs = t?.messages ?? [];
   return {
     subject: msgs[0] ? (hdr(msgs[0], 'Subject') || '(no subject)') : '',
     unread: msgs.some((m) => m.labelIds?.includes('UNREAD')),
+    starred: msgs.some((m) => m.labelIds?.includes('STARRED')),
     messages: msgs.map((m) => ({
       id: m.id, from: hdr(m, 'From'), to: hdr(m, 'To'), cc: hdr(m, 'Cc'),
       date: new Date(Number(m.internalDate ?? 0)).toISOString(), subject: hdr(m, 'Subject'),

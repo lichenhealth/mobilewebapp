@@ -72,6 +72,7 @@ export type IconName =
   | 'copy'
   | 'trash'
   | 'mail'
+  | 'star'
   | 'tag'
   | 'repeat'
   | 'rent'
@@ -367,6 +368,12 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
     content: <><path d="M3 12.2V4.5A1.5 1.5 0 0 1 4.5 3h7.7l8.8 8.8a1.5 1.5 0 0 1 0 2.1l-7 7a1.5 1.5 0 0 1-2.1 0L3 12.2z" fill="none" /><circle cx="7.6" cy="7.6" r="1.4" fill="none" /></>,
+  },
+  // Mail's star — five points; a starred thread fills it via CSS (fill: currentColor).
+  'star': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z" fill="none" strokeLinejoin="round" />,
   },
   'mail': {
     viewBox: '0 0 24 24',

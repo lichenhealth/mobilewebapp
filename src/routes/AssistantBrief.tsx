@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { listSpacesByKind } from '../lib/spacesApi';
 import { Icon, type IconName } from '../components/Icon';
 import AssistantComposer from '../components/AssistantComposer';
+import MailRefCard, { type MailRef } from '../components/MailRefCard';
 import {
   threadForSection, loadAssistantFeed, latestConvoIn, groupConvos, loadConvoNames,
   postToAssistantFeed, CONVO_GAP_MS, type ConvoGroup, type FeedPostRow,
@@ -147,6 +148,18 @@ export default function AssistantBrief() {
   // inbox's brain, filter by text, email, and chat as well"): Mail's brief
   // narrows by ?mbox=<account id>, the Inbox brief by ?medium=chat|mail|text.
   const mbox = section === 'mail' ? params.get('mbox') : null;
+  // AN EMAIL RIDES IN AS AN ATTACHMENT (founder 2026-11-14: Mail's "Ask about
+  // this thread" "takes me to the general brain, not the mail brain; and…
+  // that should be like an attachment in a chat, with the clear space to
+  // write additional context, below it"): Mail hands ?mref=<account>:<thread>
+  // plus the subject/sender/address to show; the card sits above an EMPTY box.
+  const [mailRef, setMailRef] = useState<MailRef | null>(() => {
+    const ref = section === 'mail' ? params.get('mref') : null;
+    const i = ref ? ref.indexOf(':') : -1;
+    if (!ref || i < 1) return null;
+    return { account_id: ref.slice(0, i), thread_id: ref.slice(i + 1), subject: params.get('msubj') ?? '',
+      from: params.get('mfrom') ?? '', account: params.get('macct') ?? '' };
+  });
   const medium = section === 'chat' ? params.get('medium') : null;
   const [mailAccts, setMailAccts] = useState<{ id: string; email: string }[]>([]);
   useEffect(() => {
@@ -933,8 +946,11 @@ export default function AssistantBrief() {
     // attachment, so "how long is the trip?" means what she just read.
     const briefCtx = !spaceParam && state === 'ready' && brief?.trim()
       ? { section, text: brief } : undefined;
+    const ref = mailRef;
     const row = await postToAssistantFeed(
-      text, undefined, feedThread, images, convo, sectionTag ? [sectionTag] : undefined, briefCtx);
+      text || (ref ? 'Summarize this email thread and suggest a reply.' : text),
+      undefined, feedThread, images, convo, sectionTag ? [sectionTag] : undefined, briefCtx, ref ?? undefined);
+    setMailRef(null);
     navigate(`/assistant/feed?thread=${feedThread}${!spaceParam && row.convo_id ? `&convo=${row.convo_id}` : ''}`);
   }
 
@@ -1303,6 +1319,8 @@ export default function AssistantBrief() {
         onSend={sendToClaude}
         initialText={params.get('ask') ?? undefined}
         uploaderId={me || undefined}
+        attachment={mailRef ? <MailRefCard m={mailRef} onRemove={() => setMailRef(null)} /> : undefined}
+        placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : undefined}
       />
 
       {/* EARLIER CONVERSATIONS (founder 2026-10-06) — the history log this

@@ -17,7 +17,7 @@ import './AssistantComposer.css';
  *  into the box (or picked via the + on phones, where paste barely exists)
  *  uploads immediately, previews as a chip, and rides the send. */
 export default function AssistantComposer({
-  onSend, placeholder = 'Ask about any of this…', className = '', initialText, uploaderId,
+  onSend, placeholder = 'Ask about any of this…', className = '', initialText, uploaderId, attachment,
 }: {
   onSend: (text: string, images?: string[]) => void | Promise<void>;
   placeholder?: string;
@@ -28,8 +28,22 @@ export default function AssistantComposer({
   initialText?: string;
   /** Present = photos may be pasted/attached; whose storage they land in. */
   uploaderId?: string;
+  /** Something riding the send ABOVE the box (founder 2026-11-14: an email
+   *  "should be like an attachment in a chat, with the clear space to write
+   *  additional context, below it"). Present = the box may send with no
+   *  words, the attachment alone being the ask. */
+  attachment?: React.ReactNode;
 }) {
   const [ask, setAsk] = useState(initialText ?? '');
+  // An attachment arriving means "write about this" — the box takes focus
+  // so its clear space is right there (and on screen).
+  const hasAtt = !!attachment;
+  useEffect(() => {
+    if (!hasAtt) return;
+    const t = window.setTimeout(() => taRef.current?.focus(), 250);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasAtt]);
   // THE BOX GROWS WITH ITS WORDS (founder 2026-10-29, a brain-door prefill
   // arriving clipped: "clicking in didn't show the entire text for me to
   // edit, so the box needs to expand") — height follows content from the
@@ -142,7 +156,7 @@ export default function AssistantComposer({
 
   async function submit() {
     const text = ask.trim();
-    if ((!text && images.length === 0) || sending || upBusy) return;
+    if ((!text && images.length === 0 && !attachment) || sending || upBusy) return;
     setSending(true);
     try {
       await onSend(text, images.length ? images : undefined);
@@ -158,6 +172,7 @@ export default function AssistantComposer({
       className={'assist-composer ' + className + (dragOver ? ' is-dragover' : '')}
       onSubmit={(e) => { e.preventDefault(); void submit(); }}
     >
+      {attachment && <div className="assist-composer__att">{attachment}</div>}
       {images.length > 0 && (
         <div className="assist-composer__shots">
           {images.map((url) => (
@@ -196,7 +211,7 @@ export default function AssistantComposer({
           }}
         />
         <button className="assist-composer__send" type="submit"
-          disabled={(!ask.trim() && images.length === 0) || sending || upBusy}
+          disabled={(!ask.trim() && images.length === 0 && !attachment) || sending || upBusy}
           aria-label="Send to your assistant">
           <Icon name="send" size={15} />
         </button>

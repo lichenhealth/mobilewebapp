@@ -805,9 +805,17 @@ Deno.serve(async (req) => {
   // trip was ever mentioned and the honest answer reads as amnesia.
   const briefCtxAtt = (Array.isArray(trigger?.attachments) ? trigger.attachments : [])
     .find((a: { type?: string; text?: string }) => a?.type === 'brief_ctx' && typeof a.text === 'string');
-  const briefContext = briefCtxAtt?.text?.trim()
+  let briefContext = briefCtxAtt?.text?.trim()
     ? `\n\n[Right before sending this, they were reading this briefing of theirs on the same screen — they may be replying to it: "${String(briefCtxAtt.text).slice(0, 2000)}"]`
     : '';
+  // AN EMAIL THREAD ATTACHED FROM MAIL (founder 2026-11-14): the card names
+  // the thread; the model reads it with read_mail before answering.
+  const mailRefAtt = (Array.isArray(trigger?.attachments) ? trigger.attachments : [])
+    .find((a: { type?: string; thread_id?: string }) => a?.type === 'mailref' && typeof a.thread_id === 'string') as
+    { account?: string; thread_id: string; subject?: string; from?: string } | undefined;
+  if (mailRefAtt) {
+    briefContext += `\n\n[They attached an email thread from Mail: "${String(mailRefAtt.subject ?? '').slice(0, 200)}" from ${String(mailRefAtt.from ?? '').slice(0, 200)} — inbox ${String(mailRefAtt.account ?? '').slice(0, 120)}, thread_id ${String(mailRefAtt.thread_id).slice(0, 80)}. Read it with read_mail (that account and thread_id) before answering; their words above are their context about it.]`;
+  }
 
   // A SPACE'S BUILD THREAD (founder 2026-08-22): thread `space:<uuid>` — the
   // member's own private rows, ABOUT a space. The space id comes from the

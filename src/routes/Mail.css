@@ -70,3 +70,11 @@
 .mail__bubbles { display: flex; gap: 6px; flex-wrap: wrap; }
 .mail__bubble { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 11px; border-radius: 999px; background: var(--peach-tint); border: 1px solid var(--peach); color: var(--peach-deep); font-size: 13px; max-width: 100%; overflow-wrap: anywhere; }
 .mail__bubble button { border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; padding: 0 6px; cursor: pointer; }
+/* Star is a real toggle (2026-11-14): outline at rest, filled peach when starred. */
+.mail__star { display: inline-flex; align-items: center; gap: 5px; background: none; border: 1px solid var(--bone-edge); border-radius: 999px;
+  padding: 5px 11px; font: inherit; font-size: 14px; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+.mail__star:hover { color: var(--peach-deep); border-color: var(--peach); }
+.mail__star.is-starred { color: var(--peach-deep); border-color: var(--peach); background: var(--peach-tint); }
+.mail__star.is-starred svg path { fill: currentColor; }
+.mail__row-star { display: inline-flex; vertical-align: -1px; margin-right: 5px; color: var(--peach-deep); }
+.mail__row-star svg path { fill: currentColor; }

@@ -8,13 +8,13 @@ import { supabase } from './supabase';
 export type MailAccount = { id: string; email: string; connected_at: string; last_error: string | null };
 export type ThreadSummary = {
   account_id: string; account: string; thread_id: string;
-  from: string; subject: string; snippet: string; date: string; unread: boolean; count: number;
+  from: string; subject: string; snippet: string; date: string; unread: boolean; starred?: boolean; count: number;
 };
 export type MailMessage = {
   id: string; from: string; to: string; cc: string; date: string; subject: string;
   body: string; attachments: string[]; message_id: string; references: string;
 };
-export type MailThread = { subject: string; messages: MailMessage[]; unread: boolean };
+export type MailThread = { subject: string; messages: MailMessage[]; unread: boolean; starred?: boolean };
 
 export async function mailEnabled(me: string | undefined): Promise<boolean> {
   if (!me) return false;
