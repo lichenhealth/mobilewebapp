@@ -26,6 +26,7 @@ import Practice from './routes/Practice';
 import Saved from './routes/Saved';
 import Trash from './routes/Trash';
 import Mail from './routes/Mail';
+import Workspace from './routes/Workspace';
 import BookPublic from './routes/BookPublic';
 import GuestBooking from './routes/GuestBooking';
 import Organize from './routes/Organize';
@@ -390,6 +391,7 @@ export default function App() {
           <Route path="/saved"     element={<Saved />} />
           <Route path="/trash"     element={<Trash />} />
           <Route path="/mail"      element={<Mail />} />
+          <Route path="/workspace" element={<Workspace />} />
           <Route path="/assistant" element={<AssistantBrief />} />
           <Route path="/assistant/feed" element={<AssistantFeed />} />
           <Route path="/snapshot" element={<Snapshot />} />

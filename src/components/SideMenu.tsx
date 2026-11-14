@@ -301,6 +301,9 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
               {adminExpanded && (
               <ul className="side-menu__sub-list">
                 <li>
+                  <button className="side-menu__sub-item" onClick={() => go('/workspace')}>Lichen workspace</button>
+                </li>
+                <li>
                   {/* Straight to the DOOR itself (founder 2026-10-21: the
                       #ledger landing "only scrolls down to the top of the 3
                       lists" — the item SAYS knocking, so it lands on the

@@ -1,0 +1,18 @@
+.wksp { display: flex; flex-direction: column; gap: var(--s-5); padding-bottom: var(--s-8); }
+.wksp__sec { display: flex; flex-direction: column; gap: var(--s-2); }
+.wksp__h { margin: 0; font-family: var(--font-mono, monospace); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); font-weight: 500; }
+.wksp__note { margin: 0; font-size: 13px; color: var(--ink-muted); text-wrap: pretty; }
+.wksp__err { margin: 0; font-size: 13px; color: var(--red-deep); }
+.wksp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.wksp__row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: 12px; background: #fff;
+  font: inherit; color: var(--ink); cursor: pointer;
+}
+.wksp__row:hover { border-color: var(--peach); }
+.wksp__ico { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--bone-edge); display: inline-flex; align-items: center; justify-content: center; }
+.wksp__rowtext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.wksp__rowtext strong { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wksp__rowtext em { font-style: normal; font-size: 12px; color: var(--ink-muted); }
+.wksp__badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--peach); color: #fff; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+.wksp__btn { align-self: flex-start; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--peach-deep); background: transparent; color: var(--peach-deep); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
