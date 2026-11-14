@@ -61,6 +61,8 @@ export interface EventRow {
   spanBar?: boolean;
   /** Which imported calendar this row came from (external rows only). */
   extCalId?: string;
+  /** Which Google calendar inside the connected account (sub_settings key). */
+  subCal?: string | null;
   /** A CARE-PLAN entry overlaid on the calendar (founder 2026-09-24:
    *  "overlay your care plan… just like a google cal") — read-only here,
    *  edited on the Concierge board. */
