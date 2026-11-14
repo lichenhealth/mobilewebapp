@@ -327,7 +327,7 @@ to build. Rough estimates only, not quotes:
   dollars per user) and put Lichen's Inbox on top. Don't run our own mail
   server.
 - **Recommendation on the table:** keep Google Workspace as the mailbox;
-  connect every account to Lichen Mail (her four are being connected);
+  connect every account to Lichen Mail (all four of hers connected 2026-11-14: connect@ and galyn@lichen.health, galyn@galynburke.com, galynburke@gmail.com);
   build tier 1 when she wants it; leave tiers 2–3 until members ask.
   Cancelling Workspace needs tier 1 + storage + an import of each account's
   history, AND the HIPAA upgrade for any clinical inbox. A founder money call.
