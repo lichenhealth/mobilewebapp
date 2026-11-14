@@ -124,3 +124,12 @@
   background: #fff; border-radius: 16px; border-bottom-left-radius: 6px;
 }
 .abrief__run .abrief__updated { text-align: right; }
+
+/* Brain filters (2026-11-14): Mail's brief by inbox, the Inbox brief by
+   medium — Mail's account-lens pill grammar, light-peach when on. */
+.abrief__filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--s-4); }
+.abrief__filter {
+  font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--bone-edge); background: #fff; color: var(--ink); cursor: pointer;
+}
+.abrief__filter.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }

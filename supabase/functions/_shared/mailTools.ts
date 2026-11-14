@@ -4,7 +4,7 @@
 // account itself (Gmail and Lichen Mail both show it) and the person sends.
 // Every account resolves against the SENDER's own mail_accounts rows; a
 // thread id only ever reaches their own mailbox through their own token.
-import { mailAccountsOf, listThreads, readThread, draftMail, trashThread, modifyThread, type MailAccount } from './gmail.ts';
+import { mailAccountsOf, listThreads, readThread, draftMail, trashThread, modifyThread, listFilters, createFilter, deleteFilter, labelIdFor, labelNames, type MailAccount } from './gmail.ts';
 
 type Out = { ok: boolean; [k: string]: unknown };
 
@@ -41,6 +41,21 @@ export const MAIL_TOOLS = [
         thread_ids: { type: 'array', items: { type: 'string' } },
       },
       required: ['account', 'action', 'thread_ids'],
+    },
+  },
+  {
+    name: 'mail_filters',
+    description: 'Gmail FILTERS (standing rules for future mail) on one of their inboxes. op "list" shows them; op "create" makes one — match by from / to / subject / query (Gmail search grammar), then any of: skip_inbox (archive it on arrival), mark_read, star, trash, label (a label name, created if missing), never_spam; op "delete" removes one by filter_id from list. Create or delete ONLY a rule the member asked for in their own words, and say plainly what it now does to future mail. A filter never forwards. If Gmail refuses for missing permission, tell them to tap Reconnect beside that inbox on the Mail screen once.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string' }, op: { type: 'string', enum: ['list', 'create', 'delete'] },
+        from: { type: 'string' }, to: { type: 'string' }, subject: { type: 'string' }, query: { type: 'string' },
+        skip_inbox: { type: 'boolean' }, mark_read: { type: 'boolean' }, star: { type: 'boolean' },
+        trash: { type: 'boolean' }, label: { type: 'string' }, never_spam: { type: 'boolean' },
+        filter_id: { type: 'string' },
+      },
+      required: ['account', 'op'],
     },
   },
 ];
@@ -114,6 +129,39 @@ export async function runMailTool(profileId: string, name: string, input: Record
         ...(failed.length ? { failed: `${failed.length} couldn't be moved (a thread id may not belong to that account).` } : {}),
         door: { path: '/mail', label: 'Open Mail' },
       };
+    }
+    if (name === 'mail_filters') {
+      const scopeHint = (e: unknown) => {
+        const m = e instanceof Error ? e.message : String(e);
+        return /403|insufficient|scope/i.test(m)
+          ? { ok: false, error: `${acct.email} needs one Reconnect on the Mail screen before filters work (a new Google permission).`, door: { path: '/mail', label: 'Open Mail' } }
+          : { ok: false, error: m };
+      };
+      const b = (k: string) => input[k] === true;
+      try {
+        if (s('op') === 'list') {
+          const [fs, names] = await Promise.all([listFilters(profileId, acct.id), labelNames(profileId, acct.id)]);
+          return { ok: true, filters: fs.map((f) => ({ filter_id: f.id, matches: f.criteria, adds: (f.action?.addLabelIds ?? []).map((x) => names.get(x) ?? x), removes: (f.action?.removeLabelIds ?? []).map((x) => names.get(x) ?? x) })) };
+        }
+        if (s('op') === 'delete') {
+          if (!s('filter_id')) return { ok: false, error: 'Which filter? List them first.' };
+          await deleteFilter(profileId, acct.id, s('filter_id'));
+          return { ok: true, note: `Filter removed from ${acct.email}. Mail already sorted stays where it is.` };
+        }
+        const criteria: Record<string, unknown> = {};
+        for (const k of ['from', 'to', 'subject', 'query']) if (s(k).trim()) criteria[k] = s(k).trim();
+        if (!Object.keys(criteria).length) return { ok: false, error: 'What should the filter match — a sender, a subject, words?' };
+        const add: string[] = []; const remove: string[] = [];
+        if (b('skip_inbox')) remove.push('INBOX');
+        if (b('mark_read')) remove.push('UNREAD');
+        if (b('star')) add.push('STARRED');
+        if (b('trash')) add.push('TRASH');
+        if (b('never_spam')) remove.push('SPAM');
+        if (s('label').trim()) add.push(await labelIdFor(profileId, acct.id, s('label').trim()));
+        if (!add.length && !remove.length) return { ok: false, error: 'What should it do — skip the inbox, mark read, label, star, trash?' };
+        const f = await createFilter(profileId, acct.id, criteria, { addLabelIds: add, removeLabelIds: remove });
+        return { ok: true, filter_id: f.id, note: `Filter made on ${acct.email}. It applies to NEW mail from now on; mail already there is untouched (tidy_mail can move it).`, door: { path: '/mail', label: 'Open Mail' } };
+      } catch (e) { return scopeHint(e); }
     }
     return { ok: false, error: 'Unknown mail tool.' };
   } catch (e) {
