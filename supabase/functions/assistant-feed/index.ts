@@ -1486,6 +1486,12 @@ Deno.serve(async (req) => {
         .map((p: { body?: string }) => p.body ?? '').join(' ');
       const lr = await runLifeTool(sb, profile_id, name, input as Record<string, unknown>, offSections, trigger?.source_post_id ?? null, lifeMemberText);
       if (name === 'invite_to_event' && lr.ok && lr.invite) { calInvites.push(lr.invite as Record<string, unknown>); delete lr.invite; }
+      if (name === 'drive_doc' && lr.ok) {
+        // The file it just built or touched rides as a real Open button.
+        const door = lr.door as { path: string; label: string } | undefined;
+        if (door && /^\/docs\/[0-9a-f-]{36}$/.test(door.path) && !appDoors.some((d) => d.path === door.path)) appDoors.push(door);
+        delete lr.door;
+      }
       if (name === 'add_calendar_event' && lr.ok) {
         const door = lr.door as { path: string; label: string } | undefined;
         if (door && /^\/calendar\/edit\/[0-9a-f-]{36}$/.test(door.path) && !appDoors.some((d) => d.path === door.path)) appDoors.push(door);

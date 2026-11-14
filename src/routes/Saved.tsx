@@ -16,7 +16,7 @@ import { loadSavedPostsTimed, setSaved, loadSavedMessages, type SavedMessage } f
 import { uploadDriveFile, listDriveFiles, signDriveFiles, deleteDriveFile, type DriveFileRow, type DriveFileKind } from '../lib/driveFilesApi';
 import { createPersonalDoc, listMyPersonalDocs, deleteChatDoc, DOC_KIND_ICON, DOC_KIND_LABEL, type ChatDocRow } from '../lib/chatDocsApi';
 import { listMyPostDrafts, deletePostDraft, draftLabel, type PostDraftRow } from '../lib/postDraftsApi';
-import { listMyCollections, createCollection, updateCollection, deleteCollection, duplicateCollection, listCollectionAreas, loadCollection, type CollectionRow } from '../lib/collectionsApi';
+import { listMyCollections, createCollection, updateCollection, deleteCollection, duplicateCollection, listCollectionAreas, loadCollection, foldersHolding, type CollectionRow } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
@@ -179,6 +179,8 @@ export default function Saved() {
   const [fileUrls, setFileUrls] = useState<Record<string, string>>({});
   const [pdocs, setPdocs] = useState<ChatDocRow[]>([]);
   const [fileDel, setFileDel] = useState<string | null>(null);
+  // Which folders hold each doc/file (founder 2026-11-14: files go in folders too).
+  const [heldIn, setHeldIn] = useState<Map<string, string[]>>(new Map());
   const [fileBusy, setFileBusy] = useState(false);
   const filePhotoRef = useRef<HTMLInputElement>(null);
   const fileVideoRef = useRef<HTMLInputElement>(null);
@@ -191,6 +193,8 @@ export default function Saved() {
       if (!live) return;
       setFiles(fs);
       setPdocs(ds);
+      const [hd, hf] = await Promise.all([foldersHolding('doc', ds.map((d) => d.id)), foldersHolding('file', fs.map((f) => f.id))]);
+      if (live) setHeldIn(new Map([...hd, ...hf]));
       const signed = await signDriveFiles(fs.filter((f) => f.kind === 'photo').map((f) => f.path));
       if (live) setFileUrls(signed);
     })();
@@ -1044,9 +1048,10 @@ export default function Saved() {
               <span className="drive__row-icon"><Icon name={DOC_KIND_ICON[d.kind]} size={16} /></span>
               <span className="drive__row-main">
                 <span className="drive__row-title">{d.title}</span>
-                <span className="drive__row-meta">{DOC_KIND_LABEL[d.kind]} · edited {shortDate(d.updated_at)}</span>
+                <span className="drive__row-meta">{DOC_KIND_LABEL[d.kind]} · edited {shortDate(d.updated_at)}{heldIn.get(d.id)?.length ? ` · in ${heldIn.get(d.id)!.join(', ')}` : ''}</span>
               </span>
               <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
+                <button className="drive__draft-del drive__row-folder" onClick={() => openPicker(d.id, 'doc')}>Add to folder</button>
                 <button
                   className="drive__draft-del"
                   onClick={() => {
@@ -1070,9 +1075,10 @@ export default function Saved() {
                 : <span className="drive__row-icon"><Icon name={f.kind === 'video' ? 'video' : f.kind === 'audio' ? 'mic' : 'image'} size={16} /></span>}
               <span className="drive__row-main">
                 <span className="drive__row-title">{f.title ?? 'A file'}</span>
-                <span className="drive__row-meta">{f.kind[0].toUpperCase() + f.kind.slice(1)} · added {shortDate(f.created_at)}</span>
+                <span className="drive__row-meta">{f.kind[0].toUpperCase() + f.kind.slice(1)} · added {shortDate(f.created_at)}{heldIn.get(f.id)?.length ? ` · in ${heldIn.get(f.id)!.join(', ')}` : ''}</span>
               </span>
               <span className="drive__row-acts" onClick={(e) => e.stopPropagation()}>
+                <button className="drive__draft-del drive__row-folder" onClick={() => openPicker(f.id, 'file')}>Add to folder</button>
                 <button
                   className="drive__draft-del"
                   onClick={() => {

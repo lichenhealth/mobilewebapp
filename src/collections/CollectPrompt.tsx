@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/Icon';
 import {
-  listMyCollections, createCollection, addToCollection, type CollectionRow,
+  listMyCollections, createCollection, addToCollection, type CollectionRow, type FolderTarget,
 } from '../lib/collectionsApi';
 import { loadPost } from '../lib/postsApi';
 import { supabase } from '../lib/supabase';
@@ -16,8 +16,9 @@ import './CollectPrompt.css';
 interface CollectCtx {
   /** Show the after-save toast with its "Add to collection…" action. */
   promptSaved: (postId: string) => void;
-  /** Open the folder picker for a post straight away. */
-  openPicker: (postId: string) => void;
+  /** Open the folder picker for a post — or (founder 2026-11-14) one of your
+   *  own Drive docs/sheets/presentations ('doc') or uploaded files ('file'). */
+  openPicker: (id: string, type?: FolderTarget) => void;
 }
 
 const Ctx = createContext<CollectCtx>({ promptSaved: () => {}, openPicker: () => {} });
@@ -35,6 +36,7 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
     return () => window.removeEventListener('pointerdown', track, { capture: true });
   }, []);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [pickerType, setPickerType] = useState<FolderTarget>('post');
   const [cols, setCols] = useState<CollectionRow[]>([]);
   // WEAVEABLE CONSENT (founder 2026-08-14): a post whose author keeps it out
   // of others' collections gets a quiet notice instead of the folder rows.
@@ -59,12 +61,14 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
     toastTimer.current = window.setTimeout(() => setToastFor(null), 6000);
   }, []);
 
-  const openPicker = useCallback((postId: string) => {
+  const openPicker = useCallback((postId: string, type: FolderTarget = 'post') => {
     setToastFor(null);
     setPickerFor(postId);
+    setPickerType(type);
     setNewName('');
     setNoWeaveBy(null);
     void listMyCollections().then(setCols).catch(console.error);
+    if (type !== 'post') return;
     void (async () => {
       const [p, { data: { user } }] = await Promise.all([loadPost(postId), supabase.auth.getUser()]);
       if (p && user && p.author_id !== user.id && (p.details as { noWeave?: boolean } | null)?.noWeave === true) {
@@ -81,7 +85,7 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
 
   async function addTo(collectionId: string, postId: string) {
     try {
-      await addToCollection(collectionId, postId);
+      await addToCollection(collectionId, postId, pickerType);
       flash(`Added to ${cols.find((c) => c.id === collectionId)?.name ?? 'collection'} ✓`);
     } catch (e) {
       console.error(e);
@@ -96,7 +100,7 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
     if (!nm) return;
     try {
       const cid = await createCollection(nm);
-      await addToCollection(cid, postId);
+      await addToCollection(cid, postId, pickerType);
       flash(`Added to ${nm} ✓`);
     } catch (e) {
       console.error(e);
@@ -130,8 +134,8 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
       {pickerFor && (
         <>
           <div className="collect__scrim" onClick={() => setPickerFor(null)} />
-          <div className="collect__picker" role="dialog" aria-label="Add to collection">
-            <h3>Add to collection</h3>
+          <div className="collect__picker" role="dialog" aria-label="Add to a folder">
+            <h3>{pickerType === 'post' ? 'Add to collection' : 'Add to a folder'}</h3>
             {noWeaveBy && (
               <p className="collect__muted">
                 {noWeaveBy} keeps this piece out of others&rsquo; collections —

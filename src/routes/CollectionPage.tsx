@@ -32,8 +32,10 @@ import {
   suggestToCollection, listPendingSuggestions, resolveSuggestion,
   type CollectionRow, type OfferingMeta, type CollectionSuggestionRow,
   listCourseNotes, addCourseNote, updateCourseNote, deleteCourseNote, courseFolder,
-  type CourseNote,
+  type CourseNote, loadCollectionFiles, type FolderFile,
 } from '../lib/collectionsApi';
+import { DOC_KIND_ICON, DOC_KIND_LABEL, type ChatDocKind } from '../lib/chatDocsApi';
+import { signDriveFiles } from '../lib/driveFilesApi';
 import { useCollect } from '../collections/CollectPrompt';
 import './CollectionPage.css';
 
@@ -89,6 +91,7 @@ export default function CollectionPage() {
   const [suggPosts, setSuggPosts] = useState<FeedPost[]>([]);
   const [suggNote, setSuggNote] = useState('');
   const [suggSent, setSuggSent] = useState(false);
+  const [folderFiles, setFolderFiles] = useState<FolderFile[]>([]);
 
   const load = useCallback(async () => {
     setReady(false);
@@ -108,6 +111,7 @@ export default function CollectionPage() {
     setSuggPosts(suggIds.length ? await loadPostsByIds(suggIds) : []);
     setSpaceDuty(duty);
     setMeta(col.meta); setPosts(col.posts);
+    setFolderFiles(await loadCollectionFiles(id));
     setName(col.meta.name); setDescription(col.meta.description ?? ''); setForm(col.meta.details ?? {});
     setEnrolled(prog.enrolled); setDone(prog.done);
     setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov);
@@ -1300,7 +1304,43 @@ export default function CollectionPage() {
       )}
 
       <section className={'colp__list' + (playerMode ? ' colp__list--player' : '')}>
-        {posts.length === 0 && (
+        {/* FILES IN THE FOLDER (founder 2026-11-14) — docs, sheets,
+            presentations and uploads from someone's own Drive, by reference.
+            One only its owner can open says so instead of vanishing. */}
+        {folderFiles.length > 0 && (
+          <div className="colp__files">
+            <h3 className="colp__files-h">Files &amp; docs</h3>
+            {folderFiles.map((f) => {
+              const mine = f.title != null;
+              const icon = f.type === 'doc' ? DOC_KIND_ICON[(f.kind ?? 'doc') as ChatDocKind] : f.kind === 'video' ? 'video' : f.kind === 'audio' ? 'mic' : 'image';
+              const open = async () => {
+                if (!mine) return;
+                if (f.type === 'doc') { navigate(`/docs/${f.id}`); return; }
+                const u = f.path ? (await signDriveFiles([f.path]))[f.path] : null;
+                if (u) window.open(u, '_blank', 'noopener');
+              };
+              return (
+                <div key={f.type + f.id} className={'colp__file' + (mine ? '' : ' is-locked')} role={mine ? 'button' : undefined} tabIndex={mine ? 0 : undefined}
+                  onClick={() => void open()} onKeyDown={(e) => { if (e.key === 'Enter') void open(); }}>
+                  <span className="colp__file-icon"><Icon name={icon} size={16} /></span>
+                  <span className="colp__file-main">
+                    <span className="colp__file-title">{mine ? f.title : 'A private file'}</span>
+                    <span className="colp__file-meta">{mine
+                      ? `${f.type === 'doc' ? DOC_KIND_LABEL[(f.kind ?? 'doc') as ChatDocKind] : (f.kind ?? 'File')} · ${f.updated_at ? new Date(f.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}`
+                      : 'Only its owner can open it'}</span>
+                  </span>
+                  {canEdit && (
+                    <button className="colp__file-x" aria-label="Take it out of this folder" onClick={(e) => {
+                      e.stopPropagation();
+                      void removeFromCollection(id, f.id, f.type).then(() => setFolderFiles((cur) => cur.filter((x) => !(x.id === f.id && x.type === f.type)))).catch(console.error);
+                    }}>Remove</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {posts.length === 0 && folderFiles.length === 0 && (
           <p className="colp__muted">
             {structured ? `No ${itemWord(meta.kind)}s yet` : 'Nothing here yet'}
             {canEdit ? ' — add pieces from your posts (⋯ → Add to collection…).' : '.'}

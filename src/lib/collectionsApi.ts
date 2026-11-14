@@ -307,9 +307,8 @@ export async function listCollectionAreas(collectionIds: string[]): Promise<Map<
   if (collectionIds.length === 0) return out;
   const { data: items } = await supabase
     .from('collection_items')
-    .select('collection_id, target_id')
-    .in('collection_id', collectionIds)
-    .eq('target_type', 'post');
+    .select('collection_id, target_id, target_type')
+    .in('collection_id', collectionIds);
   const rows = (items as { collection_id: string; target_id: string }[] | null) ?? [];
   if (rows.length === 0) return out;
   const { data: posts } = await supabase
@@ -363,23 +362,76 @@ export async function duplicateCollection(id: string): Promise<string> {
   return newId;
 }
 
-export async function addToCollection(collectionId: string, postId: string): Promise<void> {
+/** What a folder can hold (founder 2026-11-14: "docs and presos etc can go
+ *  inside folders, not just posts"): posts by reference, plus your own Drive
+ *  docs/sheets/presentations ('doc') and uploaded files ('file'). */
+export type FolderTarget = 'post' | 'doc' | 'file';
+
+export async function addToCollection(collectionId: string, targetId: string, targetType: FolderTarget = 'post'): Promise<void> {
   const { count } = await supabase
     .from('collection_items')
     .select('*', { count: 'exact', head: true })
     .eq('collection_id', collectionId);
   const { error } = await supabase.from('collection_items').insert({
-    collection_id: collectionId, target_type: 'post', target_id: postId,
+    collection_id: collectionId, target_type: targetType, target_id: targetId,
     position: count ?? 0,
   });
   if (error && error.code !== '23505') throw error;
 }
 
-export async function removeFromCollection(collectionId: string, postId: string): Promise<void> {
+export async function removeFromCollection(collectionId: string, targetId: string, targetType: FolderTarget = 'post'): Promise<void> {
   const { error } = await supabase.from('collection_items')
     .delete()
-    .eq('collection_id', collectionId).eq('target_type', 'post').eq('target_id', postId);
+    .eq('collection_id', collectionId).eq('target_type', targetType).eq('target_id', targetId);
   if (error) throw error;
+}
+
+/** A folder's docs and files. Each resolves through RLS at read time — a doc
+ *  or file only its owner can open comes back as a stub, never a hole. */
+export interface FolderFile {
+  type: 'doc' | 'file';
+  id: string;
+  title: string | null;
+  kind: string | null;
+  updated_at: string | null;
+  path?: string | null;
+}
+export async function loadCollectionFiles(collectionId: string): Promise<FolderFile[]> {
+  const { data: items } = await supabase
+    .from('collection_items')
+    .select('target_type, target_id, position')
+    .eq('collection_id', collectionId)
+    .in('target_type', ['doc', 'file'])
+    .order('position');
+  const rows = (items as { target_type: 'doc' | 'file'; target_id: string }[] | null) ?? [];
+  if (!rows.length) return [];
+  const docIds = rows.filter((r) => r.target_type === 'doc').map((r) => r.target_id);
+  const fileIds = rows.filter((r) => r.target_type === 'file').map((r) => r.target_id);
+  const [d, f] = await Promise.all([
+    docIds.length ? supabase.from('chat_docs').select('id, title, kind, updated_at').in('id', docIds) : Promise.resolve({ data: [] }),
+    fileIds.length ? supabase.from('drive_files').select('id, title, kind, created_at, path').in('id', fileIds) : Promise.resolve({ data: [] }),
+  ]);
+  const docs = new Map(((d.data as { id: string; title: string; kind: string; updated_at: string }[] | null) ?? []).map((x) => [x.id, x]));
+  const files = new Map(((f.data as { id: string; title: string | null; kind: string; created_at: string; path: string }[] | null) ?? []).map((x) => [x.id, x]));
+  return rows.map((r) => {
+    if (r.target_type === 'doc') { const x = docs.get(r.target_id); return { type: 'doc' as const, id: r.target_id, title: x?.title ?? null, kind: x?.kind ?? null, updated_at: x?.updated_at ?? null }; }
+    const x = files.get(r.target_id);
+    return { type: 'file' as const, id: r.target_id, title: x ? (x.title ?? 'A file') : null, kind: x?.kind ?? null, updated_at: x?.created_at ?? null, path: x?.path ?? null };
+  });
+}
+
+/** Which folders hold this doc/file (Drive rows say "In Taxes 2026"). */
+export async function foldersHolding(targetType: 'doc' | 'file', ids: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (!ids.length) return out;
+  const { data } = await supabase.from('collection_items')
+    .select('target_id, collection:collections(name)')
+    .eq('target_type', targetType).in('target_id', ids);
+  for (const r of (data as unknown as { target_id: string; collection: { name: string } | null }[] | null) ?? []) {
+    if (!r.collection) continue;
+    out.set(r.target_id, [...(out.get(r.target_id) ?? []), r.collection.name]);
+  }
+  return out;
 }
 
 /** A collection with its posts in curated order. Null when private + not mine. */
@@ -399,6 +451,7 @@ export async function loadCollection(id: string): Promise<{ meta: CollectionRow;
     .from('collection_items')
     .select('target_id, position')
     .eq('collection_id', id)
+    .eq('target_type', 'post')
     .order('position');
   const ids = ((items as { target_id: string }[] | null) ?? []).map((r) => r.target_id);
   const posts = ids.length ? await loadPostsByIds(ids) : [];

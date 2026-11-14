@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { IconName } from '../components/Icon';
+import type { SheetTab } from './formula';
 
 /** Docs, polls and spreadsheets born in a chat room's composer (founder
  *  2026-10-21). A row IS the room-drive item: chat_id is the room whose
@@ -10,7 +11,7 @@ import type { IconName } from '../components/Icon';
  *  read path (none reads chat_docs today; keep it that way without one). */
 
 export type ChatDocKind = 'doc' | 'poll' | 'sheet' | 'slides';
-export interface Slide { title: string; body: string }
+export interface Slide { title: string; body: string; body2?: string; layout?: string; notes?: string }
 
 export interface ChatDocRow {
   id: string;
@@ -20,7 +21,7 @@ export interface ChatDocRow {
   kind: ChatDocKind;
   title: string;
   body: string | null;
-  data: { options?: string[]; cells?: string[][]; slides?: Slide[] } | null;
+  data: { options?: string[]; cells?: string[][]; slides?: Slide[]; sheets?: SheetTab[]; html?: string; theme?: string } | null;
   ai_enabled: boolean;
   created_by: string;
   created_at: string;
@@ -138,14 +139,15 @@ export async function retractVote(me: string, docId: string): Promise<void> {
 export async function createPersonalDoc(
   kind: 'doc' | 'sheet' | 'slides',
   title: string,
+  init?: { body?: string | null; data?: ChatDocRow['data'] },
 ): Promise<ChatDocRow> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
-  const data = kind === 'sheet' ? { cells: [['', '', ''], ['', '', ''], ['', '', '']] }
-    : kind === 'slides' ? { slides: [{ title: '', body: '' }] } : {};
+  const data = init?.data ?? (kind === 'sheet' ? { sheets: [{ name: 'Sheet1', cells: [['']] }], cells: [['']] }
+    : kind === 'slides' ? { theme: 'paper', slides: [{ title: '', body: '', layout: 'title' }] } : {});
   const fallback = kind === 'doc' ? 'Untitled doc' : kind === 'sheet' ? 'Untitled spreadsheet' : 'Untitled presentation';
   const { data: row, error } = await supabase.from('chat_docs')
-    .insert({ chat_id: null, kind, title: title.trim() || fallback, data, created_by: user.id })
+    .insert({ chat_id: null, kind, title: title.trim() || fallback, data, body: init?.body ?? null, created_by: user.id })
     .select(DOC_COLS).single();
   if (error) throw error;
   return row as ChatDocRow;
