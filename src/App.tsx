@@ -25,6 +25,7 @@ import Giving from './routes/Giving';
 import Practice from './routes/Practice';
 import Saved from './routes/Saved';
 import Trash from './routes/Trash';
+import DriveImport from './routes/DriveImport';
 import Mail from './routes/Mail';
 import Workspace from './routes/Workspace';
 import BookPublic from './routes/BookPublic';
@@ -389,6 +390,7 @@ export default function App() {
           {/* Drive (founder 2026-08-14) — /saved stays as an alias for old
               links and muscle memory. */}
           <Route path="/drive"     element={<Saved />} />
+          <Route path="/drive/import" element={<DriveImport />} />
           <Route path="/saved"     element={<Saved />} />
           <Route path="/trash"     element={<Trash />} />
           <Route path="/mail"      element={<Mail />} />

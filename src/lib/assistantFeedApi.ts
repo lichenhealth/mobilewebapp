@@ -38,6 +38,9 @@ export type FeedAttachment =
    *  the member saw it as the brief card already. */
   | { type: 'brief_ctx'; section: string; text: string }
   | { type: 'mailref'; account_id: string; account: string; thread_id: string; subject: string; from: string }
+  /** GOOGLE DRIVE → LICHEN (2026-11-15): files the brain picked; the card's
+   *  tap re-creates each as a Lichen file through the member's own session. */
+  | { type: 'gdrive_import'; account_id: string; account: string; then_trash?: boolean; files: { id: string; name: string; mimeType: string; size?: string; modifiedTime?: string }[] }
   | { type: 'mail_reconnect'; accounts: string[] }
   /** An email the brain DRAFTED (founder 2026-11-15) — the card carries Send; the person's tap sends it. */
   | { type: 'mail_draft'; account_id: string; account: string; thread_id: string; message_id: string; to: string; cc?: string; subject: string; body: string }

@@ -14,7 +14,9 @@ const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/mail-oauth-callback`;
 const ALLOWED_RETURNS = ['https://lichen.health', 'http://localhost:5173', 'http://localhost:4173'];
 // gmail.settings.basic (2026-11-14): Gmail FILTERS — the brain's "skip the
 // inbox for X" rules. Inboxes connected before need one Reconnect.
-const SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic openid email';
+// drive (2026-11-15): Google Drive → Lichen Drive import + trash. Same
+// connection, one Reconnect per account to grant it.
+const SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic https://www.googleapis.com/auth/drive openid email';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -65,7 +67,7 @@ Deno.serve(async (req) => {
     + `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`
     + '&response_type=code'
     + `&scope=${encodeURIComponent(SCOPES)}`
-    + '&access_type=offline&prompt=consent%20select_account'
+    + '&access_type=offline&include_granted_scopes=true&prompt=consent%20select_account'
     + hint + `&state=${state}`;
   return json({ url });
 });

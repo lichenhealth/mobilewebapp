@@ -30,6 +30,7 @@ import { ScrollHintRow } from '../components/ScrollHintRow';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import KnockDraftCard from '../components/KnockDraftCard';
 import MailDraftCard from '../components/MailDraftCard';
+import GDriveImportCard from '../components/GDriveImportCard';
 import CalInviteCard from '../components/CalInviteCard';
 import './AssistantFeed.css';
 
@@ -1531,6 +1532,13 @@ export default function AssistantFeed() {
                   .map((a) => (
                     <div className="afeed__pubrow" key={`${p.id}:calinv:${a.event_id}`}>
                       <CalInviteCard eventId={a.event_id} title={a.title} members={a.members} emails={a.emails} calendar={a.calendar} />
+                    </div>
+                  ))}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'gdrive_import' ? [a] : []))
+                  .map((a, i) => (
+                    <div className="afeed__pubrow" key={`${p.id}:gdi:${i}`}>
+                      <GDriveImportCard accountId={a.account_id} account={a.account} files={a.files} thenTrash={a.then_trash} />
                     </div>
                   ))}
                 {/* RECONNECT, ONE TAP EACH (founder 2026-11-14: "i know the
