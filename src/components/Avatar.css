@@ -33,3 +33,13 @@
    messed up"): transparent logos floated loose and oversized beside the
    round member faces. A logo is contained, never cropped, inside one ring. */
 img.avatar.avatar--logo { background: #fff; border: 1px solid var(--bone-edge); object-fit: contain; padding: 3px; box-sizing: border-box; }
+/* THE BRAIN OVER A FACE (founder 2026-11-15, "my profile picture with the
+   little brain over it"): the member's own face in a dashed peach ring (the
+   hand-off grammar — this voice is passed through), a peach-ringed brain
+   perched on the upper right. Whose AI, at a glance. */
+.avatar-wrap--brain > .avatar { outline: 1.5px dashed var(--peach); outline-offset: 1.5px; }
+.avatar__mark--brain {
+  top: -5px; right: -6px; bottom: auto;
+  background: var(--bone-warm); color: var(--peach-deep);
+  border: 1.5px solid var(--peach); box-shadow: 0 0 0 1.5px var(--bone);
+}

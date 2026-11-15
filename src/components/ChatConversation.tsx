@@ -287,7 +287,14 @@ export default function ChatConversation({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
-  const runs = useMemo(() => groupRuns(messages.filter((m) => !hidden.has(m.id))), [messages, hidden]);
+  // THREAD FILTERS (founder 2026-11-15: "just like they are in a text thread
+  // on iphone where you can go to pictures, links, etc"): one conversation,
+  // narrowed — photos, links, docs, or by who wrote it (you, your Brain, them).
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filter, setFilter] = useState<ThreadFilter>('all');
+  const visibleMsgs = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
+  const hasBrain = useMemo(() => visibleMsgs.some((m) => m.via_brain), [visibleMsgs]);
+  const runs = useMemo(() => groupRuns(visibleMsgs.filter((m) => matchesFilter(m, filter, me))), [visibleMsgs, filter, me]);
 
   // ── The message menu's hands (founder 2026-10-21) ──────────────────────
   const copyMessage = (m: MessageRow) => {
@@ -454,9 +461,20 @@ export default function ChatConversation({
       <ChatHeader
         chat={chat} title={title} members={memberList} me={me} onBack={onBack} onMenu={onMenu} onInfo={onInfo}
         onDrive={docable ? () => navigate(`/chat/${chat.id}/drive`) : undefined}
+        onFilter={() => { setFilterOpen((o) => { if (o) setFilter('all'); return !o; }); }} filterOn={filterOpen || filter !== 'all'}
       />
+      {filterOpen && (
+        <div className="thread__filters" role="group" aria-label="Show">
+          {threadFilterOptions(chat.kind === 'direct', hasBrain, memberList.find((x) => x.profile_id !== me)?.name ?? '').map(([k, label]) => (
+            <button key={k} type="button" className={'thread__filter' + (filter === k ? ' is-on' : '')} onClick={() => setFilter(k)}>{label}</button>
+          ))}
+        </div>
+      )}
       <div className="thread__scroll" ref={scrollRef}>
         {showIntro && <ChatIntro chat={chat} title={title} members={memberList} me={me} />}
+        {filter !== 'all' && runs.length === 0 && (
+          <p className="thread__day">Nothing like that in this conversation yet.</p>
+        )}
         {runs.map((run, i) => {
           const day = new Date(run.messages[0].created_at).toDateString();
           const prevDay = i > 0 ? new Date(runs[i - 1].messages[0].created_at).toDateString() : null;
@@ -628,7 +646,7 @@ function spacePartyView(chat: ChatInfo, members: MemberInfo[], me: string): { av
   };
 }
 
-function ChatHeader({ chat, title, members, me, onBack, onMenu, onInfo, onDrive }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void; onMenu?: () => void; onInfo?: () => void; onDrive?: () => void }) {
+function ChatHeader({ chat, title, members, me, onBack, onMenu, onInfo, onDrive, onFilter, filterOn }: { chat: ChatInfo; title: string; members: MemberInfo[]; me: string; onBack?: () => void; onMenu?: () => void; onInfo?: () => void; onDrive?: () => void; onFilter?: () => void; filterOn?: boolean }) {
   const navigate = useNavigate();
   const profilePath = profilePathFor(chat, members, me);
   // Help is no longer DM-shaped: with two possible responders, a message
@@ -720,6 +738,11 @@ function ChatHeader({ chat, title, members, me, onBack, onMenu, onInfo, onDrive 
           </p>
         </div>
       </div>
+      {onFilter && (
+        <button className={'thread__icon' + (filterOn ? ' is-on' : '')} aria-label="Filter this conversation" title="Filter — photos, links, who wrote" aria-pressed={!!filterOn} onClick={onFilter}>
+          <Icon name="sliders" size={18} />
+        </button>
+      )}
       {onDrive && (
         <button className="thread__icon" aria-label="This room's drive" title="This room's drive" onClick={onDrive}>
           <Icon name="drive" size={18} />
@@ -813,7 +836,34 @@ function ChatIntro({ chat, title, members, me }: { chat: ChatInfo; title: string
   );
 }
 
-interface Run { senderId: string; messages: MessageRow[]; }
+interface Run { senderId: string; brain: boolean; messages: MessageRow[]; }
+
+type ThreadFilter = 'all' | 'photos' | 'links' | 'docs' | 'me' | 'mybrain' | 'them' | 'theirbrain';
+const LINK_IN = /(https?:\/\/|www\.)\S+/i;
+function matchesFilter(m: MessageRow, f: ThreadFilter, me: string): boolean {
+  const atts = m.attachments ?? [];
+  switch (f) {
+    case 'all': return true;
+    case 'photos': return atts.some((a) => a.type === 'photo' || a.type === 'video');
+    case 'links': return !!m.body && LINK_IN.test(m.body) || atts.some((a) => a.type === 'postref');
+    case 'docs': return atts.some((a) => a.type === 'docref' || a.type === 'audio');
+    case 'me': return m.sender_id === me && !m.via_brain;
+    case 'mybrain': return m.sender_id === me && !!m.via_brain;
+    case 'them': return m.sender_id !== me && !m.via_brain;
+    case 'theirbrain': return m.sender_id !== me && !!m.via_brain;
+  }
+}
+function threadFilterOptions(direct: boolean, hasBrain: boolean, otherName: string): [ThreadFilter, string][] {
+  const o: [ThreadFilter, string][] = [['all', 'All'], ['photos', 'Photos'], ['links', 'Links'], ['docs', 'Docs & files']];
+  if (direct) {
+    const them = (otherName || 'Them').split(' ')[0];
+    o.push(['me', 'You']);
+    if (hasBrain) o.push(['mybrain', 'Your Brain']);
+    o.push(['them', them]);
+    if (hasBrain) o.push(['theirbrain', `${them}'s Brain`]);
+  }
+  return o;
+}
 
 function groupRuns(msgs: MessageRow[]): Run[] {
   const runs: Run[] = [];
@@ -823,8 +873,11 @@ function groupRuns(msgs: MessageRow[]): Run[] {
       ? new Date(m.created_at).getTime() - new Date(last.messages[last.messages.length - 1].created_at).getTime()
       : Infinity;
     // A reply starts its own run so its quoted context reads clearly.
-    if (last && last.senderId === m.sender_id && gap < 3 * 60_000 && !m.reply_to) last.messages.push(m);
-    else runs.push({ senderId: m.sender_id, messages: [m] });
+    // A Brain message never shares a run with its owner's own words — the
+    // speaker changed even though the sender_id didn't.
+    const brain = !!m.via_brain;
+    if (last && last.senderId === m.sender_id && last.brain === brain && gap < 3 * 60_000 && !m.reply_to) last.messages.push(m);
+    else runs.push({ senderId: m.sender_id, brain, messages: [m] });
   }
   return runs;
 }
@@ -861,7 +914,12 @@ function MessageRun({
   const navigate = useNavigate();
   const isMe = run.senderId === me;
   const sender = members[run.senderId];
-  const showSender = !isMe;
+  // «FIRST»'S BRAIN (founder 2026-11-15): AI writing on the sender's behalf —
+  // their face with the brain over it, a name that says so, a dashed bubble.
+  const brain = run.brain;
+  const senderFirst = (sender?.name ?? 'Member').split(' ')[0];
+  const brainName = isMe ? 'Your Brain' : `${senderFirst}'s Brain`;
+  const showSender = !isMe || brain;
   const openSender = () => navigate(`/members/${run.senderId}`);
   // THE HUMAN BEHIND THE ORANGE ICON (founder 2026-08-18): in a help room,
   // a person answering who isn't the member being helped, Lichen Health
@@ -875,22 +933,27 @@ function MessageRun({
       {!isMe && (
         <button className={'msg-run__avatar msg-run__avatar--link' + (steward ? ' msg-run__avatar--steward' : '')} onClick={openSender}
           aria-label={`${sender?.name ?? 'Member'}'s profile`} title={steward ? `${sender?.name ?? 'A steward'} — answering for Lichen Health` : undefined}>
-          <Avatar id={run.senderId} name={sender?.name ?? '?'} url={sender?.avatarUrl} size={28} />
+          <Avatar id={run.senderId} name={brain ? senderFirst : (sender?.name ?? '?')} url={sender?.avatarUrl} size={28} mark={brain ? 'brain' : undefined} />
           {steward && <span className="msg-run__steward-mark" aria-hidden><Icon name="heart-line" size={9} /></span>}
         </button>
       )}
       <div className="msg-run__bubbles">
-        {showSender && (
+        {showSender && (brain ? (
+          <p className="msg-run__sender msg-run__sender--brain">
+            {isMe ? <span>{brainName}</span> : <button className="msg-run__sender-link" onClick={openSender}>{brainName}</button>}
+            <span className="msg-run__sender-role"> · AI on {isMe ? 'your' : `${senderFirst}'s`} behalf</span>
+          </p>
+        ) : (
           <p className="msg-run__sender">
             <button className="msg-run__sender-link" onClick={openSender}>{sender?.name ?? 'Member'}</button>
           </p>
-        )}
+        ))}
         {run.messages.map((m, i) => {
           const quoted = m.reply_to ? messagesById[m.reply_to] : undefined;
           const rx = reactionsByMessage[m.id] ?? [];
           return (
             <div key={m.id} className={'bubble-wrap' + (isMe ? ' bubble-wrap--me' : '')}>
-              <div className={'bubble' + (isMe ? ' bubble--me' : '')}>
+              <div className={'bubble' + (isMe ? ' bubble--me' : '') + (brain ? ' bubble--brain' : '')}>
                 {m.reply_to && (
                   <div className="bubble__reply">
                     <span className="bubble__reply-author">
@@ -1030,7 +1093,7 @@ function MessageRun({
           directions; mirrors the mockups' Maya-avatar-on-the-right). */}
       {isMe && (
         <span className="msg-run__avatar msg-run__avatar--mine" aria-hidden>
-          <Avatar id={run.senderId} name={sender?.name ?? 'You'} url={sender?.avatarUrl} size={28} />
+          <Avatar id={run.senderId} name={brain ? senderFirst : (sender?.name ?? 'You')} url={sender?.avatarUrl} size={28} mark={brain ? 'brain' : undefined} />
         </span>
       )}
     </div>

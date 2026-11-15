@@ -43,6 +43,8 @@ export interface MessageRow {
   created_at: string;
   attachments?: Attachment[] | null;
   reply_to?: string | null;
+  /** Written by the sender's Brain — AI on their behalf (founder 2026-11-15). */
+  via_brain?: boolean | null;
 }
 export interface ReactionRow {
   message_id: string;
@@ -99,7 +101,7 @@ export function helpMemberOfKey(key: string | null | undefined): string | null {
 }
 
 /** Columns to fetch for a message everywhere (list + thread + realtime re-fetch). */
-export const MESSAGE_COLS = 'id, chat_id, sender_id, body, created_at, attachments, reply_to';
+export const MESSAGE_COLS = 'id, chat_id, sender_id, body, created_at, attachments, reply_to, via_brain';
 
 export const KIND_LABEL: Record<ChatKind, string> = {
   organization: 'Organization',
@@ -224,6 +226,8 @@ export function otherMember(members: MemberInfo[], me: string): MemberInfo | und
 /** One-line preview of a message for the chat list — falls back to an attachment
  *  label when the message is media-only. */
 export function messagePreview(msg: MessageRow): string {
+  // A Brain message says it's the Brain in the inbox too (founder 2026-11-15).
+  if (msg.via_brain && msg.body && msg.body.trim()) return '🧠 ' + msg.body;
   if (msg.body && msg.body.trim()) return msg.body;
   const a = msg.attachments;
   if (a && a.length) {

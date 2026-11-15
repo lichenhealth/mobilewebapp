@@ -794,6 +794,20 @@ export async function sendFeedShareChat(share: FeedShare, text: string): Promise
   await markFeedShareSent(share.id, 'chat');
   return chatId;
 }
+/** «FIRST»'S BRAIN SENDS IT (founder 2026-11-15): the brain-errand fn posts
+ *  the link + instructions into your DM as YOUR BRAIN (via_brain), then keeps
+ *  helping them set it up and bells you if they need you. Returns the chat id. */
+export async function sendFeedShareByBrain(shareId: string, note?: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('brain-errand', { body: { mode: 'send', share_id: shareId, note: note ?? '' } });
+  if (error) {
+    const ctx = (error as { context?: Response }).context;
+    const msg = ctx ? ((await ctx.json().catch(() => null)) as { error?: string } | null)?.error : null;
+    throw new Error(msg || 'Your Brain couldn\'t send it — try again.');
+  }
+  const d = data as { error?: string; chat_id?: string } | null;
+  if (d?.error) throw new Error(d.error);
+  return d?.chat_id ?? '';
+}
 /** Email: the server reads the address and link off the row. */
 export async function sendFeedShareEmail(shareId: string, note?: string): Promise<void> {
   const { data, error } = await supabase.functions.invoke('share-calendar', { body: { share_id: shareId, note: note ?? '' } });
