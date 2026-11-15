@@ -505,7 +505,11 @@ function composeQuery(text: string, filters: string[], cat: MailCat | null): str
   const parts: string[] = [];
   const scoped = filters.some((f) => /^in:/i.test(f));
   if (!text.trim() && !scoped) parts.push('in:inbox');
-  if (cat) parts.push(`category:${cat}`);
+  // Gmail's own `category:primary` search is unreliable (empty or ignored on
+  // many accounts — promotions leaked into Primary), so Primary = not in any
+  // other tab, which is exactly what Gmail's Primary tab shows.
+  if (cat === 'primary') parts.push('-category:promotions -category:social -category:updates -category:forums');
+  else if (cat) parts.push(`category:${cat}`);
   parts.push(...filters);
   if (text.trim()) parts.push(text.trim());
   return parts.join(' ');
