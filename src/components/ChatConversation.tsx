@@ -294,7 +294,13 @@ export default function ChatConversation({
   const [filter, setFilter] = useState<ThreadFilter>('all');
   const visibleMsgs = useMemo(() => messages.filter((m) => !hidden.has(m.id)), [messages, hidden]);
   const hasBrain = useMemo(() => visibleMsgs.some((m) => m.via_brain), [visibleMsgs]);
-  const runs = useMemo(() => groupRuns(visibleMsgs.filter((m) => matchesFilter(m, filter, me))), [visibleMsgs, filter, me]);
+  // AI ON OR OFF IN THE LOG (founder 2026-11-15: "a filter for filtering out
+  // Ai messages, versus including them in a thread log") — independent of the
+  // chips above: a Brain's words and Claude's own, shown or set aside.
+  const isAi = (m: MessageRow) => !!m.via_brain || m.sender_id === CLAUDE_PROFILE_ID;
+  const hasAi = useMemo(() => visibleMsgs.some(isAi), [visibleMsgs]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [hideAi, setHideAi] = useState(false);
+  const runs = useMemo(() => groupRuns(visibleMsgs.filter((m) => (!hideAi || !isAi(m)) && matchesFilter(m, filter, me))), [visibleMsgs, filter, me, hideAi]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── The message menu's hands (founder 2026-10-21) ──────────────────────
   const copyMessage = (m: MessageRow) => {
@@ -461,18 +467,24 @@ export default function ChatConversation({
       <ChatHeader
         chat={chat} title={title} members={memberList} me={me} onBack={onBack} onMenu={onMenu} onInfo={onInfo}
         onDrive={docable ? () => navigate(`/chat/${chat.id}/drive`) : undefined}
-        onFilter={() => { setFilterOpen((o) => { if (o) setFilter('all'); return !o; }); }} filterOn={filterOpen || filter !== 'all'}
+        onFilter={() => { setFilterOpen((o) => { if (o) { setFilter('all'); setHideAi(false); } return !o; }); }} filterOn={filterOpen || filter !== 'all' || hideAi}
       />
       {filterOpen && (
         <div className="thread__filters" role="group" aria-label="Show">
           {threadFilterOptions(chat.kind === 'direct', hasBrain, memberList.find((x) => x.profile_id !== me)?.name ?? '').map(([k, label]) => (
             <button key={k} type="button" className={'thread__filter' + (filter === k ? ' is-on' : '')} onClick={() => setFilter(k)}>{label}</button>
           ))}
+          {hasAi && (
+            <label className="thread__aitoggle">
+              <input type="checkbox" checked={!hideAi} onChange={(e) => setHideAi(!e.target.checked)} />
+              Include AI messages
+            </label>
+          )}
         </div>
       )}
       <div className="thread__scroll" ref={scrollRef}>
         {showIntro && <ChatIntro chat={chat} title={title} members={memberList} me={me} />}
-        {filter !== 'all' && runs.length === 0 && (
+        {(filter !== 'all' || hideAi) && runs.length === 0 && (
           <p className="thread__day">Nothing like that in this conversation yet.</p>
         )}
         {runs.map((run, i) => {
