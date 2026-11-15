@@ -362,6 +362,16 @@ export default function Onboarding() {
                 ? 'You’re a member now. Add your name, and we’ll walk you into your care — everything else can wait.'
                 : 'You’re a member now. Start with the basics, then tell us how you’ll show up — the rest is optional, and you can change it anytime.'}
           </p>
+          {/* Which account this is — so a browser still signed into another
+              account never reads as "Lichen forgot me" (founder 2026-11-15). */}
+          {user?.email && (
+            <p className="onb__who">
+              Signed in as {user.email} ·{' '}
+              <button type="button" onClick={async () => { await supabase.auth.signOut({ scope: 'local' }); window.location.assign('/login'); }}>
+                Not you? Sign out
+              </button>
+            </p>
+          )}
         </header>
 
         {/* The arrival card — says plainly what this invitation set up and

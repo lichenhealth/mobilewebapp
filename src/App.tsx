@@ -79,6 +79,7 @@ import Courses from './routes/Courses';
 import BottomNav from './components/BottomNav';
 import GuideCompanion from './components/GuideCompanion';
 import GuestGate from './components/GuestGate';
+import AccountMismatch from './components/AccountMismatch';
 import TopBar from './components/TopBar';
 import SideMenu from './components/SideMenu';
 import InstallPrompt from './components/InstallPrompt';
@@ -564,6 +565,7 @@ export default function App() {
       {/* The guest gate (founder 2026-11-01): signed-out taps on member
           doors land here — Sign in, or Request to join. */}
       {!isAuth && !isGuest && !isEmbed && <GuestGate />}
+      {!isGuest && !isEmbed && <AccountMismatch />}
       {/* The docked desktop rail is app chrome too — it stands down with the
           rest on a naked-site rendering (founder 2026-09-09: the builder's
           Preview showed the side nav). */}
