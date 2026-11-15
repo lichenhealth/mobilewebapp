@@ -16,7 +16,7 @@ import { CLAUDE_PROFILE_ID } from '../lib/chatApi';
 import {
   loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursors, isSnagNote,
   loadProfileContext, loadSpaceContext, spaceIdOfThread, spaceRoomOfThread, spaceThreadId, isSharedSpaceThread,
-  loadSectionPresence, groupConvos, loadConvoNames, renameConvo,
+  loadSectionPresence, groupConvos, type ConvoGroup, loadConvoNames, renameConvo, deleteConvo,
   ASSISTANT_THREADS, BRAIN_RAIL, threadLabel, sectionIcon, sectionLabel,
   type FeedPostRow, type ProfileContext, type SpaceContext,
 } from '../lib/assistantFeedApi';
@@ -296,6 +296,21 @@ export default function AssistantFeed() {
   const [nameEdit, setNameEdit] = useState(false);
   // Which LIST row is renaming in place (founder 2026-10-12) — one at a time.
   const [rowRename, setRowRename] = useState<string | null>(null);
+  // Delete asks twice — the first tap arms, the second deletes (founder 2026-11-15).
+  const [rowDel, setRowDel] = useState<string | null>(null);
+  async function removeConvo(c: ConvoGroup) {
+    try {
+      const gone = new Set(await deleteConvo(c));
+      setAllRows((cur) => cur.filter((r) => !gone.has(r.id)));
+      setPosts((cur) => cur.filter((r) => !gone.has(r.id)));
+      setRowDel(null);
+      if (c.id === openConvo) {
+        const next = new URLSearchParams(params);
+        next.delete('convo');
+        setParams(next, { replace: true });
+      }
+    } catch (e) { console.error(e); setRowDel(null); }
+  }
   useEffect(() => { setNameEdit(false); setRowRename(null); }, [thread, openConvo]);
 
   const load = async () => {
@@ -755,6 +770,13 @@ export default function AssistantFeed() {
                   Rename
                 </button>
               )}
+              <button
+                className={'afeed__convo-rename afeed__convo-del' + (rowDel === c.id ? ' is-armed' : '')}
+                onClick={(e) => { e.stopPropagation(); if (rowDel === c.id) void removeConvo(c); else setRowDel(c.id); }}
+                onBlur={() => setRowDel((d) => (d === c.id ? null : d))}
+              >
+                {rowDel === c.id ? 'Delete for good?' : 'Delete'}
+              </button>
             </span>
           )}
           <p className="afeed__convo-snippet">

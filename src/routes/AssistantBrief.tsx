@@ -9,7 +9,7 @@ import MailRefCard, { type MailRef } from '../components/MailRefCard';
 import {
   threadForSection, loadAssistantFeed, latestConvoIn, groupConvos, loadConvoNames,
   postToAssistantFeed, CONVO_GAP_MS, type ConvoGroup, type FeedPostRow,
-  ASSISTANT_THREADS, BRAIN_RAIL, sectionIcon, sectionLabel, renameConvo,
+  ASSISTANT_THREADS, BRAIN_RAIL, sectionIcon, sectionLabel, renameConvo, deleteConvo,
   loadThreadCursors, markThreadRead, isSnagNote,
 } from '../lib/assistantFeedApi';
 import { ScrollHintRow } from '../components/ScrollHintRow';
@@ -961,6 +961,7 @@ export default function AssistantBrief() {
   // only the convos that pertain"): the general brief lists EVERY thread's
   // conversations, section-labeled; a section's brief lists its own.
   const [briefRaw, setBriefRaw] = useState<FeedPostRow[]>([]);
+  const [briefDel, setBriefDel] = useState<string | null>(null);
   const [briefNames, setBriefNames] = useState<Record<string, string>>({});
   useEffect(() => {
     if (!me) { setBriefRaw([]); return; }
@@ -1374,6 +1375,21 @@ export default function AssistantBrief() {
                           Rename
                         </button>
                       )}
+                      <button
+                        className={'afeed__convo-rename afeed__convo-del' + (briefDel === c.id ? ' is-armed' : '')}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (briefDel !== c.id) { setBriefDel(c.id); return; }
+                          try {
+                            const gone = new Set(await deleteConvo(c));
+                            setBriefRaw((cur) => cur.filter((r) => !gone.has(r.id)));
+                          } catch (err) { console.error(err); }
+                          setBriefDel(null);
+                        }}
+                        onBlur={() => setBriefDel((d) => (d === c.id ? null : d))}
+                      >
+                        {briefDel === c.id ? 'Delete for good?' : 'Delete'}
+                      </button>
                     </span>
                   )}
                   <p className="afeed__convo-snippet">
