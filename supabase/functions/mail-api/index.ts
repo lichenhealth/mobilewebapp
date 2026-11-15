@@ -8,7 +8,7 @@
 //   send   { accountId, threadId?, to, cc?, subject, body }
 //   draft  { ...same }                         → a Gmail draft
 // Every account is checked against the CALLER's own mail_accounts row.
-import { mailTester, mailAccountsOf, listThreads, readThread, attachmentData, modifyThread, trashThread, unsubscribeThread, sendMail, draftMail, sendDraft, updateDraft, discardDraft, type ThreadSummary } from '../_shared/gmail.ts';
+import { mailTester, mailAccountsOf, listThreads, mailSortRules, readThread, attachmentData, modifyThread, trashThread, unsubscribeThread, sendMail, draftMail, sendDraft, updateDraft, discardDraft, type ThreadSummary } from '../_shared/gmail.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -38,7 +38,8 @@ Deno.serve(async (req) => {
         const ids = Array.isArray(b.accountIds) ? (b.accountIds as unknown[]).map(String) : (s('accountId') ? [s('accountId')] : []);
         const pick = ids.length ? accts.filter((a) => ids.includes(a.id)) : accts;
         const errors: { account: string; error: string }[] = [];
-        const lists = await Promise.all(pick.map((a) => listThreads(me, a, s('q').slice(0, 300), 20).catch((e) => {
+        const rules = await mailSortRules(me);
+        const lists = await Promise.all(pick.map((a) => listThreads(me, a, s('q').slice(0, 300), Math.min(50, Math.max(5, Number(b.max) || 20)), rules).catch((e) => {
           errors.push({ account: a.email, error: e instanceof Error ? e.message : String(e) }); return [] as ThreadSummary[];
         })));
         const threads = lists.flat().sort((x, y) => y.date.localeCompare(x.date));

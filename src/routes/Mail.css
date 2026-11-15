@@ -83,3 +83,9 @@
 .mail__msgcard--draft { border: 1px dashed var(--peach); }
 .mail__draftlabel { margin: 0 0 var(--s-2); font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--peach-deep); }
 .mail__compose--inline { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+
+/* "Move to…" — teach the sorting (founder 2026-11-15). */
+.mail__sortas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 2px 0 var(--s-4); font-size: 13px; color: var(--ink-muted); }
+.mail__sortas-lbl strong { color: var(--ink-soft); font-weight: 500; }
+.mail__sortas-dom { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.mail__sortas .mail__fine, .mail__sortas .mail__err { flex-basis: 100%; margin: 2px 0 0; }

@@ -9,6 +9,8 @@ export type MailAccount = { id: string; email: string; connected_at: string; las
 export type ThreadSummary = {
   account_id: string; account: string; thread_id: string;
   from: string; subject: string; snippet: string; date: string; unread: boolean; starred?: boolean; count: number;
+  /** Lichen's own sorting — primary · subscriptions · promotions · updates. */
+  kind?: 'primary' | 'subscriptions' | 'promotions' | 'updates';
 };
 export type MailFile = { name: string; mime: string; size: number; attachment_id: string; cid: string | null; inline: boolean };
 export type MailMessage = {
@@ -56,8 +58,8 @@ export async function disconnectMail(accountId: string): Promise<void> {
 }
 
 /** Empty `accountIds` = every connected inbox. */
-export async function loadInbox(accountIds: string[], q: string): Promise<{ threads: ThreadSummary[]; errors: { account: string; error: string }[] }> {
-  return call('mail-api', { action: 'inbox', accountIds, q });
+export async function loadInbox(accountIds: string[], q: string, max?: number): Promise<{ threads: ThreadSummary[]; errors: { account: string; error: string }[] }> {
+  return call('mail-api', { action: 'inbox', accountIds, q, max });
 }
 
 export async function loadMailThread(accountId: string, threadId: string): Promise<MailThread> {
@@ -107,4 +109,20 @@ export function senderAddress(from: string): string {
 export type UnsubResult = { thread_id: string; from: string; status: 'unsubscribed' | 'emailed' | 'needs_you' | 'no_option' | 'failed'; how?: string; url?: string; error?: string };
 export async function unsubscribeMailThread(accountId: string, threadId: string): Promise<UnsubResult> {
   return call('mail-api', { action: 'unsubscribe', accountId, threadId });
+}
+
+/** MAIL SORTING LEARNS FROM YOU (founder 2026-11-15: "can we get smarter at
+ *  filtering. how can i help with that?"). A correction files every email from
+ *  that address — or, with wholeDomain, everyone at that domain — under one tab
+ *  from now on. Owner-only rows; the server's classifier reads them first. */
+export type MailKind = 'primary' | 'subscriptions' | 'promotions' | 'updates';
+export async function saveMailSort(from: string, kind: MailKind, wholeDomain = false): Promise<string> {
+  const addr = senderAddress(from).toLowerCase();
+  const sender = wholeDomain && addr.includes('@') ? '@' + addr.split('@')[1] : addr;
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error('Sign in first.');
+  const { error } = await supabase.from('mail_sort_rules')
+    .upsert({ profile_id: u.user.id, sender, kind }, { onConflict: 'profile_id,sender' });
+  if (error) throw new Error(error.message);
+  return sender;
 }

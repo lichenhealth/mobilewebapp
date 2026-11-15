@@ -808,6 +808,9 @@
  "trashApi:emptySpamKnocks": {
   "gap": "1"
  },
+ "mailApi:saveMailSort": {
+  "tool": "sort_mail"
+ },
  "mailApi:call": {
   "exempt": "plumbing: the one edge-fn caller every Mail/Drive helper rides; each act is decided on its own"
  },
