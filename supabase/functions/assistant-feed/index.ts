@@ -522,7 +522,7 @@ const READ_INTAKE_DRAFT_TOOL = {
 };
 
 // Reply shapes that send a member off to do by hand what a tool could do.
-const DEFLECT_RE = /\b(manually|by hand)\b|\b(tap|press|hit|use) (the )?(\+|plus\b)|\bwhere you(?:'d|’d| would| can) (create|make|set|add|fill)|\b(head|go) (over )?to [^.\n]{0,40}\b(and|to) (create|fill|make|set up|add)\b|\byou(?:'ll|’ll| will) (need|have) to (create|make|set|add|fill)/i;
+const DEFLECT_RE = /\b(manually|by hand)\b|\b(tap|press|hit|use) (the )?(\+|plus\b)|\bwhere you(?:'d|’d| would| can) (create|make|set|add|fill)|\b(head|go) (over )?to [^.\n]{0,40}\b(and|to) (create|fill|make|set up|add)\b|\byou(?:'ll|’ll| will) (need|have) to (create|make|set|add|fill)|(?:^|\n)\s*(?:\d+[.)]|step \d+:?)\s*(?:open|go|tap|click|select|navigate|choose|head)\b|\b(?:open|go to|navigate to|head to) (?:your |the )?[^.\n]{0,30}\b(?:settings|tab|menu|screen|page)\b[^.\n]{0,40}\b(?:and|then) (?:tap|click|select|choose|turn|toggle|press)\b/i;
 
 const POST_TOOLS = [
   {
@@ -1129,6 +1129,12 @@ Deno.serve(async (req) => {
   // Staying in the right thread is part of the job: if what they've asked
   // plainly belongs somewhere else, say so and point, rather than doing the
   // work in the wrong place (founder 2026-08-11).
+  // DO IT, DON'T DIRECT (founder 2026-11-15: "make sure that you and the
+  // lichen.health brains always do everything you can, instead of giving me
+  // instructions. If you can't do something, then tell us how, like passwords
+  // and secrets...but everything else, assume that we should build the
+  // functionality"). The standing posture for every reply.
+  const doRule = '\n\nDO IT, DON\'T DIRECT — Lichen\'s standing rule. When they ask for something, you DO it with your tools; you never answer with steps for them to follow. The only things that stay theirs: typing a password or secret, signing in or consenting on another service\'s own screen (Google, a bank — hand the reconnect/door button that takes them straight there), proving who they are, and the three taps Lichen keeps for people (publishing, sending to another person, moving money — each comes as a confirm card, never as instructions). For one of those, say in one line exactly what only they can do and why, and put the button in front of them. Anything else you cannot do yet is a missing tool, not a reason to hand them homework: say plainly you can\'t do that part yet AND call file_dev_report naming the tool that would let you, so the builder builds it. Never write "go to…", "open…", "tap…", "click…", or numbered how-to steps for something on Lichen.';
   const threadRule = spaceRoom === 'currentcy'
     ? `\n\nYou are in the space's own Current-cy room named above. Keep the work about THAT space's treasury and economy; the member's personal wallet has its own Current-cy thread — point there for personal-money asks, one short sentence. Page-building for this space lives in its build thread.`
     : spaceId
@@ -3464,7 +3470,7 @@ Deno.serve(async (req) => {
         // inside the cached block it would bust the doctrine's prompt cache
         // on every exchange.
         system: [
-          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${identityRule}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${postsRule}${lifeRule}${mailRule}${gdriveRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${identityRule}${doRule}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${postsRule}${lifeRule}${mailRule}${gdriveRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
           ...(pulse ? [{ type: 'text', text: pulse }] : []),
         ],
         messages,

@@ -38,6 +38,30 @@ through a UI is the fallback, not the default.
 
 ⚠ **DO EVERYTHING YOU'RE ALLOWED TO DO — HAND OFF ONLY WHAT YOU CAN'T** (founder 2026-11-15, standing rule for EVERY agent — the builder Claude, browser Claude, and every in-app assistant on lichen.health: "in the future, literally do everything for me that you are allowed to do, its not efficient to give me instructions… do it and then have me do only what you can't. make this the rule across all agents"): never answer with a list of steps the agent could have taken itself. Do the work — fill the forms, set the options, click through, push the change — and stop only at the exact moments that must be the person's: typing a password or one-time code, copying/pasting a secret or API key, a consent/OAuth screen only they can approve, sending something on their behalf or moving money or deleting irreversibly without their yes (ask once, then do it), and anything the safety rules forbid. When a handoff is needed, do everything up to it first, leave the screen ready (fields filled, tab open), then name ONLY the remaining clicks in the fewest words. In-app assistants: this is THE TEST in the AI-parity entry, applied to every section — a member's ask is done from their written words, never answered with "go do it manually". Walking someone through a UI is the last resort, never the default (the third-party-config rule above, generalized).
 
+⚠ **DO IT, DON'T DIRECT — FOR THE BUILDER AND EVERY LICHEN BRAIN** (founder
+2026-11-15, standing rule: "make sure that you and the lichen.health brains
+always do everything you can, instead of giving me instructions. If you can't
+do something, then tell us how, like passwords and secrets...but everything
+else, assume that we should build the functionality in lichen.health so that
+the brain can do everything except what it legally can't do"). The default
+answer to any ask is the DONE thing, never a list of steps. What stays the
+person's — and ONLY this: typing a password or secret, signing in / consenting
+on another service's own screen, proving who they are (phone/ID
+verification), and the three taps Lichen keeps for people (publishing,
+sending to another person, moving money — each a confirm card with Always
+allow, never instructions). For those, say in one line exactly what only they
+can do and why, and put the button that takes them straight there in front of
+them. Everything else that can't be done yet is a MISSING TOOL: the builder
+builds it (the AI PARITY rule below), and an in-app brain says so plainly and
+files it with `file_dev_report` so it gets built. The check that makes it stick:
+assistant-feed's `doRule` (in every cached system block) + the PARITY GUARD's
+`DEFLECT_RE`, widened this day to catch instruction-shaped replies (numbered
+"1. Open…/Step 1: tap…" steps, "go to your X settings and tap…") — one forced
+re-think, then a self-filed `[parity-guard]` dev report. The builder holds
+itself to the same: do it via the service's API (the third-party rule above),
+and in a reply never hand the founder steps for something this session could
+do itself.
+
 ⚠ **SESSION-START PROTOCOL — check the bug bridge** (founder 2026-08-24): the
 in-app assistants file member-reported bugs into **`dev_reports`** via their
 `file_dev_report` tool (`_shared/devReport.ts`; via = which room, member's own
