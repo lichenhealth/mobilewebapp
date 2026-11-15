@@ -78,3 +78,8 @@
 .mail__star.is-starred svg path { fill: currentColor; }
 .mail__row-star { display: inline-flex; vertical-align: -1px; margin-right: 5px; color: var(--peach-deep); }
 .mail__row-star svg path { fill: currentColor; }
+
+/* A draft in a thread is a composer, peach-edged so it never reads as received mail. */
+.mail__msgcard--draft { border: 1px dashed var(--peach); }
+.mail__draftlabel { margin: 0 0 var(--s-2); font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--peach-deep); }
+.mail__compose--inline { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }

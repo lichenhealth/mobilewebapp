@@ -10,6 +10,7 @@ import { useTopBackFor } from '../lib/topBack';
 import {
   mailEnabled, listMailAccounts, connectMail, disconnectMail, loadInbox, loadMailThread,
   modifyMailThread, trashMailThread, unsubscribeMailThread, sendMail, saveMailDraft, senderName, senderAddress,
+  sendMailDraft, updateMailDraft, discardMailDraft, type MailMessage,
   type MailAccount, type ThreadSummary, type MailThread,
 } from '../lib/mailApi';
 import './Mail.css';
@@ -128,7 +129,8 @@ export default function Mail() {
 
   function startReply(all: boolean) {
     if (!open || !openAcct || !openThread) return;
-    const last = open.messages[open.messages.length - 1];
+    const real = open.messages.filter((m) => !m.draft);
+    const last = real[real.length - 1] ?? open.messages[open.messages.length - 1];
     const fromMe = mine.has(senderAddress(last.from).toLowerCase());
     const to = fromMe ? last.to : last.from;
     const cc = all ? [last.to, last.cc].filter(Boolean).join(', ').split(',')
@@ -246,7 +248,7 @@ export default function Mail() {
       <textarea className="mail__body-in" rows={8} value={draft.body} autoFocus
         placeholder="Write it here…" onChange={(e) => setDraft({ ...draft, body: e.target.value })} />
       <div className="mail__compose-acts">
-        <button className="btn btn--primary" disabled={!!busy} onClick={() => void submit(false)}>{busy === 'send' ? 'Sending…' : 'Send'}</button>
+        <button className="btn btn-primary" disabled={!!busy} onClick={() => void submit(false)}>{busy === 'send' ? 'Sending…' : 'Send'}</button>
         <button className="btn" disabled={!!busy} onClick={() => void submit(true)}>{busy === 'draft' ? 'Saving…' : 'Save as draft'}</button>
         <button className="mail__quiet" onClick={() => setDraft(null)}>Cancel</button>
       </div>
@@ -364,7 +366,14 @@ export default function Mail() {
                 <button className="mail__askbtn" onClick={askBrain}>
                   <Icon name="brain" size={13} /> Ask about this thread</button>
               </div>
-              {open.messages.map((m) => (
+              {open.messages.map((m) => m.draft ? (
+                <DraftInThread key={m.id} m={m} accountId={openAcct ?? ''} threadId={openThread ?? ''}
+                  from={accounts.find((a) => a.id === openAcct)?.email ?? ''}
+                  onDone={async (note) => {
+                    setMsg(note);
+                    if (openAcct && openThread) setOpen(await loadMailThread(openAcct, openThread).catch(() => open));
+                  }} />
+              ) : (
                 <section key={m.id} className="mail__msgcard">
                   <header className="mail__msghead">
                     <span className="mail__msgfrom">{senderName(m.from)} <em>{senderAddress(m.from)}</em></span>
@@ -413,6 +422,51 @@ export default function Mail() {
         </section>
       )}
     </div>
+  );
+}
+
+/** A DRAFT IN THE THREAD IS A COMPOSER, NEVER A RECEIVED MESSAGE (founder
+ *  2026-11-15: the brain drafted her reply and Mail showed it with no Send
+ *  button). Edit it right where it sits; Send hands the draft to Gmail. */
+function DraftInThread({ m, accountId, threadId, from, onDone }: {
+  m: MailMessage; accountId: string; threadId: string; from: string; onDone: (note: string) => void | Promise<void>;
+}) {
+  const [to, setTo] = useState(m.to);
+  const [cc, setCc] = useState(m.cc);
+  const [body, setBody] = useState(m.body);
+  const [busy, setBusy] = useState<'send' | 'save' | 'discard' | null>(null);
+  const [err, setErr] = useState('');
+  const [messageId, setMessageId] = useState(m.id);
+  const edited = to !== m.to || cc !== m.cc || body !== m.body;
+  const edits = () => ({ accountId, threadId: threadId || undefined, to, cc: cc || undefined, subject: m.subject, body });
+
+  async function go(kind: 'send' | 'save' | 'discard') {
+    setErr(''); setBusy(kind);
+    try {
+      if (kind === 'send') { await sendMailDraft(accountId, messageId, edited ? edits() : undefined); await onDone(`Sent from ${from} ✓`); }
+      else if (kind === 'save') { setMessageId(await updateMailDraft(accountId, messageId, edits()) || messageId); await onDone('Draft saved ✓'); }
+      else { await discardMailDraft(accountId, messageId); await onDone('Draft discarded.'); }
+    } catch (e) { setErr(e instanceof Error ? e.message : 'That didn’t go through.'); }
+    finally { setBusy(null); }
+  }
+
+  return (
+    <section className="mail__msgcard mail__msgcard--draft">
+      <p className="mail__draftlabel">Draft · not sent yet · from {from}</p>
+      <div className="mail__compose mail__compose--inline">
+        <label className="mail__field"><span>To</span>
+          <input value={to} onChange={(e) => setTo(e.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck={false} /></label>
+        <label className="mail__field"><span>Cc</span>
+          <input value={cc} onChange={(e) => setCc(e.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck={false} /></label>
+        <textarea className="mail__body-in" rows={12} value={body} onChange={(e) => setBody(e.target.value)} />
+        {err && <p className="mail__err">{err}</p>}
+        <div className="mail__compose-acts">
+          <button className="btn btn-primary" disabled={!!busy || !to.trim() || !body.trim()} onClick={() => void go('send')}>{busy === 'send' ? 'Sending…' : 'Send'}</button>
+          {edited && <button className="btn" disabled={!!busy} onClick={() => void go('save')}>{busy === 'save' ? 'Saving…' : 'Save changes'}</button>}
+          <button className="mail__quiet" disabled={!!busy} onClick={() => void go('discard')}>{busy === 'discard' ? 'Discarding…' : 'Discard'}</button>
+        </div>
+      </div>
+    </section>
   );
 }
 

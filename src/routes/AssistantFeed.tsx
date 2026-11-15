@@ -29,6 +29,7 @@ import BuildModeSplit from '../components/BuildModeSplit';
 import { ScrollHintRow } from '../components/ScrollHintRow';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import KnockDraftCard from '../components/KnockDraftCard';
+import MailDraftCard from '../components/MailDraftCard';
 import CalInviteCard from '../components/CalInviteCard';
 import './AssistantFeed.css';
 
@@ -1491,6 +1492,15 @@ export default function AssistantFeed() {
                   .map((a) => (
                     <div className="afeed__pubrow" key={`${p.id}:knock:${a.knock_id}`}>
                       <KnockDraftCard knockId={a.knock_id} name={a.name} email={a.email} message={a.message} />
+                    </div>
+                  ))}
+                {/* AN EMAIL, DRAFTED (founder 2026-11-15: "there's no send button") — edit and tap Send. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'mail_draft' ? [a] : []))
+                  .map((a) => (
+                    <div className="afeed__pubrow" key={`${p.id}:mdraft:${a.message_id}`}>
+                      <MailDraftCard accountId={a.account_id} account={a.account} threadId={a.thread_id} messageId={a.message_id}
+                        to={a.to} cc={a.cc} subject={a.subject} body={a.body} />
                     </div>
                   ))}
                 {/* INVITATIONS, DRAFTED (founder 2026-11-13) — the person taps Send. */}

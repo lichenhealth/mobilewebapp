@@ -14,6 +14,8 @@ export type MailFile = { name: string; mime: string; size: number; attachment_id
 export type MailMessage = {
   id: string; from: string; to: string; cc: string; date: string; subject: string;
   body: string; html: string | null; attachments: string[]; files: MailFile[]; message_id: string; references: string;
+  /** An unsent draft in the thread — rendered as an editable composer with Send. */
+  draft?: boolean;
 };
 export type MailThread = { subject: string; messages: MailMessage[]; unread: boolean; starred?: boolean };
 
@@ -77,6 +79,18 @@ export async function modifyMailThread(accountId: string, threadId: string, add:
 export type Outgoing = { accountId: string; threadId?: string; to: string; cc?: string; subject: string; body: string };
 export async function sendMail(o: Outgoing): Promise<void> { await call('mail-api', { action: 'send', ...o }); }
 export async function saveMailDraft(o: Outgoing): Promise<void> { await call('mail-api', { action: 'draft', ...o }); }
+/** A draft already in Gmail (often the brain's): send it — with edits, or as
+ *  it stands — save edits, or discard it. */
+export async function sendMailDraft(accountId: string, messageId: string, edits?: Outgoing): Promise<void> {
+  await call('mail-api', { ...(edits ?? {}), action: 'send_draft', accountId, messageId });
+}
+export async function updateMailDraft(accountId: string, messageId: string, edits: Outgoing): Promise<string> {
+  const r = await call<{ messageId: string }>('mail-api', { ...edits, action: 'update_draft', accountId, messageId });
+  return r.messageId;
+}
+export async function discardMailDraft(accountId: string, messageId: string): Promise<void> {
+  await call('mail-api', { action: 'discard_draft', accountId, messageId });
+}
 
 /** "Galyn Burke <g@x.com>" → "Galyn Burke"; a bare address stays itself. */
 export function senderName(from: string): string {

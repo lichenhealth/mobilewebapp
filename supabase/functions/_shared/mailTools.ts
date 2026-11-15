@@ -119,18 +119,23 @@ export async function runMailTool(profileId: string, name: string, input: Record
       let to = s('to');
       if (s('thread_id') && !to) {
         const t = await readThread(profileId, acct.id, s('thread_id'));
-        const last = t.messages[t.messages.length - 1];
+        const sent = t.messages.filter((m) => !m.draft);
+        const last = sent[sent.length - 1] ?? t.messages[t.messages.length - 1];
         const mine = new Set(accts.map((a) => a.email.toLowerCase()));
         const addr = (x: string) => (x.match(/<([^>]+)>/)?.[1] ?? x).trim().toLowerCase();
         to = mine.has(addr(last.from)) ? last.to : last.from;
       }
       if (!to) return { ok: false, error: 'Who is it to? Ask them, or reply on a thread.' };
       if (!s('thread_id') && !s('subject')) return { ok: false, error: 'A new email needs a subject.' };
-      await draftMail(profileId, { accountId: acct.id, threadId: s('thread_id') || undefined, to, cc: s('cc') || undefined, subject: s('subject'), body: s('body') });
+      const d = await draftMail(profileId, { accountId: acct.id, threadId: s('thread_id') || undefined, to, cc: s('cc') || undefined, subject: s('subject'), body: s('body') });
+      const thread = d.threadId || s('thread_id');
       return {
-        ok: true, note: `Draft saved in ${acct.email}'s Drafts, to ${to}. Not sent — they review and send it.`,
-        door: s('thread_id')
-          ? { path: `/mail?thread=${acct.id}:${encodeURIComponent(s('thread_id'))}`, label: 'Open the thread in Mail' }
+        ok: true, note: `Draft saved in ${acct.email}'s Drafts, to ${to}. Not sent — a card under your reply lets them edit and tap Send (or open it in Mail). Never say it was sent.`,
+        // THE DRAFT HANDS A SEND BUTTON (founder 2026-11-15: "there's no send
+        // button") — the person's tap on the card sends it, nothing else does.
+        mailDraft: { account_id: acct.id, account: acct.email, thread_id: thread, message_id: d.messageId, to, cc: s('cc'), subject: s('subject'), body: s('body') },
+        door: thread
+          ? { path: `/mail?thread=${acct.id}:${encodeURIComponent(thread)}`, label: 'Open the draft in Mail' }
           : { path: '/mail', label: 'Open Mail' },
       };
     }
