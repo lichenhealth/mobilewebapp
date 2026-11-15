@@ -79,3 +79,7 @@ verify_jwt = false
 
 [functions.event-poll]
 verify_jwt = false
+
+# send mode checks the JWT itself; reply mode is webhook-secret gated
+[functions.brain-errand]
+verify_jwt = false
