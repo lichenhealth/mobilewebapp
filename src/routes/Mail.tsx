@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import AssistantDoor from '../components/AssistantDoor';
+import MailBody, { MailFiles } from '../components/MailBody';
 import { Icon, type IconName } from '../components/Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
@@ -370,8 +371,8 @@ export default function Mail() {
                     <span className="mail__msgwhen">{longWhen(m.date)}</span>
                     <span className="mail__msgto">to {m.to}{m.cc ? ` · cc ${m.cc}` : ''}</span>
                   </header>
-                  <div className="mail__msgbody">{m.body || '(no text in this message)'}</div>
-                  {m.attachments.length > 0 && <p className="mail__fine">📎 {m.attachments.join(', ')} — open it in Gmail for now.</p>}
+                  <MailBody accountId={openAcct ?? ''} m={m} />
+                  <MailFiles accountId={openAcct ?? ''} m={m} />
                 </section>
               ))}
               {composer}

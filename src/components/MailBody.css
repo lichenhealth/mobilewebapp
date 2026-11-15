@@ -1,0 +1,18 @@
+/* An email as its sender designed it — the frame is the white card's body. */
+.mailb__text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.55; }
+.mailb__frame { display: block; width: 100%; border: 0; background: #fff; min-height: 60px; }
+.mailb__files { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--bone-edge); }
+.mailb__fileshead { margin: 0 0 8px; font-size: 12px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; }
+.mailb__files ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.mailb__file { display: flex; align-items: center; gap: 10px; border: 1px solid var(--bone-edge); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+.mailb__fileicon { width: 40px; height: 40px; border-radius: 8px; background: var(--bone); display: grid; place-items: center; color: var(--ink-soft); flex-shrink: 0; }
+.mailb__thumb { width: 40px; height: 40px; border-radius: 8px; overflow: hidden; padding: 0; border: 1px solid var(--bone-edge); background: var(--bone); flex-shrink: 0; cursor: pointer; }
+.mailb__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mailb__filemeta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.mailb__filename { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mailb__filesize { font-size: 12px; color: var(--ink-muted); }
+.mailb__fileacts { display: flex; gap: 4px; flex-shrink: 0; }
+.mailb__fileact { background: none; border: 1px solid var(--bone-edge); border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 13px; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+.mailb__fileact:hover { color: var(--peach-deep); border-color: var(--peach); }
+.mailb__fileact:disabled { opacity: .6; cursor: default; }
+.mailb__err { margin: 8px 0 0; font-size: 13px; color: var(--red-deep); }
