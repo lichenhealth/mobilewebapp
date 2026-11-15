@@ -10,7 +10,10 @@ import './Avatar.css';
  *  who answers for something, or at an assistant. `pulse` = carbon, a steward;
  *  `chip` = silicon. Absent on ordinary members — a badge means a ROLE, not a
  *  decoration, so most people wear none. */
-export type MindMark = 'pulse' | 'chip';
+export type MindMark = 'pulse' | 'chip' | 'brain';
+// 'brain' (founder 2026-11-15): a PERSON's own face with a little brain over
+// its upper right — "Galyn's Brain", the AI writing on that member's behalf.
+// Their face says whose; the brain says it's their AI, not them.
 
 /** Identity avatar: the member's photo when they have one, else their colored
  *  monogram. One component so the photo rolls out everywhere consistently. */
@@ -52,9 +55,9 @@ export default function Avatar({
   // The person in FRONT, lower right, at least half the logo, and hanging a
   // little past its edge — a face on a space, not a pin in it (founder
   // 2026-08-18 mockup). Marks (pulse/chip) keep the small corner badge.
-  const badge = stewardFace && !mark ? Math.round(size * 0.5) : Math.round(size * 0.42);
+  const badge = (stewardFace && !mark) || mark === 'brain' ? Math.round(size * 0.5) : Math.round(size * 0.42);
   return (
-    <span className={'avatar-wrap' + (stewardFace && !mark ? ' avatar-wrap--face' : '')} style={style}>
+    <span className={'avatar-wrap' + (stewardFace && !mark ? ' avatar-wrap--face' : '') + (mark === 'brain' ? ' avatar-wrap--brain' : '')} style={style}>
       {face}
       {/* WHO answers beats THAT someone answers (founder 2026-08-17): when the
           steward has a face, show it — it's the same move the TopBar already
@@ -75,9 +78,9 @@ export default function Avatar({
         <span
           className={`avatar__mark avatar__mark--${mark}`}
           style={{ width: badge, height: badge }}
-          title={markTitle ?? (mark === 'chip' ? 'An assistant — silicon' : 'A steward — carbon')}
+          title={markTitle ?? (mark === 'chip' ? 'An assistant — silicon' : mark === 'brain' ? `${name}'s Brain — AI on ${name}'s behalf` : 'A steward — carbon')}
         >
-          <Icon name={mark} size={Math.max(8, Math.round(size * 0.26))} />
+          <Icon name={mark} size={Math.max(8, Math.round(size * (mark === 'brain' ? 0.34 : 0.26)))} />
         </span>
       ) : null}
     </span>
