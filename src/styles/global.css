@@ -482,3 +482,14 @@ body.is-website::before { content: none; }   /* the paper grain is Lichen's, not
 .cmp__evshare { display: flex; flex-wrap: wrap; gap: 6px; }
 .cmp__evshare-pill { font: inherit; font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--bone-edge); background: #fff; color: var(--ink-soft); cursor: pointer; }
 .cmp__evshare-pill.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+
+/* Notification link opened under the wrong account (AccountMismatch.tsx). */
+.acctmis { position: fixed; left: 50%; transform: translateX(-50%); top: calc(var(--top-h, 64px) + 10px); z-index: 900;
+  width: min(440px, calc(100vw - 28px)); background: var(--peach-tint); border: 1px solid var(--peach); border-radius: 14px;
+  padding: 14px 16px; box-shadow: 0 6px 24px rgba(0,0,0,.12); font-size: var(--t-sm); line-height: 1.45; color: var(--ink); }
+.acctmis p { margin: 0 0 10px; overflow-wrap: anywhere; }
+.acctmis__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.acctmis__btn { white-space: nowrap; }
+.acctmis__x { background: none; border: 0; color: var(--peach-deep); font: inherit; cursor: pointer; padding: 6px 4px; }
+.onb__who { font-size: var(--t-xs, 12px); color: var(--ink-muted); margin-top: var(--s-3); }
+.onb__who button { background: none; border: 0; padding: 0; color: var(--peach-deep); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }

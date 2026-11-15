@@ -17,7 +17,7 @@
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM = Deno.env.get('NOTIF_FROM') ?? 'Lichen <hello@lichen.health>';
 const REPLY_TO = Deno.env.get('INVITE_REPLY_TO') ?? 'connect@lichen.health';
-const APP_URL = (Deno.env.get('APP_URL') ?? 'https://lichen.healthcare').replace(/\/$/, '');
+const APP_URL = (Deno.env.get('APP_URL') ?? 'https://lichen.health').replace(/\/$/, '');
 const WEBHOOK_SECRET = Deno.env.get('NOTIFICATION_WEBHOOK_SECRET');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -67,7 +67,12 @@ Deno.serve(async (req) => {
   const prof = Array.isArray(profs) ? profs[0] : null;
   if (!prof?.email || prof.notification_pref !== 'both') return json({ ok: true, skipped: 'opted-out' });
 
-  const url = `${APP_URL}${n.link ?? ''}`;
+  // The link names WHO it was for (founder 2026-11-15: a booking email opened in a
+  // browser signed into an old test account landed on that account's onboarding).
+  // The app compares ?for= with whoever is signed in and says so plainly.
+  const link = n.link ?? '/home';
+  const [pathQ, hash] = link.split('#');
+  const url = `${APP_URL}${pathQ}${pathQ.includes('?') ? '&' : '?'}for=${n.recipient_id}${hash ? '#' + hash : ''}`;
   const line = `${n.title}${n.body ? ` ${n.body}` : ''}`;
   const subject = `Lichen · ${n.title}`;
   const text = `${line}\n\nOpen Lichen:\n${url}\n\n— Lichen\n\n` +
