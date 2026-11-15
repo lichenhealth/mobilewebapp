@@ -4,15 +4,15 @@
 // account itself (Gmail and Lichen Mail both show it) and the person sends.
 // Every account resolves against the SENDER's own mail_accounts rows; a
 // thread id only ever reaches their own mailbox through their own token.
-import { mailAccountsOf, listThreads, readThread, draftMail, trashThread, modifyThread, unsubscribeThread, type UnsubResult, listFilters, createFilter, deleteFilter, labelIdFor, labelNames, type MailAccount } from './gmail.ts';
+import { mailAccountsOf, listThreads, mailSortRules, saveMailSortRule, readThread, draftMail, trashThread, modifyThread, unsubscribeThread, type UnsubResult, listFilters, createFilter, deleteFilter, labelIdFor, labelNames, type MailAccount } from './gmail.ts';
 
 type Out = { ok: boolean; [k: string]: unknown };
 
 export const MAIL_TOOLS = [
   {
     name: 'my_mail',
-    description: 'Search the member\'s connected email inboxes (Gmail / Google Workspace), live. query uses Gmail search grammar (from:katie, is:unread, newer_than:7d, subject:invoice, has:attachment); empty = their inboxes. account = one of their addresses to narrow (empty = all). Returns threads with account, thread_id, from, subject, date, unread and a snippet. Read this before read_mail or draft_mail.',
-    input_schema: { type: 'object', properties: { query: { type: 'string' }, account: { type: 'string' } } },
+    description: 'Search the member\'s connected email inboxes (Gmail / Google Workspace), live. query uses Gmail search grammar (from:katie, is:unread, newer_than:7d, subject:invoice, has:attachment); empty = their inboxes. account = one of their addresses to narrow (empty = all). Returns threads with account, thread_id, from, subject, date, unread, a snippet, and kind — Lichen\'s own sorting: primary (a person wrote), subscriptions (newsletters/lists), promotions (sales), updates (orders, tickets, app conversations like Etsy messages). The sorting is a best guess, a bit messy; say so if it matters. kind = narrow to one of those. Read this before read_mail or draft_mail.',
+    input_schema: { type: 'object', properties: { query: { type: 'string' }, account: { type: 'string' }, kind: { type: 'string', enum: ['primary', 'subscriptions', 'promotions', 'updates'] } } },
   },
   {
     name: 'read_mail',
@@ -30,6 +30,11 @@ export const MAIL_TOOLS = [
       },
       required: ['account', 'body'],
     },
+  },
+  {
+    name: 'sort_mail',
+    description: 'Teach Lichen\'s mail sorting (the Primary · Subscriptions · Promotions · Updates tabs on their Mail screen): from now on, every email from this sender files under the tab they name. sender = an exact email address from my_mail\'s from field, or "@domain.com" for everyone at that domain. Use it when they say something is sorted wrong ("Breyer is a promotion, not an update") — then tell them it is done.',
+    input_schema: { type: 'object', properties: { sender: { type: 'string' }, kind: { type: 'string', enum: ['primary', 'subscriptions', 'promotions', 'updates'] } }, required: ['sender', 'kind'] },
   },
   {
     name: 'tidy_mail',
@@ -89,14 +94,25 @@ export async function runMailTool(profileId: string, name: string, input: Record
     if (name === 'my_mail') {
       const one = s('account') ? pick(accts, s('account')) : null;
       if (s('account') && !one) return { ok: false, error: `Not one of their inboxes. Connected: ${list}.` };
-      const lists = await Promise.all((one ? [one] : accts).map((a) => listThreads(profileId, a, s('query'), 12).catch((e) => [{ error: `${a.email}: ${e instanceof Error ? e.message : e}` }])));
-      const flat = lists.flat();
+      const rules = await mailSortRules(profileId);
+      const lists = await Promise.all((one ? [one] : accts).map((a) => listThreads(profileId, a, s('query'), s('kind') ? 40 : 12, rules).catch((e) => [{ error: `${a.email}: ${e instanceof Error ? e.message : e}` }])));
+      const flat = lists.flat().filter((x) => !s('kind') || (x as { kind?: string; error?: string }).error || (x as { kind?: string }).kind === s('kind'));
       // An expired inbox comes back with the Reconnect card already attached.
       const stale = flat.flatMap((x) => {
         const err = (x as { error?: string }).error;
         return err && /reconnect/i.test(err) ? [err.split(':')[0]] : [];
       });
       return { ok: true, inboxes: list, threads: flat.slice(0, 40), ...(stale.length ? { reconnect: stale, note: 'Some inboxes need reconnecting; a Reconnect card is attached to this reply.' } : {}) };
+    }
+    if (name === 'sort_mail') {
+      const raw = s('sender').trim().toLowerCase();
+      const m = /<([^>]+)>/.exec(raw);
+      const sender = (m ? m[1] : raw).trim();
+      const kind = s('kind');
+      if (!/^@?[^\s@]*@?[^\s@]+\.[^\s@]+$/.test(sender)) return { ok: false, error: 'Name the sender as an email address or @domain.' };
+      if (!['primary', 'subscriptions', 'promotions', 'updates'].includes(kind)) return { ok: false, error: 'kind must be primary, subscriptions, promotions or updates.' };
+      if (!(await saveMailSortRule(profileId, sender, kind as 'primary'))) return { ok: false, error: 'That didn\'t save.' };
+      return { ok: true, sorted: `${sender.startsWith('@') ? 'Everyone at ' + sender.slice(1) : sender} now files under ${kind}.` };
     }
     if (name === 'mail_reconnect') {
       const want = Array.isArray(input.accounts) ? (input.accounts as unknown[]).map((x) => String(x).trim().toLowerCase()).filter(Boolean) : [];

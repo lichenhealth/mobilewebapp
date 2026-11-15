@@ -85,15 +85,78 @@ const hdr = (m: GMsg, n: string) => m.payload?.headers?.find((h) => h.name.toLow
 export type ThreadSummary = {
   account_id: string; account: string; thread_id: string;
   from: string; subject: string; snippet: string; date: string; unread: boolean; starred: boolean; count: number;
+  /** Lichen's own sorting (founder 2026-11-15) — see classifyMail. */
+  kind: MailKind;
 };
 
+/** LICHEN'S MAIL SORTING (founder 2026-11-15: "the gmail filters… are not very
+ *  accurate… Subscriptions (for like, newsletters), Promotions and Updates
+ *  (like etsy convos), sometimes newsletters are promotional, so lets do our
+ *  best… they'll be a bit messy"). Deterministic, from how the mail was SENT
+ *  (List-* headers, no-reply senders) plus words in the subject and Gmail's
+ *  own label as one more signal. Order matters: updates first (an Etsy
+ *  message or a refund ticket is news about YOU even when it's bulk-sent),
+ *  then sales words, then anything list-sent reads as a subscription, then a
+ *  person. */
+export type MailKind = 'primary' | 'subscriptions' | 'promotions' | 'updates';
+const UPDATE_RE = /\b(order|receipt|invoice|payment|paid|refund|shipp?ed|shipping update|deliver(ed|y)|out for delivery|tracking|ticket|case #|support request|reservation|booking|booked|appointment|confirm(ed|ation)?|verif(y|ication)|security|sign[- ]in|log[- ]?in|password|your account|account (update|alert)|statement|bill|renewal|subscription (renew|confirm)|new message|sent you a message|messaged you|replied|reply from|mentioned you|commented|invited you|shared .{0,30}with you|reminder|due (soon|today)|expir(es|ing)|alert|coming up|upcoming|rsvp|you'?re invited|invitation|starts (soon|in)|(today|tomorrow) at|your (session|appointment|booking|event|trip|stay))\b/i;
+const PROMO_RE = /(\d+\s?%\s?off|\$\d+\s?off|\bsale\b|\bdeals?\b|\bdiscount|\bcoupon|\bpromo|\bsave (up to|\$|\d)|\bfree shipping|\blimited[- ]time|\bends (tonight|today|soon|sunday|midnight)|\blast chance|\bshop (now|the)\b|\bnew arrivals|\bexclusive (offer|access)|\bblack friday|\bcyber monday|\bflash\b|\bclearance|\bbogo\b|\bgift (guide|idea)|\bdon'?t miss|\bjust dropped|\bback in stock|\b(use|with|enter) (promo )?code\b|\bholiday savings|\bsavings\b|\bbest[- ]sellers?\b|\bsitewide)/i;
+const NEWSLETTER_RE = /(substack|beehiiv|mailchimp|mcsv\.net|list-manage|convertkit|kit\.com|buttondown|ghost\.io|mailerlite|sendinblue|brevo|campaign-archive|constantcontact|newsletter|digest|weekly|edition|issue\s?#?\d|this week|roundup|dispatch|letter from)/i;
+/** The bare address inside a From header, lowercased. */
+export function senderAddress(from: string): string {
+  const m = /<([^>]+)>/.exec(from || '');
+  return (m ? m[1] : (from || '')).trim().toLowerCase();
+}
+/** A member's own corrections (mail_sort_rules): address → kind, @domain → kind. */
+export type SortRules = Record<string, MailKind>;
+export async function mailSortRules(profileId: string): Promise<SortRules> {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/mail_sort_rules?profile_id=eq.${profileId}&select=sender,kind`, { headers: svc() }).catch(() => null);
+  const rows = r ? await r.json().catch(() => []) : [];
+  const out: SortRules = {};
+  for (const x of Array.isArray(rows) ? rows : []) out[String(x.sender)] = x.kind;
+  return out;
+}
+export async function saveMailSortRule(profileId: string, sender: string, kind: MailKind): Promise<boolean> {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/mail_sort_rules?on_conflict=profile_id,sender`, {
+    method: 'POST', headers: { ...svc(), prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify({ profile_id: profileId, sender, kind }),
+  });
+  return r.ok;
+}
+export function classifyMail(m: { from: string; subject: string; snippet?: string; labels: string[]; listUnsub: string; listId: string; precedence: string }, rules: SortRules = {}): MailKind {
+  // Their own correction wins — the exact address first, then its domain.
+  const addr = senderAddress(m.from);
+  const dom = addr.includes('@') ? '@' + addr.split('@')[1] : '';
+  if (rules[addr]) return rules[addr];
+  if (dom && rules[dom]) return rules[dom];
+  const subj = m.subject || '';
+  const snip = m.snippet || '';
+  const from = (m.from || '').toLowerCase();
+  const noreply = /no-?reply|do-?not-?reply|notifications?@|notify@|alerts?@|mailer@|automated|support@|help@|hello@.*\b(etsy|amazon|paypal|stripe|venmo)/.test(from);
+  const bulk = !!(m.listUnsub || m.listId || /bulk|list/i.test(m.precedence));
+  const g = (l: string) => m.labels.includes(l);
+  const promoWords = PROMO_RE.test(subj);
+  if (UPDATE_RE.test(subj) && !promoWords) return 'updates';
+  if (promoWords) return 'promotions';
+  // Sales words in the preview line count too ("Save $15… with code HAPPY26").
+  if (PROMO_RE.test(snip) && (bulk || g('CATEGORY_PROMOTIONS') || g('CATEGORY_UPDATES'))) return 'promotions';
+  if (bulk || g('CATEGORY_SOCIAL') || g('CATEGORY_FORUMS')) {
+    if (g('CATEGORY_PROMOTIONS') && !NEWSLETTER_RE.test(subj + ' ' + from + ' ' + m.listId)) return 'promotions';
+    if (g('CATEGORY_UPDATES') && !NEWSLETTER_RE.test(subj + ' ' + from + ' ' + m.listId)) return 'updates';
+    return 'subscriptions';
+  }
+  if (g('CATEGORY_PROMOTIONS')) return 'promotions';
+  if (noreply || g('CATEGORY_UPDATES')) return 'updates';
+  return 'primary';
+}
+
 /** Threads for one account — Gmail's own search grammar (default: the inbox). */
-export async function listThreads(profileId: string, acct: MailAccount, q: string, max = 20): Promise<ThreadSummary[]> {
+export async function listThreads(profileId: string, acct: MailAccount, q: string, max = 20, rules: SortRules = {}): Promise<ThreadSummary[]> {
   const token = await accessTokenFor(profileId, acct.id);
   const list = await gm(token, `threads?maxResults=${max}&q=${encodeURIComponent(q || 'in:inbox')}`) as { threads?: { id: string }[] };
   const ids = (list?.threads ?? []).map((t) => t.id);
   const threads = await Promise.all(ids.map((id) =>
-    gm(token, `threads/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`).catch(() => null)));
+    gm(token, `threads/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Id&metadataHeaders=Precedence`).catch(() => null)));
   const out: ThreadSummary[] = [];
   for (const t of threads as ({ id: string; messages?: GMsg[] } | null)[]) {
     const msgs = t?.messages ?? [];
@@ -104,6 +167,12 @@ export async function listThreads(profileId: string, acct: MailAccount, q: strin
       from: hdr(last, 'From'), subject: hdr(first, 'Subject') || '(no subject)',
       snippet: decodeEntities(last.snippet ?? ''), date: new Date(Number(last.internalDate ?? 0)).toISOString(),
       unread: msgs.some((m) => m.labelIds?.includes('UNREAD')), starred: msgs.some((m) => m.labelIds?.includes('STARRED')), count: msgs.length,
+      kind: classifyMail({
+        from: hdr(last, 'From'), subject: hdr(first, 'Subject'),
+        labels: [...new Set(msgs.flatMap((m) => m.labelIds ?? []))],
+        snippet: last.snippet ?? '',
+        listUnsub: hdr(last, 'List-Unsubscribe'), listId: hdr(last, 'List-Id'), precedence: hdr(last, 'Precedence'),
+      }, rules),
     });
   }
   return out;

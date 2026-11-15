@@ -10,7 +10,7 @@ import { useTopBackFor } from '../lib/topBack';
 import {
   mailEnabled, listMailAccounts, connectMail, disconnectMail, loadInbox, loadMailThread,
   modifyMailThread, trashMailThread, unsubscribeMailThread, sendMail, saveMailDraft, senderName, senderAddress,
-  sendMailDraft, updateMailDraft, discardMailDraft, type MailMessage,
+  sendMailDraft, updateMailDraft, discardMailDraft, saveMailSort, type MailMessage, type MailKind,
   type MailAccount, type ThreadSummary, type MailThread,
 } from '../lib/mailApi';
 import './Mail.css';
@@ -83,8 +83,11 @@ export default function Mail() {
   const fetchInbox = useCallback(async (query: string) => {
     setLoading(true);
     try {
-      const r = await loadInbox(acctFilter, composeQuery(query, filters, cat));
-      setThreads(r.threads); setInboxErrs(r.errors);
+      // Lichen sorts the mail itself (classifyMail on the server), so a
+      // tab reads a deeper slice of the inbox and keeps what matches.
+      const r = await loadInbox(acctFilter, composeQuery(query, filters), cat.length ? 40 : 20);
+      setThreads(cat.length ? r.threads.filter((t) => cat.includes((t.kind ?? 'primary') as MailCat)) : r.threads);
+      setInboxErrs(r.errors);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'The inbox didn’t load.');
       setThreads([]);
@@ -327,7 +330,7 @@ export default function Mail() {
           {loading && !threads && <p className="mail__fine">Opening your inboxes…</p>}
           {threads && threads.length === 0 && !loading && <p className="mail__fine">{
             q || filters.length ? 'Nothing matched that search.'
-              : cat.length ? `Nothing in ${cat.map((id) => CATS.find((c) => c.id === id)?.label).join(' or ')} — some inboxes (often work accounts) don't sort mail into categories.`
+              : cat.length ? `Nothing in ${cat.map((id) => CATS.find((c) => c.id === id)?.label).join(' or ')} in your recent mail.`
               : 'Inbox zero. 🌿'}</p>}
           {threads && threads.length > 0 && (
             <ul className={'mail__list' + (loading ? ' is-loading' : '')}>
@@ -372,6 +375,15 @@ export default function Mail() {
                 <button className="mail__askbtn" onClick={askBrain}>
                   <Icon name="brain" size={13} /> Ask about this thread</button>
               </div>
+              <SortAs thread={open} mine={accounts.map((a) => a.email.toLowerCase())}
+                current={threads?.find((t) => t.thread_id === openThread && t.account_id === openAcct)?.kind}
+                onSaved={(kind, sender) => {
+                  const dom = sender.startsWith('@');
+                  setThreads((cur) => cur?.map((t) => {
+                    const a = senderAddress(t.from).toLowerCase();
+                    return (dom ? a.endsWith(sender) : a === sender) ? { ...t, kind } : t;
+                  }) ?? cur);
+                }} />
               {open.messages.map((m) => m.draft ? (
                 <DraftInThread key={m.id} m={m} accountId={openAcct ?? ''} threadId={openThread ?? ''}
                   from={accounts.find((a) => a.id === openAcct)?.email ?? ''}
@@ -476,13 +488,14 @@ function DraftInThread({ m, accountId, threadId, from, onDone }: {
   );
 }
 
-type MailCat = 'primary' | 'promotions' | 'social' | 'updates' | 'forums';
+/** LICHEN'S OWN TABS (founder 2026-11-15, Gmail's were "not very accurate"):
+ *  sorted on the server by classifyMail — a best guess, a bit messy. */
+type MailCat = 'primary' | 'subscriptions' | 'promotions' | 'updates';
 const CATS: { id: MailCat; label: string; icon: IconName }[] = [
   { id: 'primary', label: 'Primary', icon: 'inbox' },
+  { id: 'subscriptions', label: 'Subscriptions — newsletters & lists', icon: 'newsfeed' },
   { id: 'promotions', label: 'Promotions', icon: 'tag' },
-  { id: 'social', label: 'Social', icon: 'user-multiple' },
-  { id: 'updates', label: 'Updates', icon: 'info' },
-  { id: 'forums', label: 'Forums', icon: 'chat' },
+  { id: 'updates', label: 'Updates — orders, tickets, app messages', icon: 'info' },
 ];
 const QUICK = [
   { op: 'is:unread', label: 'Unread' }, { op: 'is:starred', label: 'Starred' },
@@ -510,19 +523,45 @@ function toggleIn<T>(list: T[], v: T, total: number): T[] {
   const next = list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
   return next.length >= total ? [] : next;
 }
-function composeQuery(text: string, filters: string[], cat: MailCat[]): string {
+function composeQuery(text: string, filters: string[]): string {
   const parts: string[] = [];
   const scoped = filters.some((f) => /^in:/i.test(f));
   if (!text.trim() && !scoped) parts.push('in:inbox');
-  // Gmail's own `category:primary` search is unreliable (empty or ignored on
-  // many accounts — promotions leaked into Primary), so Primary = not in any
-  // other tab, which is exactly what Gmail's Primary tab shows.
-  if (cat.includes('primary')) {
-    // Primary = not in another tab, so Primary + others = exclude the tabs NOT picked.
-    parts.push(...(['promotions', 'social', 'updates', 'forums'] as MailCat[]).filter((c) => !cat.includes(c)).map((c) => `-category:${c}`));
-  } else if (cat.length === 1) parts.push(`category:${cat[0]}`);
-  else if (cat.length > 1) parts.push(`{${cat.map((c) => `category:${c}`).join(' ')}}`);
   parts.push(...filters);
   if (text.trim()) parts.push(text.trim());
   return parts.join(' ');
+}
+
+/** "Move to…" — teach Lichen's sorting with one tap (founder 2026-11-15). */
+function SortAs({ thread, mine, current, onSaved }: {
+  thread: MailThread; mine: string[]; current?: MailKind;
+  onSaved: (kind: MailKind, sender: string) => void;
+}) {
+  const from = thread.messages.find((m) => !m.draft && !mine.includes(senderAddress(m.from).toLowerCase()))?.from
+    ?? thread.messages[0]?.from ?? '';
+  const addr = senderAddress(from).toLowerCase();
+  const domain = addr.includes('@') ? addr.split('@')[1] : '';
+  const [whole, setWhole] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [err, setErr] = useState('');
+  if (!addr) return null;
+  const pick = async (kind: MailKind) => {
+    setErr('');
+    try {
+      const sender = await saveMailSort(from, kind, whole);
+      onSaved(kind, sender);
+      setSaved(`From now on, mail from ${sender.startsWith('@') ? 'everyone at ' + domain : senderName(from)} files under ${CATS.find((c) => c.id === kind)?.label.split(' —')[0]} ✓`);
+    } catch (e) { setErr(e instanceof Error ? e.message : 'That didn’t save.'); }
+  };
+  return (
+    <div className="mail__sortas">
+      <span className="mail__sortas-lbl">Sorted as <strong>{CATS.find((c) => c.id === (current ?? 'primary'))?.label.split(' —')[0]}</strong> · move to:</span>
+      {CATS.filter((c) => c.id !== (current ?? 'primary')).map((c) => (
+        <button key={c.id} className="mail__chip" onClick={() => void pick(c.id)}>{c.label.split(' —')[0]}</button>
+      ))}
+      {domain && <label className="mail__sortas-dom"><input type="checkbox" checked={whole} onChange={(e) => setWhole(e.target.checked)} /> everyone at {domain}</label>}
+      {saved && <p className="mail__fine">{saved}</p>}
+      {err && <p className="mail__err">{err}</p>}
+    </div>
+  );
 }
