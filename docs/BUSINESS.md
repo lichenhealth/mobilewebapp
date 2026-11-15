@@ -165,7 +165,9 @@ the WeavePitch template.
   donation** (founder: "the 6.8k from mark is revenue, and the 10K is
   donation" — it matches the Mark Correction sheet: Mark paid $6,802 for the
   retreat's practitioners, lodging, food and gas). The $10K is a SEPARATE
-  donation, operating share 5–15% per policy. The 10-14 note below called the
+  donation — it came as a DAF (donor-advised fund) grant, off Stripe, which is
+  why the October reconciliation never saw it; the founder later moved it into
+  the Relay account (confirmed 2026-11-15). Operating share 5–15% per policy. The 10-14 note below called the
   charge the donation; read it with this correction: the
   **$6,802.00 charge 2026-09-10 → $6,652.06 paid out 2026-09-14** (net of
   Stripe fees, to WF) is Mark's program-restricted donation. It has NO
@@ -590,7 +592,7 @@ session billing.
 Business expenses paid personally since the July payback (audit sheet in the
 founder's Lichen Drive, "Business expenses to reimburse — since July 13,
 2026"): **$1,794.77** (+ WP Engine's 9/26 renewal, amount TBD). Funded as
-**$1,500.00 = 15% operating share of Mark's $10K donation** + **$294.77 from
+**$1,500.00 = 15% operating share of Mark's $10K DAF grant (held in Relay)** + **$294.77 from
 the $6,802 retreat revenue** (WP Engine also from revenue). If the 6/19
 Claude charge proves already reimbursed in June: $1,685.57 → $185.57 from
 revenue. Paid out via Relay.
