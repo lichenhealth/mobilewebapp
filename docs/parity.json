@@ -822,5 +822,8 @@
  },
  "streamsApi:deleteStream": {
   "tool": "revenue_streams"
+ },
+ "assistantFeedApi:deleteConvo": {
+  "exempt": "erasing the conversation with the assistant itself is the member's own hand on its memory \u2014 the assistant never deletes its own history"
  }
 }

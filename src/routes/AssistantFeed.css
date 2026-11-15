@@ -591,3 +591,10 @@
 .mailrc__go { align-self: flex-start; }
 .mailrc__fine { margin: 0; font-size: 12px; color: var(--ink-muted); }
 .mailrc__err { margin: 0; font-size: 13px; color: var(--red-deep, #a3412f); }
+/* Delete a conversation (founder 2026-11-15): a quiet word beside Rename;
+   the first tap arms it in the needs-attention red, the second deletes. */
+.afeed__convo-del { margin-left: 10px; }
+.afeed__convo-del:hover { color: var(--red-deep); }
+.afeed__convo-del.is-armed { color: var(--red-deep); font-weight: 600; }
+/* While Delete asks, Rename steps aside so the title keeps its room. */
+.afeed__convo-titlerow:has(.afeed__convo-del.is-armed) .afeed__convo-rename:not(.afeed__convo-del) { display: none; }

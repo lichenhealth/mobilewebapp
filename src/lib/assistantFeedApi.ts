@@ -500,6 +500,26 @@ export async function renameConvo(convoId: string, title: string): Promise<void>
   if (error) throw error;
 }
 
+/** DELETE A CONVERSATION (founder 2026-11-15: "lets create the capacity to
+ *  delete old chats"). Removes the member's OWN rows of that exchange (both
+ *  sides — the relationship is theirs) and any chosen name. Real delete,
+ *  confirmed by a second tap at the call site. Returns the ids removed. */
+export async function deleteConvo(group: ConvoGroup): Promise<string[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const ids = group.entries.filter((e) => !e.profile_id || e.profile_id === user.id).map((e) => e.id);
+  if (ids.length) {
+    const { error } = await supabase.from('assistant_feed_posts').delete()
+      .in('id', ids).eq('profile_id', user.id);
+    if (error) throw error;
+  }
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(group.id)) {
+    await supabase.from('assistant_convo_names').delete()
+      .match({ profile_id: user.id, convo_id: group.id });
+  }
+  return ids;
+}
+
 /** Group feed rows into conversations, newest activity first — the ONE
  *  grouping both the feed's list and the brief's history log render.
  *  `names` overlays the member's chosen titles (loadConvoNames). */
