@@ -807,7 +807,7 @@ Deno.serve(async (req) => {
   const briefCtxAtt = (Array.isArray(trigger?.attachments) ? trigger.attachments : [])
     .find((a: { type?: string; text?: string }) => a?.type === 'brief_ctx' && typeof a.text === 'string');
   let briefContext = briefCtxAtt?.text?.trim()
-    ? `\n\n[Right before sending this, they were reading this briefing of theirs on the same screen — they may be replying to it: "${String(briefCtxAtt.text).slice(0, 2000)}"]`
+    ? `\n\n[Right before sending this, they were reading this briefing of theirs on the same screen — it is background only. Their message may have nothing to do with it; answer what they actually asked, and only draw on the briefing if their words point at it: "${String(briefCtxAtt.text).slice(0, 2000)}"]`
     : '';
   // AN EMAIL THREAD ATTACHED FROM MAIL (founder 2026-11-14): the card names
   // the thread; the model reads it with read_mail before answering.
