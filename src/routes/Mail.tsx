@@ -356,11 +356,14 @@ export default function Mail() {
                 <button className="btn" onClick={() => startReply(false)}>Reply</button>
                 <button className="btn" onClick={() => startReply(true)}>Reply all</button>
                 <button className="btn" disabled={!!busy} onClick={() => void act('archive')}>Archive</button>
-                <button className="mail__quiet" disabled={!!busy} onClick={() => void act('trash')}>Trash</button>
                 <button className="mail__quiet" disabled={!!busy} onClick={() => void act('unread')}>Mark unread</button>
                 <button className="mail__quiet" disabled={!!busy} onClick={() => void unsubscribe()}>{busy === 'unsub' ? 'Unsubscribing…' : 'Unsubscribe'}</button>
+                {/* Star + Trash are icon circles (founder 2026-11-15) — the word rides the tip. */}
                 <button className={'mail__star' + (open.starred ? ' is-starred' : '')} disabled={!!busy} aria-pressed={!!open.starred}
-                  onClick={() => void act('star')}><Icon name="star" size={15} /> {open.starred ? 'Starred' : 'Star'}</button>
+                  aria-label={open.starred ? 'Unstar' : 'Star'} data-tip={open.starred ? 'Starred — tap to unstar' : 'Star'}
+                  onClick={() => void act('star')}><Icon name="star" size={16} /></button>
+                <button className="mail__star" disabled={!!busy} aria-label="Move to Trash" data-tip="Trash"
+                  onClick={() => void act('trash')}><Icon name="trash" size={16} /></button>
                 {/* An ACTION, not a stateful circle — worded, so it never reads
                     as the brain toggle (the circle rule, 2026-11-14). */}
                 <button className="mail__askbtn" onClick={askBrain}>
