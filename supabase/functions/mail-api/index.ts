@@ -8,7 +8,7 @@
 //   send   { accountId, threadId?, to, cc?, subject, body }
 //   draft  { ...same }                         → a Gmail draft
 // Every account is checked against the CALLER's own mail_accounts row.
-import { mailTester, mailAccountsOf, listThreads, readThread, attachmentData, modifyThread, trashThread, unsubscribeThread, sendMail, draftMail, type ThreadSummary } from '../_shared/gmail.ts';
+import { mailTester, mailAccountsOf, listThreads, readThread, attachmentData, modifyThread, trashThread, unsubscribeThread, sendMail, draftMail, sendDraft, updateDraft, discardDraft, type ThreadSummary } from '../_shared/gmail.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -72,6 +72,24 @@ Deno.serve(async (req) => {
         const o = { accountId: s('accountId'), threadId: s('threadId') || undefined, to: s('to'), cc: s('cc') || undefined, subject: s('subject'), body: s('body') };
         const id = b.action === 'send' ? await sendMail(me, o) : await draftMail(me, o);
         return json({ ok: true, id });
+      }
+      // A draft already in Gmail (often the brain's): send it, save edits, or discard.
+      case 'send_draft':
+      case 'update_draft': {
+        if (!s('messageId')) return json({ error: 'Which draft?' }, 400);
+        const edits = s('body').trim()
+          ? { accountId: s('accountId'), threadId: s('threadId') || undefined, to: s('to'), cc: s('cc') || undefined, subject: s('subject'), body: s('body') }
+          : undefined;
+        if (edits && !edits.to.trim()) return json({ error: 'Who is it to?' }, 400);
+        if (b.action === 'update_draft') {
+          if (!edits) return json({ error: 'There are no words to save yet.' }, 400);
+          return json({ ok: true, messageId: await updateDraft(me, s('accountId'), s('messageId'), edits) });
+        }
+        return json({ ok: true, id: await sendDraft(me, s('accountId'), s('messageId'), edits) });
+      }
+      case 'discard_draft': {
+        await discardDraft(me, s('accountId'), s('messageId'));
+        return json({ ok: true });
       }
       default:
         return json({ error: 'Unknown action' }, 400);

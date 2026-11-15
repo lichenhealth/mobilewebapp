@@ -186,6 +186,9 @@ export type MailFile = { name: string; mime: string; size: number; attachment_id
 export type MailMessage = {
   id: string; from: string; to: string; cc: string; date: string; subject: string;
   body: string; html: string | null; attachments: string[]; files: MailFile[]; message_id: string; references: string;
+  /** An unsent draft sitting in the thread — Mail renders it as an editable
+   *  composer with Send, never as a received message. */
+  draft: boolean;
 };
 
 /** A whole thread. `body` is the words (what the brain reads); `html` is the
@@ -209,6 +212,7 @@ export async function readThread(profileId: string, accountId: string, threadId:
       files: filesOf(m.payload),
       attachments: filesOf(m.payload).filter((f) => !f.inline).map((f) => f.name),
       message_id: hdr(m, 'Message-ID') || hdr(m, 'Message-Id'), references: hdr(m, 'References'),
+      draft: !!m.labelIds?.includes('DRAFT'),
     })),
   };
 }
@@ -362,7 +366,9 @@ async function prepared(profileId: string, o: Outgoing) {
   let inReplyTo: string | undefined, references: string | undefined, subject = o.subject;
   if (o.threadId) {
     const t = await readThread(profileId, o.accountId, o.threadId);
-    const last = t.messages[t.messages.length - 1];
+    // Reply to the last REAL message — never to a draft sitting in the thread.
+    const sent = t.messages.filter((m) => !m.draft);
+    const last = sent[sent.length - 1];
     if (last?.message_id) { inReplyTo = last.message_id; references = `${last.references} ${last.message_id}`.trim(); }
     if (!subject) subject = /^re:/i.test(t.subject) ? t.subject : `Re: ${t.subject}`;
   }
@@ -379,11 +385,55 @@ export async function sendMail(profileId: string, o: Outgoing): Promise<string> 
 
 /** A draft in the account itself — shows in Gmail AND in Lichen Mail. The
  *  brain only ever drafts; the person sends. */
-export async function draftMail(profileId: string, o: Outgoing): Promise<string> {
+export async function draftMail(profileId: string, o: Outgoing): Promise<{ draftId: string; messageId: string; threadId: string }> {
   const token = await accessTokenFor(profileId, o.accountId);
   const p = await prepared(profileId, o);
-  const r = await gm(token, 'drafts', { method: 'POST', body: JSON.stringify({ message: p }) }) as { id: string };
-  return r.id;
+  const r = await gm(token, 'drafts', { method: 'POST', body: JSON.stringify({ message: p }) }) as { id: string; message?: { id: string; threadId: string } };
+  return { draftId: r.id, messageId: r.message?.id ?? '', threadId: r.message?.threadId ?? '' };
+}
+
+/** A draft's id from the message it holds (a thread shows message ids; the
+ *  drafts API wants the draft's). */
+async function draftIdOf(token: string, messageId: string): Promise<string | null> {
+  let page = '';
+  for (let i = 0; i < 5; i++) {
+    const r = await gm(token, `drafts?maxResults=500${page ? `&pageToken=${page}` : ''}`) as { drafts?: { id: string; message: { id: string } }[]; nextPageToken?: string };
+    const hit = r?.drafts?.find((d) => d.message?.id === messageId);
+    if (hit) return hit.id;
+    if (!r?.nextPageToken) return null;
+    page = r.nextPageToken;
+  }
+  return null;
+}
+const GONE = 'That draft isn’t in Gmail anymore — it may have been sent or deleted there.';
+
+/** SEND A DRAFT (founder 2026-11-15: the brain drafted her reply and Mail
+ *  showed it with no Send button). Optional edits replace the draft's words
+ *  first; then Gmail sends the draft itself, so it leaves Drafts cleanly. */
+export async function sendDraft(profileId: string, accountId: string, messageId: string, edits?: Outgoing): Promise<string> {
+  const token = await accessTokenFor(profileId, accountId);
+  const id = await draftIdOf(token, messageId);
+  if (!id) throw new Error(GONE);
+  if (edits) {
+    const p = await prepared(profileId, edits);
+    await gm(token, `drafts/${id}`, { method: 'PUT', body: JSON.stringify({ id, message: p }) });
+  }
+  const r = await gm(token, 'drafts/send', { method: 'POST', body: JSON.stringify({ id }) }) as { id: string };
+  return r?.id ?? '';
+}
+export async function updateDraft(profileId: string, accountId: string, messageId: string, o: Outgoing): Promise<string> {
+  const token = await accessTokenFor(profileId, accountId);
+  const id = await draftIdOf(token, messageId);
+  if (!id) throw new Error(GONE);
+  const p = await prepared(profileId, o);
+  const r = await gm(token, `drafts/${id}`, { method: 'PUT', body: JSON.stringify({ id, message: p }) }) as { message?: { id: string } };
+  return r?.message?.id ?? '';
+}
+export async function discardDraft(profileId: string, accountId: string, messageId: string): Promise<void> {
+  const token = await accessTokenFor(profileId, accountId);
+  const id = await draftIdOf(token, messageId);
+  if (!id) return;
+  await gm(token, `drafts/${id}`, { method: 'DELETE' });
 }
 
 /** Revoke at Google, then forget the account. */

@@ -1,0 +1,14 @@
+.mdraft { display: flex; flex-direction: column; gap: var(--s-2); width: 100%; margin-top: var(--s-2);
+  padding: var(--s-3); background: var(--bone-warm, #fff); border: 1px solid var(--bone-edge); border-radius: var(--r-md, 12px); box-sizing: border-box; }
+.mdraft__hint { margin: 0; font-size: 13px; color: var(--ink-muted); text-wrap: pretty; }
+.mdraft__done { margin: var(--s-2) 0 0; font-size: 13px; color: var(--moss, var(--green-deep)); }
+.mdraft__field { display: flex; align-items: center; gap: var(--s-2); font-size: 13px; }
+.mdraft__field span { width: 26px; color: var(--ink-muted); flex-shrink: 0; }
+.mdraft__field input { flex: 1; min-width: 0; }
+.mdraft__box { width: 100%; box-sizing: border-box; min-height: 160px; }
+.mdraft__err { margin: 0; font-size: 13px; color: var(--red-deep, #a5462f); }
+.mdraft__acts { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; border-top: 1px solid var(--bone-edge); padding-top: var(--s-2); }
+.mdraft__spacer { flex: 1; }
+.mdraft__open { font-size: 13px; color: var(--peach-deep); }
+.mdraft__quiet { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; color: var(--ink-muted); cursor: pointer; }
+.mdraft__quiet:hover { color: var(--peach-deep); }
