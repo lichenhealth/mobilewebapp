@@ -552,6 +552,10 @@ export default function EventComposer() {
         shareLevel: calendar === 'me' ? (shareLevel || null) : null,
       };
       savingRef.current = true;
+      // An autosave still in flight would finish AFTER this save and leave its
+      // draft behind beside the real event (founder 2026-11-15, "it saved the
+      // event and also a draft"). Wait for it, so the draft is the one promoted.
+      if (writingRef.current) { try { await writingRef.current; } catch { /* the save goes on */ } }
       let id = liveId ?? '';
       const publishing = kind === 'event' && !liveId && !!draftRef.current;
       if (liveId) await updateEvent(me, liveId, input);
