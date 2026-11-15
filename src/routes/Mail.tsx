@@ -40,13 +40,13 @@ export default function Mail() {
   const [params, setParams] = useSearchParams();
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [accounts, setAccounts] = useState<MailAccount[]>([]);
-  const [acctFilter, setAcctFilter] = useState<string | null>(null);
+  const [acctFilter, setAcctFilter] = useState<string[]>([]); // empty = All inboxes
   const [q, setQ] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   // Google's categories + filters as bubbles (founder 2026-11-14: "help people
   // navigate by promotions and other types of mail, like google… search just
   // lets you apply filters and they show up as bubbles").
-  const [cat, setCat] = useState<MailCat | null>(null);
+  const [cat, setCat] = useState<MailCat[]>([]); // empty = All mail
   const [filters, setFilters] = useState<string[]>([]);
   const [threads, setThreads] = useState<ThreadSummary[] | null>(null);
   const [inboxErrs, setInboxErrs] = useState<{ account: string; error: string }[]>([]);
@@ -273,14 +273,17 @@ export default function Mail() {
               onClick={() => { setSearchOpen((o) => !o); setTimeout(() => searchRef.current?.focus(), 0); }}>
               <Icon name="search" size={16} /></button>
             <button className="icon-row__btn" data-tip="New email" aria-label="New email"
-              onClick={() => setDraft({ accountId: acctFilter ?? accounts[0].id, to: '', cc: '', subject: '', body: '' })}>
+              onClick={() => setDraft({ accountId: acctFilter[0] ?? accounts[0].id, to: '', cc: '', subject: '', body: '' })}>
               <Icon name="plus" size={16} /></button>
             <AssistantDoor section="mail" label="Work with AI — your mail" />
             <span className="mail__cats" role="group" aria-label="Categories">
+              <button className={'icon-row__btn' + (cat.length === 0 ? ' icon-row__btn--here' : '')}
+                data-tip="All mail" aria-label="All mail" aria-pressed={cat.length === 0} onClick={() => setCat([])}>
+                <Icon name="newsfeed" size={16} /></button>
               {CATS.map((c, i) => (
-                <button key={c.id} className={'icon-row__btn' + (cat === c.id ? ' icon-row__btn--here' : '') + (i === CATS.length - 1 ? ' tip-right' : '')}
-                  data-tip={c.label} aria-label={c.label} aria-pressed={cat === c.id}
-                  onClick={() => setCat(cat === c.id ? null : c.id)}>
+                <button key={c.id} className={'icon-row__btn' + (cat.includes(c.id) ? ' icon-row__btn--here' : '') + (i === CATS.length - 1 ? ' tip-right' : '')}
+                  data-tip={c.label} aria-label={c.label} aria-pressed={cat.includes(c.id)}
+                  onClick={() => setCat(toggleIn(cat, c.id, CATS.length))}>
                   <Icon name={c.icon} size={16} /></button>
               ))}
             </span>
@@ -298,18 +301,18 @@ export default function Mail() {
               </div>
             </form>
           )}
-          {(filters.length > 0 || cat) && (
+          {(filters.length > 0 || cat.length > 0) && (
             <div className="mail__bubbles" aria-label="Filters on">
-              {cat && <span className="mail__bubble">{CATS.find((c) => c.id === cat)?.label}<button aria-label="Remove" onClick={() => setCat(null)}>×</button></span>}
+              {cat.map((id) => <span key={id} className="mail__bubble">{CATS.find((c) => c.id === id)?.label}<button aria-label="Remove" onClick={() => setCat(cat.filter((x) => x !== id))}>×</button></span>)}
               {filters.map((f) => <span key={f} className="mail__bubble">{prettyOp(f)}<button aria-label={`Remove ${prettyOp(f)}`} onClick={() => toggleFilter(f)}>×</button></span>)}
             </div>
           )}
           {accounts.length > 0 && (
             <div className="mail__lenses" role="tablist">
-              {accounts.length > 1 && <button className={'mail__lens' + (!acctFilter ? ' is-on' : '')} onClick={() => setAcctFilter(null)}>All inboxes</button>}
+              {accounts.length > 1 && <button className={'mail__lens' + (acctFilter.length === 0 ? ' is-on' : '')} aria-pressed={acctFilter.length === 0} onClick={() => setAcctFilter([])}>All inboxes</button>}
               {accounts.length > 1 && accounts.map((a) => (
-                <button key={a.id} className={'mail__lens' + (acctFilter === a.id ? ' is-on' : '')} title={a.email}
-                  onClick={() => setAcctFilter(acctFilter === a.id ? null : a.id)}>{shortAcct(a.email)}</button>
+                <button key={a.id} className={'mail__lens' + (acctFilter.includes(a.id) ? ' is-on' : '')} title={a.email} aria-pressed={acctFilter.includes(a.id)}
+                  onClick={() => setAcctFilter(toggleIn(acctFilter, a.id, accounts.length))}>{shortAcct(a.email)}</button>
               ))}
               {/* ADD MAIL rides the lens row (founder 2026-11-14): another
                   inbox is one tap from where the inboxes are listed. */}
@@ -324,7 +327,7 @@ export default function Mail() {
           {loading && !threads && <p className="mail__fine">Opening your inboxes…</p>}
           {threads && threads.length === 0 && !loading && <p className="mail__fine">{
             q || filters.length ? 'Nothing matched that search.'
-              : cat ? `Nothing in ${CATS.find((c) => c.id === cat)?.label} — some inboxes (often work accounts) don't sort mail into categories.`
+              : cat.length ? `Nothing in ${cat.map((id) => CATS.find((c) => c.id === id)?.label).join(' or ')} — some inboxes (often work accounts) don't sort mail into categories.`
               : 'Inbox zero. 🌿'}</p>}
           {threads && threads.length > 0 && (
             <ul className={'mail__list' + (loading ? ' is-loading' : '')}>
@@ -337,7 +340,7 @@ export default function Mail() {
                     </span>
                     <span className="mail__row-subj">{t.subject}</span>
                     <span className="mail__row-snip">{t.snippet}</span>
-                    {accounts.length > 1 && !acctFilter && <span className="mail__row-acct">{t.account}</span>}
+                    {accounts.length > 1 && acctFilter.length !== 1 && <span className="mail__row-acct">{t.account}</span>}
                   </button>
                 </li>
               ))}
@@ -501,15 +504,24 @@ function prettyOp(op: string): string {
   return `${OP_WORD[k.toLowerCase()] ?? k}: ${val}`;
 }
 /** Words search all mail; filters alone (or a category) stay in the inbox. */
-function composeQuery(text: string, filters: string[], cat: MailCat | null): string {
+/** The circle rule for a multi-select lens set: toggle one; choosing every
+ *  one is the same as All, so it collapses back to empty (= All). */
+function toggleIn<T>(list: T[], v: T, total: number): T[] {
+  const next = list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
+  return next.length >= total ? [] : next;
+}
+function composeQuery(text: string, filters: string[], cat: MailCat[]): string {
   const parts: string[] = [];
   const scoped = filters.some((f) => /^in:/i.test(f));
   if (!text.trim() && !scoped) parts.push('in:inbox');
   // Gmail's own `category:primary` search is unreliable (empty or ignored on
   // many accounts — promotions leaked into Primary), so Primary = not in any
   // other tab, which is exactly what Gmail's Primary tab shows.
-  if (cat === 'primary') parts.push('-category:promotions -category:social -category:updates -category:forums');
-  else if (cat) parts.push(`category:${cat}`);
+  if (cat.includes('primary')) {
+    // Primary = not in another tab, so Primary + others = exclude the tabs NOT picked.
+    parts.push(...(['promotions', 'social', 'updates', 'forums'] as MailCat[]).filter((c) => !cat.includes(c)).map((c) => `-category:${c}`));
+  } else if (cat.length === 1) parts.push(`category:${cat[0]}`);
+  else if (cat.length > 1) parts.push(`{${cat.map((c) => `category:${c}`).join(' ')}}`);
   parts.push(...filters);
   if (text.trim()) parts.push(text.trim());
   return parts.join(' ');

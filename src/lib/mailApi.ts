@@ -55,8 +55,9 @@ export async function disconnectMail(accountId: string): Promise<void> {
   await call('mail-oauth-start', { action: 'disconnect', accountId });
 }
 
-export async function loadInbox(accountId: string | null, q: string): Promise<{ threads: ThreadSummary[]; errors: { account: string; error: string }[] }> {
-  return call('mail-api', { action: 'inbox', accountId: accountId ?? undefined, q });
+/** Empty `accountIds` = every connected inbox. */
+export async function loadInbox(accountIds: string[], q: string): Promise<{ threads: ThreadSummary[]; errors: { account: string; error: string }[] }> {
+  return call('mail-api', { action: 'inbox', accountIds, q });
 }
 
 export async function loadMailThread(accountId: string, threadId: string): Promise<MailThread> {
