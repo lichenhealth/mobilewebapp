@@ -7,13 +7,21 @@
 .cshare__seg { display: flex; gap: 6px; flex-wrap: wrap; }
 .cshare__seg button { border: 1px solid var(--bone-edge); background: #fff; border-radius: var(--r-full); padding: 5px 12px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
 .cshare__seg button.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
-.cshare__msg summary { font-size: 13px; color: var(--peach-deep); cursor: pointer; }
-.cshare__msg textarea, .cshare__note { width: 100%; box-sizing: border-box; border: 1px solid var(--bone-edge); border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--ink); margin-top: 6px; }
 .cshare__acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .cshare__copy { background: none; border: none; color: var(--peach-deep); font-size: 13px; cursor: pointer; padding: 4px 2px; }
-/* «FIRST»'S BRAIN SENDS IT — the owner's face wearing the brain badge. */
-.cshare__brain { display: flex; gap: 12px; align-items: flex-start; padding: 12px; margin: 10px 0; border: 1px dashed var(--peach); border-radius: 12px; background: var(--bone-warm); }
-.cshare__brain-words { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; color: var(--ink-soft); }
-.cshare__brain-words strong { color: var(--ink); font-weight: 500; }
-.cshare__brain-words em { font-style: normal; color: var(--peach-deep); }
-.cshare__brain-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; align-items: center; }
+/* SEE IT BEFORE IT GOES (founder 2026-11-15) — two options, each showing its
+   message as a bubble with Send + Edit, then the bare link. */
+.cshare__note { width: 100%; box-sizing: border-box; border: 1px solid var(--bone-edge); border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--ink); }
+.cshare__opt { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--bone-edge); border-radius: 12px; background: #fff; }
+.cshare__opt--brain { border: 1px dashed var(--peach); background: var(--bone-warm); }
+.cshare__opt-head { display: flex; gap: 12px; align-items: flex-start; }
+.cshare__opt-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; color: var(--ink-soft); text-wrap: pretty; }
+.cshare__opt-words strong { color: var(--ink); font-weight: 500; font-size: 14px; }
+.cshare__opt-words em { font-style: normal; color: var(--peach-deep); }
+.cshare__bubble { border: 1px solid var(--bone-edge); border-radius: 12px; background: var(--bone); padding: 10px 12px; font-size: 13px; color: var(--ink); max-height: 240px; overflow-y: auto; }
+.cshare__bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
+.cshare__fixed { color: var(--peach-deep); margin-bottom: 8px !important; }
+.cshare__bubble textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--peach); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; line-height: 1.45; color: var(--ink); background: #fff; resize: vertical; }
+.cshare__link { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border: 1px solid var(--bone-edge); border-radius: 12px; }
+.cshare__link-label { font-size: 13px; color: var(--ink); font-weight: 500; }
+.cshare__link-url { flex: 1 1 60px; min-width: 0; font-size: 12px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: inherit; }

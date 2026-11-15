@@ -797,16 +797,28 @@ export async function sendFeedShareChat(share: FeedShare, text: string): Promise
 /** «FIRST»'S BRAIN SENDS IT (founder 2026-11-15): the brain-errand fn posts
  *  the link + instructions into your DM as YOUR BRAIN (via_brain), then keeps
  *  helping them set it up and bells you if they need you. Returns the chat id. */
-export async function sendFeedShareByBrain(shareId: string, note?: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('brain-errand', { body: { mode: 'send', share_id: shareId, note: note ?? '' } });
+export async function sendFeedShareByBrain(shareId: string, text?: string): Promise<{ chatId: string; custom: boolean }> {
+  const { data, error } = await supabase.functions.invoke('brain-errand', { body: { mode: 'send', share_id: shareId, text: text ?? '' } });
   if (error) {
     const ctx = (error as { context?: Response }).context;
     const msg = ctx ? ((await ctx.json().catch(() => null)) as { error?: string } | null)?.error : null;
     throw new Error(msg || 'Your Brain couldn\'t send it — try again.');
   }
-  const d = data as { error?: string; chat_id?: string } | null;
+  const d = data as { error?: string; chat_id?: string; custom?: boolean } | null;
   if (d?.error) throw new Error(d.error);
-  return d?.chat_id ?? '';
+  return { chatId: d?.chat_id ?? '', custom: !!d?.custom };
+}
+/** Does the live brain-errand take an EDITED message? An older deploy answers
+ *  "Unknown mode" — then the card shows the Brain's message read-only rather
+ *  than letting an edit be silently ignored. */
+let brainEditCache: Promise<boolean> | null = null;
+export function brainCanEdit(): Promise<boolean> {
+  if (!brainEditCache) {
+    brainEditCache = supabase.functions.invoke('brain-errand', { body: { mode: 'caps' } })
+      .then(({ data, error }) => !error && !!(data as { edit?: boolean } | null)?.edit)
+      .catch(() => false);
+  }
+  return brainEditCache;
 }
 /** Email: the server reads the address and link off the row. */
 export async function sendFeedShareEmail(shareId: string, note?: string): Promise<void> {
