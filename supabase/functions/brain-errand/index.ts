@@ -16,7 +16,7 @@
 // Every Brain message says what it is. The model cannot reach another chat,
 // person or share: errand id → chat/owner/recipient/share are all read here.
 // Env: ANTHROPIC_API_KEY, PUSH_HOOK_SECRET, optional BRAIN_ERRAND_MODEL.
-import { shareMessage, seesLine, FEED_BASE } from '../_shared/calShare.ts';
+import { seesLine, FEED_BASE, brainShareIntro, brainShareBody } from '../_shared/calShare.ts';
 import { assistantConsentOff } from '../_shared/consent.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -55,6 +55,9 @@ Deno.serve(async (req) => {
   if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Not configured' }, 500);
   const body = await req.json().catch(() => ({})) as Record<string, unknown>;
 
+  // ── CAPS: lets the card know this deploy takes an edited message ─────
+  if (body.mode === 'caps') return json({ ok: true, edit: true });
+
   // ── SEND: the member's own tap ─────────────────────────────────────────
   if (body.mode === 'send') {
     const auth = req.headers.get('Authorization') ?? '';
@@ -83,24 +86,21 @@ Deno.serve(async (req) => {
     const them = people.find((p) => p.id === share.recipient_profile_id);
     const ownerFirst = first(me?.full_name, me?.first_name);
     const themFirst = first(them?.full_name ?? share.recipient_name, them?.first_name);
+    // The member may have EDITED the Brain's message on the card (founder
+    // 2026-11-15: "show me what the brain is going to send… with the option
+    // to just send it; or, edit it"). Only the BODY is theirs to change — the
+    // intro saying it's the Brain is always prepended here, server-side.
+    const edited = String(body.text ?? '').trim().slice(0, 4000);
     const note = String(body.note ?? '').trim().slice(0, 1200);
-    const text = `Hi ${themFirst} — this is ${ownerFirst}'s Brain, the AI assistant ${ownerFirst} uses on Lichen, writing on ${ownerFirst}'s behalf. `
-      + `${ownerFirst} asked me to share their calendar with you and help you get it set up.\n\n`
-      + (note ? note + '\n\n' : '')
-      // The share wording is the owner's first person; the Brain speaks ABOUT them.
-      + shareMessage(ownerFirst, share.detail, FEED_BASE + share.token).replace(/\n\n— .*$/s, '')
-        .replace("Here's my Lichen calendar", `Here's ${ownerFirst}'s Lichen calendar`)
-        .replace(/Anything I've marked/, `Anything ${ownerFirst} has marked`)
-        .replace(/\bI'm\b/g, `${ownerFirst} is`).replace(/\bI'm going\b/g, `${ownerFirst} is going`)
-        .replace(/\bmy (to-dos|Lichen calendar)/g, `${ownerFirst}'s $1`)
-      + `\n\nIf anything gets stuck, just reply here — I'll help, and I'll let ${ownerFirst} know if it needs them.`;
+    const text = brainShareIntro(themFirst, ownerFirst) + '\n\n'
+      + (edited || ((note ? note + '\n\n' : '') + brainShareBody(ownerFirst, share.detail, FEED_BASE + share.token)));
 
     // One live errand per chat.
     await svc(`brain_errands?chat_id=eq.${chatId}&status=in.(open,flagged)`, { method: 'PATCH', body: JSON.stringify({ status: 'closed', updated_at: new Date().toISOString(), last_note: 'Replaced by a new errand' }) });
     await postAsBrain(chatId, user.id, text);
     await svc('brain_errands', { method: 'POST', body: JSON.stringify({ owner_id: user.id, chat_id: chatId, recipient_id: share.recipient_profile_id, share_id: id }) });
     await svc(`calendar_feed_shares?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ channel: 'chat', sent_at: new Date().toISOString() }) });
-    return json({ ok: true, chat_id: chatId });
+    return json({ ok: true, chat_id: chatId, custom: !!edited });
   }
 
   // ── REPLY: the recipient wrote back ───────────────────────────────────

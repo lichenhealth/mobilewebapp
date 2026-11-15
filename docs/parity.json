@@ -841,6 +841,9 @@
  "calendarApi:markFeedShareSent": {
   "exempt": "the PERSON's send tap on the share card — the brain proposes via share_calendar, never sends"
  },
+ "calendarApi:brainCanEdit": {
+  "exempt": "a read-only capability probe (does the live brain-errand take an edited message) — writes nothing"
+ },
  "calendarApi:sendFeedShareByBrain": {
   "exempt": "the PERSON's tap on Let my Brain send it — share_calendar makes the share, the Brain never sends on its own word"
  },
