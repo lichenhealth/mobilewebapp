@@ -1,0 +1,41 @@
+/* CONTACT CARDS — gray until on Lichen, peach once they are. */
+.ccards { display: flex; flex-direction: column; gap: 2px; }
+.ccards__filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+.ccards__filter { border: 1px solid var(--bone-edge); background: #fff; border-radius: var(--r-full); padding: 4px 11px; font: inherit; font-size: 12px; color: var(--ink-soft); cursor: pointer; }
+.ccards__filter.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+.ccards__legend { margin: 0 0 6px; font-size: 11.5px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; }
+.ccard__dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--ink-faint); margin-left: 4px; }
+.ccard__dot.is-live { border-color: var(--peach); background: var(--peach-tint); }
+.ccard--child { margin-left: 26px; }
+.ccard__row.is-open { background: var(--bone-warm); }
+.ccard__ava { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--ink-faint); color: var(--ink-muted); background: var(--bone); overflow: hidden; }
+.ccard__ava img { width: 100%; height: 100%; object-fit: cover; }
+.ccard__ava.is-live { border-color: var(--peach); color: var(--peach-deep); background: var(--peach-tint); }
+.ccard__name--live { color: var(--peach-deep); }
+.ccard__panel { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 14px 54px; }
+@media (max-width: 1023px) { .ccard__panel { padding-left: 8px; } }
+.ccard__status { margin: 0; font-size: 12.5px; color: var(--ink-muted); }
+.ccard__status.is-live { color: var(--peach-deep); }
+.ccard__link { border: 0; background: none; padding: 0; font: inherit; color: var(--peach-deep); text-decoration: underline; text-decoration-color: var(--peach); text-underline-offset: 3px; cursor: pointer; }
+.ccard__kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+.ccard__kind { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--bone-edge); background: #fff; border-radius: var(--r-full); padding: 4px 10px; font: inherit; font-size: 12px; color: var(--ink-soft); cursor: pointer; }
+.ccard__kind.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+.ccard__roles { display: flex; gap: 14px; font-size: 13px; color: var(--ink-soft); }
+.ccard__roles input { accent-color: var(--peach); }
+.ccard__notes { resize: vertical; min-height: 64px; }
+.ccard__addlist { appearance: auto; }
+.dcon__tabs { display: flex; gap: 16px; margin: 2px 0 8px; border-bottom: 1px solid var(--bone-edge); }
+.dcon__tab { border: 0; background: none; padding: 6px 0; font: inherit; font-size: 13px; font-weight: 300; color: var(--ink-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.dcon__tab.is-on { color: var(--ink); font-weight: 400; border-bottom-color: var(--peach); }
+.dcon__person.is-gray { color: var(--ink-soft); }
+.lshare { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding: 10px; border: 1px solid var(--bone-edge); border-radius: 10px; background: #fff; }
+.lshare__head { margin: 0; font-size: 12.5px; font-weight: 500; color: var(--ink); }
+.lshare__rule { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); flex-wrap: wrap; }
+.lshare__who { flex: 1; min-width: 120px; }
+.lshare__add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.lshare__sel { border: 1px solid var(--bone-edge); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 13px; background: #fff; }
+.lshare__fine { margin: 0; font-size: 11.5px; color: var(--ink-muted); line-height: 1.45; }
+.lshare__sugg { display: flex; flex-direction: column; border: 1px solid var(--bone-edge); border-radius: 8px; background: #fff; }
+.lshare__sugg button { text-align: left; border: 0; background: none; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.lshare__sugg button:hover { background: var(--bone-warm); }

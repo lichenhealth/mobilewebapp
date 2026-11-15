@@ -7,6 +7,9 @@ import {
   listGuestLists, createGuestList, updateGuestList, deleteGuestList,
   entryKey, entryLabel, listToRows, exportRows, type GuestList, type ListEntry,
 } from '../lib/guestListsApi';
+import ContactCards from './ContactCards';
+import ListSharePanel from './ListSharePanel';
+import { listContacts, listSharedWithMe, type SharedList } from '../lib/contactsApi';
 import './DriveContacts.css';
 
 // CONTACTS IN DRIVE (founder 2026-11-06: "Should we create a drive folder
@@ -44,11 +47,18 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [note, setNote] = useState<string | null>(null);
+  // CARDS · LISTS · SHARED WITH YOU (founder 2026-11-15): cards are the
+  // people, organizations and places themselves; lists group them; lists
+  // others share land under Shared with you.
+  const [tab, setTab] = useState<'cards' | 'lists' | 'shared'>('cards');
+  const [cardCount, setCardCount] = useState(0);
+  const [shared, setShared] = useState<SharedList[]>([]);
+  const [sharing, setSharing] = useState<string | null>(null);
 
   async function refresh() {
-    const rows = await listGuestLists(me);
-    setLists(rows);
-    const ids = rows.flatMap((l) => l.space_ids);
+    const [rows, cards, sh] = await Promise.all([listGuestLists(me), listContacts(me), listSharedWithMe(me)]);
+    setLists(rows); setCardCount(cards.length); setShared(sh);
+    const ids = [...rows, ...sh].flatMap((l) => l.space_ids);
     if (ids.length) setSpaceNames(await loadSpaceNames(ids));
   }
   useEffect(() => { void refresh(); }, [me]);
@@ -120,10 +130,49 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
   return (
     <section className="drive__drafts dcon">
       <div className="drive__items-head">
-        {foldHead('contacts', 'Contacts', lists.length)}
+        {foldHead('contacts', 'Contacts', cardCount)}
       </div>
       {foldOpen('contacts') && (<>
-        {visible.map((l) => {
+        <div className="dcon__tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'cards'} className={'dcon__tab' + (tab === 'cards' ? ' is-on' : '')} onClick={() => setTab('cards')}>Cards</button>
+          <button role="tab" aria-selected={tab === 'lists'} className={'dcon__tab' + (tab === 'lists' ? ' is-on' : '')} onClick={() => setTab('lists')}>Lists{lists.length ? ` · ${lists.length}` : ''}</button>
+          {shared.length > 0 && (
+            <button role="tab" aria-selected={tab === 'shared'} className={'dcon__tab' + (tab === 'shared' ? ' is-on' : '')} onClick={() => setTab('shared')}>Shared with you · {shared.length}</button>
+          )}
+        </div>
+        {tab === 'cards' && <ContactCards me={me} query={query} lists={lists} onListsChanged={() => void refresh()} />}
+        {tab === 'shared' && shared.map((l) => (
+          <div key={l.id} className={'dcon__list' + (open === l.id ? ' is-open' : '')}>
+            <div className="drive__row" role="button" tabIndex={0} onClick={() => setOpen(open === l.id ? null : l.id)}>
+              <span className="drive__row-icon"><Icon name="user-multiple" size={16} /></span>
+              <span className="drive__row-main">
+                <span className="drive__row-title">{l.name}</span>
+                <span className="drive__row-meta">From {l.owner_name} · {l.entries.length} {l.entries.length === 1 ? 'person' : 'people'} · {l.level === 'edit' ? 'you can edit' : 'you can see'}</span>
+              </span>
+              <span className={'drive__foldcar' + (open === l.id ? ' is-open' : '')} aria-hidden="true"><Icon name="chevron-right" size={13} /></span>
+            </div>
+            {open === l.id && (
+              <div className="dcon__panel">
+                {l.entries.map((e) => (
+                  <div key={entryKey(e)} className={'dcon__person' + (e.kind === 'member' ? ' is-member' : ' is-gray')}>
+                    <Icon name={e.kind === 'member' ? 'profile' : e.kind === 'email' ? 'send' : 'phone'} size={13} />
+                    <span className="dcon__person-name">{entryLabel(e)}</span>
+                    {e.kind === 'member' && <span className="dcon__tag">on Lichen</span>}
+                    {l.level === 'edit' && (
+                      <button className="dcon__x" aria-label={`Remove ${entryLabel(e)}`}
+                        onClick={() => void updateGuestList(l.id, { entries: l.entries.filter((x) => entryKey(x) !== entryKey(e)) }).then(refresh)}>×</button>
+                    )}
+                  </div>
+                ))}
+                <div className="dcon__acts">
+                  <button className="dcon__act" onClick={() => exportRows(l.name, listToRows({ ...l, entries: l.entries }), 'csv')}>Export CSV</button>
+                  <button className="dcon__act" onClick={() => exportRows(l.name, listToRows({ ...l, entries: l.entries }), 'vcf')}>Export vCard</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {tab === 'lists' && visible.map((l) => {
           const isOpen = open === l.id;
           return (
             <div key={l.id} className={'dcon__list' + (isOpen ? ' is-open' : '')}>
@@ -157,7 +206,7 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
                     <p className="dcon__empty">Nobody here yet — add an email or phone below, or save people from an event’s invite box.</p>
                   )}
                   {l.entries.map((e) => (
-                    <div key={entryKey(e)} className={'dcon__person' + (e.kind === 'member' ? ' is-member' : '')}>
+                    <div key={entryKey(e)} className={'dcon__person' + (e.kind === 'member' ? ' is-member' : ' is-gray')}>
                       <Icon name={e.kind === 'member' ? 'profile' : e.kind === 'email' ? 'send' : 'phone'} size={13} />
                       <span className="dcon__person-name">{entryLabel(e)}</span>
                       {e.kind === 'member' && <span className="dcon__tag">on Lichen</span>}
@@ -188,6 +237,7 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
                     </button>
                     <button className="dcon__act" onClick={() => exportRows(l.name, listToRows(l), 'csv')}>Export CSV</button>
                     <button className="dcon__act" onClick={() => exportRows(l.name, listToRows(l), 'vcf')}>Export vCard</button>
+                    <button className={'dcon__act' + (sharing === l.id ? ' dcon__act--lead' : '')} onClick={() => setSharing(sharing === l.id ? null : l.id)}>Share</button>
                     <button className="dcon__act" onClick={() => { setRenaming(l.id); setRenameVal(l.name); }}>Rename</button>
                     <button className={'dcon__act dcon__act--danger'}
                       onClick={() => {
@@ -197,6 +247,7 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
                       {del === l.id ? 'Really delete?' : 'Delete'}
                     </button>
                   </div>
+                  {sharing === l.id && <ListSharePanel me={me} listId={l.id} />}
                   <p className="dcon__fine">
                     Exports carry what you typed. Members export as their name and Lichen profile link — their private email and phone stay theirs.
                     CSV opens in Excel or Google Sheets; vCard imports into your phone’s contacts.
@@ -206,7 +257,7 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
             </div>
           );
         })}
-        {creating ? (
+        {tab === 'lists' && (creating ? (
           <div className="dcon__add dcon__add--new">
             <input className="dcon__input" value={newName} autoFocus maxLength={80} placeholder="Name the list — e.g. Solstice regulars"
               onChange={(e) => setNewName(e.target.value)}
@@ -216,7 +267,7 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
           </div>
         ) : (
           <button className="dcon__new" onClick={() => { setCreating(true); setNote(null); }}>⊕ New guest list</button>
-        )}
+        ))}
         {!open && note && <p className="dcon__note">{note}</p>}
       </>)}
     </section>
