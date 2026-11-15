@@ -204,11 +204,36 @@ export const LIFE_TOOLS = [
       required: ['op'],
     },
   },
+  {
+    name: 'contacts',
+    description: 'Their PRIVATE contact cards in Drive → Contacts — people (personal, professional or both), organizations (which can run places), places, communities, groups. A card is GRAY until that person/organization is on Lichen and PEACH once it links (Lichen links them by email/phone/website when they join, and on save if they already are). op: list (optional query/kind filter), read (one card by exact name), create, update (by exact name: new_name, add_emails, add_phones, website, address, notes [replaces], roles, kind, run_by), delete (by exact name — only when they asked), add_to_list (put the card on one of their guest lists by exact list name — created if missing). For a place an organization runs, create the place with run_by = the organization card\'s exact name. Emails and phones ONLY as the member typed them in THIS conversation or as read from a photo/flyer they shared — never invent an address. Sharing a list stays theirs to set on the Contacts screen (hand the drive door).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        op: { type: 'string', enum: ['list', 'read', 'create', 'update', 'delete', 'add_to_list'] },
+        name: { type: 'string' },
+        new_name: { type: 'string' },
+        kind: { type: 'string', enum: ['person', 'organization', 'place', 'community', 'group'] },
+        roles: { type: 'array', items: { type: 'string', enum: ['personal', 'professional'] } },
+        emails: { type: 'array', items: { type: 'string' } },
+        phones: { type: 'array', items: { type: 'string' } },
+        add_emails: { type: 'array', items: { type: 'string' } },
+        add_phones: { type: 'array', items: { type: 'string' } },
+        website: { type: 'string' },
+        address: { type: 'string' },
+        notes: { type: 'string' },
+        run_by: { type: 'string', description: 'Exact name of the organization card that runs this place.' },
+        list: { type: 'string', description: 'Exact guest list name for add_to_list.' },
+        query: { type: 'string' },
+      },
+      required: ['op'],
+    },
+  },
 ];
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', drive_doc: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
+  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -967,6 +992,94 @@ export async function runLifeTool(
     const out = await res.json();
     return { ok: true, change: parts.length ? `marked «${list[0].title}» as ${parts.join(' + ')}` : `cleared how «${list[0].title}» is paid`,
       note: out?.review === 'pending' ? (out?.provider ? 'The provider will be asked to confirm the subsidy request.' : 'A coordinator reviews subsidy requests.') : undefined };
+  }
+
+  if (name === 'contacts') {
+    type C = { id: string; kind: string; name: string; roles: string[]; parent_id: string | null; emails: string[]; phones: string[]; website: string | null; address: string | null; notes: string | null; linked_profile_id: string | null; linked_space_id: string | null };
+    const cols = 'id,kind,name,roles,parent_id,emails,phones,website,address,notes,linked_profile_id,linked_space_id';
+    const all = async () => { const r = await (await sb(`contacts?owner_id=eq.${me}&select=${cols}&order=name.asc&limit=500`)).json(); return (Array.isArray(r) ? r : []) as C[]; };
+    const byName = (cs: C[], n: string) => cs.filter((c) => c.name.trim().toLowerCase() === n.trim().toLowerCase());
+    const live = (c: C) => !!(c.linked_profile_id || c.linked_space_id);
+    const line = (c: C, cs: C[]) => {
+      const parent = c.parent_id ? cs.find((x) => x.id === c.parent_id)?.name : null;
+      return `"${c.name}" · ${c.kind}${c.roles?.length ? ` (${c.roles.join(' & ')})` : ''}${parent ? ` · run by ${parent}` : ''}`
+        + `${c.emails?.length ? ` · ${c.emails.join(', ')}` : ''}${c.phones?.length ? ` · ${c.phones.join(', ')}` : ''}`
+        + `${c.website ? ` · ${c.website}` : ''} · ${live(c) ? 'ON LICHEN (peach)' : 'not on Lichen yet (gray)'}`;
+    };
+    const arr = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean) : []);
+    const op = String(input.op ?? '');
+    const cs = await all();
+    const door = { app_door: '/drive?contacts=1' };
+    if (op === 'list') {
+      const q = String(input.query ?? '').trim().toLowerCase(); const k = String(input.kind ?? '');
+      const hits = cs.filter((c) => (!k || c.kind === k) && (!q || [c.name, ...(c.emails ?? []), ...(c.phones ?? []), c.website ?? '', c.notes ?? ''].join(' ').toLowerCase().includes(q)));
+      return { ok: true, count: hits.length, cards: hits.slice(0, 60).map((c) => line(c, cs)) };
+    }
+    const nm = String(input.name ?? '').trim();
+    if (!nm) return { ok: false, error: 'Which card? Give its exact name (op=list shows them).' };
+    const found = byName(cs, nm);
+    const parentId = async (): Promise<string | null | false> => {
+      const rb = String(input.run_by ?? '').trim(); if (!rb) return null;
+      const org = byName(cs, rb).filter((c) => c.kind === 'organization');
+      return org.length === 1 ? org[0].id : false;
+    };
+    if (op === 'create') {
+      if (found.length) return { ok: false, error: `They already have a card named "${nm}" — use op=update.` };
+      const pid = await parentId(); if (pid === false) return { ok: false, error: `No single organization card named "${input.run_by}" — create it first.` };
+      const kind = String(input.kind ?? 'person');
+      const row = { owner_id: me, kind, name: nm.slice(0, 120), roles: kind === 'person' ? arr(input.roles) : [], parent_id: pid,
+        emails: arr(input.emails), phones: arr(input.phones), website: input.website ? String(input.website).trim() : null,
+        address: input.address ? String(input.address).trim() : null, notes: input.notes ? String(input.notes).slice(0, 4000) : null, source: 'assistant' };
+      const res = await sb('contacts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+      if (!res.ok) { const t = await res.text(); return { ok: false, error: (t.match(/"message":"([^"]+)"/)?.[1]) || 'The card would not save.' }; }
+      const c = (await res.json())[0] as C;
+      return { ok: true, change: `made a ${kind} card for "${c.name}"`, card: line(c, [...cs, c]), ...door };
+    }
+    if (!found.length) return { ok: false, error: `No card named "${nm}" — op=list shows their cards.` };
+    if (found.length > 1) return { ok: false, error: `More than one card is named "${nm}" — this one needs the Contacts screen.` };
+    const c = found[0];
+    if (op === 'read') return { ok: true, card: line(c, cs), address: c.address, notes: c.notes, ...door };
+    if (op === 'delete') {
+      await sb(`contacts?id=eq.${c.id}&owner_id=eq.${me}`, { method: 'DELETE' });
+      return { ok: true, change: `deleted the card "${c.name}" (it also left any guest list it was on)` };
+    }
+    if (op === 'update') {
+      const patch: Record<string, unknown> = {}; const what: string[] = [];
+      if (input.new_name) { patch.name = String(input.new_name).trim().slice(0, 120); what.push(`renamed (was "${c.name}")`); }
+      if (input.kind) { patch.kind = String(input.kind); what.push(`now a ${input.kind}`); }
+      if (input.roles) { patch.roles = arr(input.roles); what.push('roles'); }
+      const ae = arr(input.add_emails), ap = arr(input.add_phones);
+      if (ae.length) { patch.emails = [...new Set([...(c.emails ?? []), ...ae])]; what.push(`added ${ae.join(', ')}`); }
+      if (ap.length) { patch.phones = [...new Set([...(c.phones ?? []), ...ap])]; what.push(`added ${ap.join(', ')}`); }
+      if (input.website !== undefined) { patch.website = String(input.website).trim() || null; what.push('website'); }
+      if (input.address !== undefined) { patch.address = String(input.address).trim() || null; what.push('address'); }
+      if (input.notes !== undefined) { patch.notes = String(input.notes).slice(0, 4000) || null; what.push('notes'); }
+      if (input.run_by !== undefined) { const pid = await parentId(); if (pid === false) return { ok: false, error: `No single organization card named "${input.run_by}".` }; patch.parent_id = pid; what.push(pid ? `run by ${input.run_by}` : 'no longer run by an organization'); }
+      if (!what.length) return { ok: false, error: 'Nothing to change.' };
+      const res = await sb(`contacts?id=eq.${c.id}&owner_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+      if (!res.ok) { const t = await res.text(); return { ok: false, error: (t.match(/"message":"([^"]+)"/)?.[1]) || 'The card would not save.' }; }
+      const n = (await res.json())[0] as C;
+      return { ok: true, change: `updated "${n.name}": ${what.join('; ')}`, card: line(n, cs), ...door };
+    }
+    if (op === 'add_to_list') {
+      const ln = String(input.list ?? '').trim(); if (!ln) return { ok: false, error: 'Which list? Its exact name.' };
+      const lists = await (await sb(`guest_lists?owner_id=eq.${me}&name=ilike.${enc(ln)}&select=id,name,entries`)).json() as { id: string; name: string; entries: Record<string, unknown>[] }[];
+      const entry = c.linked_profile_id ? { kind: 'member', id: c.linked_profile_id, name: c.name, contact_id: c.id }
+        : c.emails?.[0] ? { kind: 'email', value: c.emails[0], name: c.name, contact_id: c.id }
+        : c.phones?.[0] ? { kind: 'phone', value: c.phones[0], sms: c.phones[0].replace(/[^\d+]/g, ''), name: c.name, contact_id: c.id }
+        : null;
+      if (!entry) return { ok: false, error: `"${c.name}" has no email or phone and isn't on Lichen yet — a list needs one of those to reach them.` };
+      if (Array.isArray(lists) && lists.length === 1) {
+        const L = lists[0];
+        if ((L.entries ?? []).some((e) => e.contact_id === c.id)) return { ok: true, change: `"${c.name}" is already on ${L.name}` };
+        await sb(`guest_lists?id=eq.${L.id}&owner_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ entries: [...(L.entries ?? []), entry] }) });
+        return { ok: true, change: `added "${c.name}" to ${L.name}`, ...door };
+      }
+      const res = await sb('guest_lists', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_id: me, name: ln.slice(0, 80), entries: [entry], space_ids: [] }) });
+      if (!res.ok) return { ok: false, error: 'The list would not save.' };
+      return { ok: true, change: `made the list "${ln}" with "${c.name}" on it`, ...door };
+    }
+    return { ok: false, error: 'op = list, read, create, update, delete or add_to_list.' };
   }
 
   return { ok: false, error: 'Unknown tool.' };

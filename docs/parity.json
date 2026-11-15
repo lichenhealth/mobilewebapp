@@ -849,5 +849,29 @@
  },
  "calendarApi:sendFeedShareEmail": {
   "exempt": "the PERSON's send tap on the share card — the brain proposes via share_calendar, never sends"
+ },
+ "contactsApi:createContact": {
+  "tool": "contacts (create)"
+ },
+ "contactsApi:updateContact": {
+  "tool": "contacts (update)"
+ },
+ "contactsApi:deleteContact": {
+  "tool": "contacts (delete)"
+ },
+ "contactsApi:addShare": {
+  "gap": "2",
+  "note": "sharing a contact list widens who sees other people's details — set on the Contacts screen until a confirm-card share is designed"
+ },
+ "contactsApi:setShareLevel": {
+  "gap": "2",
+  "note": "sharing a contact list widens who sees other people's details — set on the Contacts screen until a confirm-card share is designed"
+ },
+ "contactsApi:removeShare": {
+  "gap": "2",
+  "note": "sharing a contact list widens who sees other people's details — set on the Contacts screen until a confirm-card share is designed"
+ },
+ "contactsApi:listSharedWithMe": {
+  "exempt": "a read (the rpc call is a lookup, not a write)"
  }
 }

@@ -287,7 +287,11 @@ export default function Saved() {
   // remembered per device. An active SEARCH opens everything: hits never
   // hide behind a closed fold.
   const [folds, setFolds] = useState<Record<string, boolean>>(() => {
-    try { return JSON.parse(localStorage.getItem('lichen.driveFolds') ?? '{}') as Record<string, boolean>; }
+    try {
+      const f = JSON.parse(localStorage.getItem('lichen.driveFolds') ?? '{}') as Record<string, boolean>;
+      // /drive?contacts=1 (the contact-joined bell, the brain's door) opens Contacts.
+      return new URLSearchParams(window.location.search).get('contacts') ? { ...f, contacts: true } : f;
+    }
     catch { return {}; }
   });
   const foldOpen = (id: string) => !!query.trim() || !!folds[id];

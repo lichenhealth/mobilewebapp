@@ -22,6 +22,8 @@ export async function exportMyLichen(me: string, email: string | null): Promise<
     post_drafts: { table: 'post_drafts', filter: (q) => q.eq('profile_id', me) },
     folders: { table: 'collections', filter: (q) => q.eq('owner_id', me) },
     guest_lists: { table: 'guest_lists', filter: (q) => q.eq('owner_id', me) },
+    contact_cards: { table: 'contacts', filter: (q) => q.eq('owner_id', me) },
+    contact_list_shares: { table: 'contact_list_shares', filter: (q) => q.eq('owner_id', me) },
     contact_permissions: { table: 'contact_shares', filter: (q) => q.eq('profile_id', me) },
     personal_docs: { table: 'chat_docs', filter: (q) => q.eq('created_by', me).is('chat_id', null) },
     saved: { table: 'saved_items', filter: (q) => q.eq('profile_id', me) },

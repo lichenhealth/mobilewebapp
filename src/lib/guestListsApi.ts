@@ -5,10 +5,11 @@ import { APP_ORIGIN } from './customDomain';
 // `entries` hold the SAME chip shapes Compose's Who's-invited box holds;
 // `space_ids` are whole circles. Owner-only RLS; no assistant reads these.
 
-export type ListEntry =
+export type ListEntry = (
   | { kind: 'member'; id: string; name: string }
   | { kind: 'email'; value: string; name: string }
-  | { kind: 'phone'; value: string; sms: string; name: string };
+  | { kind: 'phone'; value: string; sms: string; name: string }
+) & { contact_id?: string }; // the card behind the entry (2026-11-15 — the database files it)
 
 export type GuestList = {
   id: string;
