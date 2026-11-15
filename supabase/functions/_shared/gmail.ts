@@ -77,7 +77,7 @@ async function gm(token: string, path: string, init?: RequestInit) {
 }
 
 type Header = { name: string; value: string };
-type Part = { mimeType?: string; body?: { data?: string; size?: number; attachmentId?: string }; parts?: Part[]; filename?: string; headers?: Header[] };
+type Part = { partId?: string; mimeType?: string; body?: { data?: string; size?: number; attachmentId?: string }; parts?: Part[]; filename?: string; headers?: Header[] };
 type GMsg = { id: string; threadId: string; labelIds?: string[]; snippet?: string; internalDate?: string; payload?: Part };
 
 const hdr = (m: GMsg, n: string) => m.payload?.headers?.find((h) => h.name.toLowerCase() === n.toLowerCase())?.value ?? '';
@@ -142,16 +142,37 @@ function bodyText(p: Part | undefined): string {
   return fromHtml || plain;
 }
 const hdrOf = (x: Part, n: string) => x.headers?.find((h) => h.name.toLowerCase() === n.toLowerCase())?.value ?? '';
-/** Every real file in a message: attachments AND inline images (cid:). */
+/** A file's name wherever the sender put it: Gmail's parsed filename, the
+ *  Content-Disposition filename (plain or RFC 2231 `filename*=`), or the
+ *  Content-Type `name=` parameter. */
+function partName(x: Part): string {
+  if (x.filename) return x.filename;
+  for (const h of ['Content-Disposition', 'Content-Type']) {
+    const v = hdrOf(x, h);
+    const star = v.match(/(?:file)?name\*=(?:[^']*'[^']*')?("?)([^";]+)\1/i);
+    if (star) { try { return decodeURIComponent(star[2]); } catch { return star[2]; } }
+    const plain = v.match(/(?:file)?name="?([^";]+)"?/i);
+    if (plain) return plain[1].trim();
+  }
+  return '';
+}
+/** Every real file in a message: attachments AND inline images (cid:).
+ *  A small file can ride INSIDE the message (body.data, no attachmentId) —
+ *  those get a `part:<partId>` id that attachmentData resolves (founder
+ *  2026-11-15: a WP Engine invoice PDF never showed). */
 function filesOf(p: Part | undefined): MailFile[] {
   const out: MailFile[] = [];
   const walk = (x: Part) => {
     const cid = hdrOf(x, 'Content-ID').replace(/^<|>$/g, '');
     const disp = hdrOf(x, 'Content-Disposition').toLowerCase();
-    if (x.body?.attachmentId && (x.filename || cid)) {
+    const name = partName(x);
+    const mime = (x.mimeType || 'application/octet-stream').toLowerCase();
+    const isBody = !name && !cid && !disp.startsWith('attachment') && (mime.startsWith('text/') || mime.startsWith('multipart/'));
+    const id = x.body?.attachmentId || (x.body?.data && x.partId ? `part:${x.partId}` : '');
+    if (id && !isBody && (name || cid || disp.startsWith('attachment') || !mime.startsWith('multipart/'))) {
       out.push({
-        name: x.filename || 'image', mime: x.mimeType || 'application/octet-stream', size: x.body.size ?? 0,
-        attachment_id: x.body.attachmentId, cid: cid || null,
+        name: name || (cid ? 'image' : 'attachment'), mime, size: x.body?.size ?? 0,
+        attachment_id: id, cid: cid || null,
         inline: !!cid && !disp.startsWith('attachment'),
       });
     }
@@ -196,6 +217,17 @@ export async function readThread(profileId: string, accountId: string, threadId:
  *  response stays deliverable; bigger files say so in plain words. */
 export async function attachmentData(profileId: string, accountId: string, messageId: string, attachmentId: string): Promise<{ data: string; size: number }> {
   const token = await accessTokenFor(profileId, accountId);
+  if (attachmentId.startsWith('part:')) {
+    // A small file packed inside the message itself — read it off the part.
+    const want = attachmentId.slice(5);
+    const m = await gm(token, `messages/${encodeURIComponent(messageId)}?format=full`) as GMsg;
+    let found: Part | null = null;
+    const walk = (x: Part) => { if (x.partId === want) found = x; (x.parts ?? []).forEach(walk); };
+    if (m?.payload) walk(m.payload);
+    const part = found as Part | null;
+    if (!part?.body?.data) throw new Error('That file couldn’t be read — open it in Gmail for now.');
+    return { data: part.body.data, size: part.body.size ?? 0 };
+  }
   const r = await gm(token, `messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`) as { data?: string; size?: number };
   const size = r?.size ?? 0;
   if (size > 24 * 1024 * 1024) throw new Error('That file is over 24 MB — open it in Gmail for now.');

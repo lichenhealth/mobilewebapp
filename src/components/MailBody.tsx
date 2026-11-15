@@ -130,13 +130,21 @@ function b64ToBytes(b64url: string): Uint8Array<ArrayBuffer> {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
+const EXT_MIME: Record<string, string> = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', txt: 'text/plain', csv: 'text/csv', mp4: 'video/mp4', mov: 'video/quicktime', mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav' };
+/** A file's real type: senders often label everything octet-stream, so a
+ *  generic type falls back to what the file name says it is. */
+function mimeOf(f: MailFile): string {
+  const m = (f.mime || '').toLowerCase();
+  if (m && m !== 'application/octet-stream' && m !== 'binary/octet-stream') return m;
+  return EXT_MIME[(f.name.split('.').pop() ?? '').toLowerCase()] ?? 'application/octet-stream';
+}
 async function fileBlob(accountId: string, messageId: string, f: MailFile): Promise<Blob> {
   const { data } = await mailAttachment(accountId, messageId, f.attachment_id);
-  return new Blob([b64ToBytes(data)], { type: f.mime || 'application/octet-stream' });
+  return new Blob([b64ToBytes(data)], { type: mimeOf(f) });
 }
 async function fileUrl(accountId: string, messageId: string, f: MailFile): Promise<string> {
   const { data } = await mailAttachment(accountId, messageId, f.attachment_id);
-  return URL.createObjectURL(new Blob([b64ToBytes(data)], { type: f.mime || 'application/octet-stream' }));
+  return URL.createObjectURL(new Blob([b64ToBytes(data)], { type: mimeOf(f) }));
 }
 
 function HtmlFrame({ accountId, m, foldQuote }: { accountId: string; m: MailMessage; foldQuote: boolean }) {
@@ -246,7 +254,7 @@ export function MailFiles({ accountId, m }: { accountId: string; m: MailMessage 
   // Small images preview as thumbnails without a tap.
   useEffect(() => {
     let live = true;
-    const small = files.filter((f) => f.mime.startsWith('image/') && f.size < 3 * 1048576).slice(0, 6);
+    const small = files.filter((f) => mimeOf(f).startsWith('image/') && f.size < 3 * 1048576).slice(0, 6);
     void Promise.all(small.map(async (f) => {
       try { return [f.attachment_id, await fileUrl(accountId, m.id, f)] as const; } catch { return null; }
     })).then((pairs) => {
@@ -264,7 +272,7 @@ export function MailFiles({ accountId, m }: { accountId: string; m: MailMessage 
   async function open(f: MailFile, download: boolean) {
     setErr(''); setBusy(f.attachment_id + (download ? ':d' : ''));
     // A new tab must open on the tap itself or the browser blocks it.
-    const tab = !download && opensInBrowser(f.mime) ? window.open('', '_blank') : null;
+    const tab = !download && opensInBrowser(mimeOf(f)) ? window.open('', '_blank') : null;
     try {
       const url = thumbs[f.attachment_id] ?? await fileUrl(accountId, m.id, f);
       if (tab) { tab.location.href = url; }
@@ -284,8 +292,9 @@ export function MailFiles({ accountId, m }: { accountId: string; m: MailMessage 
     setErr(''); setBusy(f.attachment_id + ':s');
     try {
       const blob = await fileBlob(accountId, m.id, f);
-      const kind: DriveFileKind = f.mime.startsWith('image/') ? 'photo' : f.mime.startsWith('video/') ? 'video'
-        : f.mime.startsWith('audio/') ? 'audio' : 'file';
+      const mt = mimeOf(f);
+      const kind: DriveFileKind = mt.startsWith('image/') ? 'photo' : mt.startsWith('video/') ? 'video'
+        : mt.startsWith('audio/') ? 'audio' : 'file';
       await uploadDriveFile(new File([blob], f.name || 'attachment', { type: blob.type }), kind);
       setSaved((cur) => ({ ...cur, [f.attachment_id]: true }));
     } catch (e) {
@@ -301,13 +310,13 @@ export function MailFiles({ accountId, m }: { accountId: string; m: MailMessage 
           <li key={f.attachment_id} className="mailb__file">
             {thumbs[f.attachment_id]
               ? <button className="mailb__thumb" onClick={() => void open(f, false)} aria-label={`Open ${f.name}`}><img src={thumbs[f.attachment_id]} alt="" /></button>
-              : <span className="mailb__fileicon" aria-hidden><Icon name={fileIcon(f.mime)} size={16} /></span>}
+              : <span className="mailb__fileicon" aria-hidden><Icon name={fileIcon(mimeOf(f))} size={16} /></span>}
             <span className="mailb__filemeta">
               <span className="mailb__filename">{f.name}</span>
               <span className="mailb__filesize">{sizeLabel(f.size)}</span>
             </span>
             <span className="mailb__fileacts">
-              {opensInBrowser(f.mime) && (
+              {opensInBrowser(mimeOf(f)) && (
                 <button className="mailb__fileact" disabled={!!busy} onClick={() => void open(f, false)}>
                   {busy === f.attachment_id ? 'Opening…' : 'Open'}</button>
               )}
