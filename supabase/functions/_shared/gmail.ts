@@ -119,37 +119,59 @@ function b64dec(data: string): string {
 }
 function htmlToText(html: string): string {
   return decodeEntities(html
-    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|head)[\s\S]*?<\/\1>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|tr|li|h\d)>/gi, '\n')
     .replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' '))
-    .replace(/\n{3,}/g, '\n\n').trim();
+    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
+function findPart(part: Part | undefined, mime: string): string | null {
+  if (!part) return null;
+  if (part.mimeType === mime && part.body?.data && !part.filename) return b64dec(part.body.data);
+  for (const c of part.parts ?? []) { const f = findPart(c, mime); if (f) return f; }
+  return null;
+}
+/** The words of a message for the BRAIN — plain text, or the HTML's text
+ *  when the plain part is missing or plainly thinner than the real email
+ *  (some senders ship a broken text/plain alongside their HTML). */
 function bodyText(p: Part | undefined): string {
-  if (!p) return '';
-  const find = (part: Part, mime: string): string | null => {
-    if (part.mimeType === mime && part.body?.data) return b64dec(part.body.data);
-    for (const c of part.parts ?? []) { const f = find(c, mime); if (f) return f; }
-    return null;
-  };
-  const plain = find(p, 'text/plain');
-  if (plain) return plain.trim();
-  const html = find(p, 'text/html');
-  return html ? htmlToText(html) : '';
+  const plain = findPart(p, 'text/plain')?.trim() ?? '';
+  const html = findPart(p, 'text/html');
+  const fromHtml = html ? htmlToText(html) : '';
+  if (plain && plain.length >= fromHtml.length * 0.25) return plain;
+  return fromHtml || plain;
 }
-function attachmentsOf(p: Part | undefined): string[] {
-  const out: string[] = [];
-  const walk = (x: Part) => { if (x.filename) out.push(x.filename); (x.parts ?? []).forEach(walk); };
+const hdrOf = (x: Part, n: string) => x.headers?.find((h) => h.name.toLowerCase() === n.toLowerCase())?.value ?? '';
+/** Every real file in a message: attachments AND inline images (cid:). */
+function filesOf(p: Part | undefined): MailFile[] {
+  const out: MailFile[] = [];
+  const walk = (x: Part) => {
+    const cid = hdrOf(x, 'Content-ID').replace(/^<|>$/g, '');
+    const disp = hdrOf(x, 'Content-Disposition').toLowerCase();
+    if (x.body?.attachmentId && (x.filename || cid)) {
+      out.push({
+        name: x.filename || 'image', mime: x.mimeType || 'application/octet-stream', size: x.body.size ?? 0,
+        attachment_id: x.body.attachmentId, cid: cid || null,
+        inline: !!cid && !disp.startsWith('attachment'),
+      });
+    }
+    (x.parts ?? []).forEach(walk);
+  };
   if (p) walk(p);
   return out;
 }
 
+export type MailFile = { name: string; mime: string; size: number; attachment_id: string; cid: string | null; inline: boolean };
 export type MailMessage = {
   id: string; from: string; to: string; cc: string; date: string; subject: string;
-  body: string; attachments: string[]; message_id: string; references: string;
+  body: string; html: string | null; attachments: string[]; files: MailFile[]; message_id: string; references: string;
 };
 
-/** A whole thread as plain text — never raw HTML (an email's HTML is a
- *  stranger's markup; it never renders inside Lichen). */
+/** A whole thread. `body` is the words (what the brain reads); `html` is the
+ *  email as its sender designed it, for the Mail screen to render inside a
+ *  sandboxed, script-less frame (founder 2026-11-15: "the mail import renders
+ *  with the same fidelity as the gmail inbox"). `files` are the real
+ *  attachments + inline images, fetched on demand via `attachmentData`. */
 export async function readThread(profileId: string, accountId: string, threadId: string): Promise<{ subject: string; messages: MailMessage[]; unread: boolean; starred: boolean }> {
   const token = await accessTokenFor(profileId, accountId);
   const t = await gm(token, `threads/${encodeURIComponent(threadId)}?format=full`) as { messages?: GMsg[] };
@@ -161,10 +183,23 @@ export async function readThread(profileId: string, accountId: string, threadId:
     messages: msgs.map((m) => ({
       id: m.id, from: hdr(m, 'From'), to: hdr(m, 'To'), cc: hdr(m, 'Cc'),
       date: new Date(Number(m.internalDate ?? 0)).toISOString(), subject: hdr(m, 'Subject'),
-      body: bodyText(m.payload).slice(0, 40_000), attachments: attachmentsOf(m.payload),
+      body: bodyText(m.payload).slice(0, 40_000),
+      html: (() => { const h = findPart(m.payload, 'text/html'); return h && h.length <= 1_500_000 ? h : null; })(),
+      files: filesOf(m.payload),
+      attachments: filesOf(m.payload).filter((f) => !f.inline).map((f) => f.name),
       message_id: hdr(m, 'Message-ID') || hdr(m, 'Message-Id'), references: hdr(m, 'References'),
     })),
   };
+}
+
+/** One attachment's bytes (base64url, as Gmail sends them) — capped so a
+ *  response stays deliverable; bigger files say so in plain words. */
+export async function attachmentData(profileId: string, accountId: string, messageId: string, attachmentId: string): Promise<{ data: string; size: number }> {
+  const token = await accessTokenFor(profileId, accountId);
+  const r = await gm(token, `messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`) as { data?: string; size?: number };
+  const size = r?.size ?? 0;
+  if (size > 24 * 1024 * 1024) throw new Error('That file is over 24 MB — open it in Gmail for now.');
+  return { data: r?.data ?? '', size };
 }
 
 export async function modifyThread(profileId: string, accountId: string, threadId: string, add: string[], remove: string[]) {

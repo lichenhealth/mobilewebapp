@@ -10,9 +10,10 @@ export type ThreadSummary = {
   account_id: string; account: string; thread_id: string;
   from: string; subject: string; snippet: string; date: string; unread: boolean; starred?: boolean; count: number;
 };
+export type MailFile = { name: string; mime: string; size: number; attachment_id: string; cid: string | null; inline: boolean };
 export type MailMessage = {
   id: string; from: string; to: string; cc: string; date: string; subject: string;
-  body: string; attachments: string[]; message_id: string; references: string;
+  body: string; html: string | null; attachments: string[]; files: MailFile[]; message_id: string; references: string;
 };
 export type MailThread = { subject: string; messages: MailMessage[]; unread: boolean; starred?: boolean };
 
@@ -58,6 +59,11 @@ export async function loadInbox(accountId: string | null, q: string): Promise<{ 
 
 export async function loadMailThread(accountId: string, threadId: string): Promise<MailThread> {
   return call('mail-api', { action: 'thread', accountId, threadId });
+}
+
+/** One attachment's bytes, base64url — fetched live from Gmail, never stored. */
+export async function mailAttachment(accountId: string, messageId: string, attachmentId: string): Promise<{ data: string; size: number }> {
+  return call('mail-api', { action: 'attachment', accountId, messageId, attachmentId });
 }
 
 export async function trashMailThread(accountId: string, threadId: string): Promise<void> {

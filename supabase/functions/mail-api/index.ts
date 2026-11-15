@@ -2,12 +2,13 @@
 //
 // POST (authenticated, Mail testers only). The Mail screen's one door:
 //   inbox  { accountId?, q? }                  → threads across the member's inboxes, newest first
-//   thread { accountId, threadId }             → one thread as plain text (marks it read)
+//   thread { accountId, threadId }             → one thread: words + the sender's HTML + files (marks it read)
+//   attachment { accountId, messageId, attachmentId } → one file's bytes (base64url)
 //   modify { accountId, threadId, add?, remove? } → archive / unread / star
 //   send   { accountId, threadId?, to, cc?, subject, body }
 //   draft  { ...same }                         → a Gmail draft
 // Every account is checked against the CALLER's own mail_accounts row.
-import { mailTester, mailAccountsOf, listThreads, readThread, modifyThread, trashThread, unsubscribeThread, sendMail, draftMail, type ThreadSummary } from '../_shared/gmail.ts';
+import { mailTester, mailAccountsOf, listThreads, readThread, attachmentData, modifyThread, trashThread, unsubscribeThread, sendMail, draftMail, type ThreadSummary } from '../_shared/gmail.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -46,6 +47,9 @@ Deno.serve(async (req) => {
         const t = await readThread(me, s('accountId'), s('threadId'));
         if (t.unread && b.markRead !== false) await modifyThread(me, s('accountId'), s('threadId'), [], ['UNREAD']).catch(() => null);
         return json(t);
+      }
+      case 'attachment': {
+        return json(await attachmentData(me, s('accountId'), s('messageId'), s('attachmentId')));
       }
       case 'modify': {
         const arr = (k: string) => (Array.isArray(b[k]) ? (b[k] as unknown[]).map(String) : []);
