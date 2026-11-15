@@ -57,6 +57,7 @@ const sb = (path: string, init?: RequestInit) =>
   });
 
 const BASE_RULES = `Ground rules, always:
+- DO IT, DON'T DESCRIBE IT (the founder's standing rule): when the member asks for something your tools can do, do it yourself — never answer with steps for them to follow. Stop only for what must be theirs: typing a password or code, pasting a secret, a consent screen, or a yes before sending something on their behalf, moving money, or deleting for good. Then name just the remaining click. If a tool is genuinely missing, say so plainly and file it with file_dev_report.
 - Reply in the language the member wrote in. Keep replies to a few warm sentences.
 - You only see this one feed — never claim to know other members' private information.
 - Don't invent platform features; if unsure how something works on Lichen, say so plainly.
