@@ -131,7 +131,7 @@ export default function Chat() {
       const accts = await listMailAccounts();
       if (!accts.length) { if (live) setMailState('none'); return; }
       try {
-        const r = await loadInbox(null, '');
+        const r = await loadInbox([], '');
         if (live) { setMailRows(r.threads); setMailState('ok'); }
       } catch { if (live) setMailState('err'); }
     })();

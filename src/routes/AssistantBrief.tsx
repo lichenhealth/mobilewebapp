@@ -819,7 +819,7 @@ export default function AssistantBrief() {
               : {}),
           }));
           if (aiDoorOn('mail') && await mailEnabled(me).catch(() => false)) {
-            const box = await loadInbox(null, 'is:unread').catch(() => null);
+            const box = await loadInbox([], 'is:unread').catch(() => null);
             const fresh = (box?.threads ?? []).slice(0, 8);
             if (fresh.length) {
               extras.unread_mail = fresh.map((th) => ({ from: mailSender(th.from), subject: th.subject, inbox: th.account }));
@@ -827,13 +827,13 @@ export default function AssistantBrief() {
           }
         }
         if (section === 'chat' && medium === 'mail' && aiDoorOn('mail') && await mailEnabled(me).catch(() => false)) {
-          const box = await loadInbox(null, 'is:unread').catch(() => null);
+          const box = await loadInbox([], 'is:unread').catch(() => null);
           const fresh = (box?.threads ?? []).slice(0, 15);
           extras.unread_mail = fresh.map((th) => ({ from: mailSender(th.from), subject: th.subject, snippet: th.snippet?.slice(0, 160), inbox: th.account }));
           if (!fresh.length) extras.unread_mail_note = 'No unread mail across their connected inboxes.';
         }
         if (section === 'mail' && await mailEnabled(me).catch(() => false)) {
-          const box = await loadInbox(mbox, 'is:unread').catch(() => null);
+          const box = await loadInbox(mbox ? [mbox] : [], 'is:unread').catch(() => null);
           const fresh = (box?.threads ?? []).slice(0, 15);
           extras.unread_mail = fresh.map((th) => ({ from: mailSender(th.from), subject: th.subject, snippet: th.snippet?.slice(0, 160), inbox: th.account }));
           const one = mbox ? (fresh[0]?.account ?? 'one inbox') : null;

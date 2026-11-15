@@ -35,7 +35,8 @@ Deno.serve(async (req) => {
     switch (b.action) {
       case 'inbox': {
         const accts = await mailAccountsOf(me);
-        const pick = s('accountId') ? accts.filter((a) => a.id === s('accountId')) : accts;
+        const ids = Array.isArray(b.accountIds) ? (b.accountIds as unknown[]).map(String) : (s('accountId') ? [s('accountId')] : []);
+        const pick = ids.length ? accts.filter((a) => ids.includes(a.id)) : accts;
         const errors: { account: string; error: string }[] = [];
         const lists = await Promise.all(pick.map((a) => listThreads(me, a, s('q').slice(0, 300), 20).catch((e) => {
           errors.push({ account: a.email, error: e instanceof Error ? e.message : String(e) }); return [] as ThreadSummary[];
