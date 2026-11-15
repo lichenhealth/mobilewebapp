@@ -129,8 +129,8 @@ the WeavePitch template.
   (Thread Bank), not a chartered bank itself. Account opening needs the EIN,
   formation docs, and a board resolution — confirm entity specifics with
   Eva; the repo holds no filing paperwork. (Likely Mark's pledged $10K from the 2026-09-11 subsidy
-  decisions — program-restricted, 5% operating — confirm with the founder
-  before recording it as such or minting against it.) The order of
+  decisions — program-restricted, operating share 5–15% per policy — Mark himself said
+  5% was too low, in his emails to the founder; settled 2026-11-15.) The order of
   operations, per the 2026-10-13 conversation: (1) founder opens the
   account at the bank — only she can be her (the standing third-party-config
   "unless"); (2) founder adds it in the STRIPE DASHBOARD as the payout
@@ -161,7 +161,12 @@ the WeavePitch template.
   $50.01 (the founder's $50 + the 1¢ activation test) — ⚡ in circulation
   is backed by dollars now riding the WF→Relay transfer, float rule
   intact; no pending loads. **Stripe history OUTSIDE the DB, for Eva**:
-  (1) **MARK'S GIFT, CONFIRMED BY THE FOUNDER 2026-10-14**: the
+  (1) **⚠ CORRECTED 2026-11-15 — the $6,802 is RETREAT REVENUE, not the
+  donation** (founder: "the 6.8k from mark is revenue, and the 10K is
+  donation" — it matches the Mark Correction sheet: Mark paid $6,802 for the
+  retreat's practitioners, lodging, food and gas). The $10K is a SEPARATE
+  donation, operating share 5–15% per policy. The 10-14 note below called the
+  charge the donation; read it with this correction: the
   **$6,802.00 charge 2026-09-10 → $6,652.06 paid out 2026-09-14** (net of
   Stripe fees, to WF) is Mark's program-restricted donation. It has NO
   donations-table row (it bypassed donate-checkout — Payment-Link shape),
@@ -480,8 +485,9 @@ enrollment; sessions bill against the stored rate.
 **Subsidy build decisions (founder 2026-09-11, this session):** whole
 payment runs through Lichen (member pays computed rate via Stripe, fund
 covers the rest — what makes practitioner-blindness true); Mark's $10K =
-program-restricted donation at 5% operating (his generosity with general
-gifts earned the minimum rate); practitioners accrue Current-cy and cash
+program-restricted donation; operating share 5–15% per policy (the 09-11 "5%"
+was superseded 2026-11-15 — Mark wrote that 5% was too low; his separate
+$6,802 is retreat revenue, not this gift); practitioners accrue Current-cy and cash
 out to dollars (mint→grant→burn), 1099 tracked per practitioner per year.
 Guided WOW intake shipped at /concierge/intake (PR #157) — the front door
 the policy names. Still to build: fund+policy tables, rate computation,
@@ -578,3 +584,13 @@ session billing.
 6. **HIPAA (2026-11-12): Lichen is NOT a HIPAA platform yet — never say or imply it is.** Licensed providers keep clinical communication and records in their own HIPAA tool (their "clinical home"); Lichen points there. Becoming HIPAA-ready means Supabase Team ($599/mo) + its HIPAA add-on (unpublished; ~$350/mo cited by third parties) + BAAs with every vendor touching PHI (Supabase, the mail provider, Anthropic) — roughly $900+/mo, deferred until revenue or Concierge clients justify it. The founder's own private practice is cash-pay + superbills (no electronic insurance transactions), so it's likely not a HIPAA covered entity — to be confirmed with a healthcare attorney, along with Lichen's own status once Concierge subsidies flow. State law (CA CMIA, WA My Health My Data Act) applies regardless. **UPDATE same day — LICHEN'S EIN IS ON THE MEDI-CAL CONTRACTS** (Daniela bills under it; she runs everything in SimplePractice, nothing touches the platform): that very likely makes Lichen the ORGANIZATION a HIPAA covered entity now, whatever the platform holds. Honest wording from here: "Lichen's platform doesn't hold clinical records; Lichen's clinical program runs on a HIPAA-compliant system" — never a bare "Lichen isn't HIPAA". Plan (attorney to confirm): (1) a written HYBRID-ENTITY designation — the clinical program is the covered component, the platform/community/marketplace sit outside it with a real firewall; (2) a privacy+security officer (Galyn for now), risk assessment, policies, Notice of Privacy Practices, breach plan; (3) SimplePractice BAA in LICHEN's name; Google Workspace HIPAA BAA accepted (free, Admin console) if Medi-Cal remittances land in any lichen.health inbox — and keep that mail away from Claude's connectors; (4) covered providers keep scheduling, treatment planning, billing and notes OFF the platform; (5) Daniela's own entity + EIN + Medi-Cal enrollment as a PLANNED transition, never abrupt (re-enrollment takes months; no gap in client care). Attorney questions: covered-entity status + hybrid fit; Daniela's transition order; whether a covered provider on a client's Lichen care team (non-clinical presence only) is fine; whether provider-submitted "covered elsewhere" subsidy asks are a permitted payment disclosure; and Medi-Cal supplementation — topping up a COVERED service is likely barred, so subsidies only ever fund what Medi-Cal doesn't cover (private/out-of-network gaps are different: a client at 70% OON coverage who could manage at 90% may apply for the gap).
 
 - **Ivy Pay vs Stripe (2026-11-12):** the founder's practice keeps Ivy Pay for card processing (flat 2.75%, deposits straight to her bank) — Stripe would be 2.9%+30¢ ($4.65 vs $4.13 on $150; Stripe ACH 0.8% capped $5 is cheaper for bank payers). Lichen does the bookkeeping + superbills on top. Running her practice THROUGH the nonprofit was advised against (founder = disqualified person, private-inurement/excess-benefit risk); she stays a sole proprietor/PLLC using Lichen at arm's length like any provider. Current-cy session income is NOT tax-free — barter/community-currency income is income at fair value when received; Lichen may have barter-exchange (1099-B) reporting questions — both for tax counsel.
+
+
+## Founder reimbursement, 2026-11-15
+Business expenses paid personally since the July payback (audit sheet in the
+founder's Lichen Drive, "Business expenses to reimburse — since July 13,
+2026"): **$1,794.77** (+ WP Engine's 9/26 renewal, amount TBD). Funded as
+**$1,500.00 = 15% operating share of Mark's $10K donation** + **$294.77 from
+the $6,802 retreat revenue** (WP Engine also from revenue). If the 6/19
+Claude charge proves already reimbursed in June: $1,685.57 → $185.57 from
+revenue. Paid out via Relay.
