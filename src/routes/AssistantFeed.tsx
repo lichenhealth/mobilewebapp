@@ -31,6 +31,7 @@ import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import KnockDraftCard from '../components/KnockDraftCard';
 import MailDraftCard from '../components/MailDraftCard';
 import GDriveImportCard from '../components/GDriveImportCard';
+import CalShareCard from '../components/CalShareCard';
 import CalInviteCard from '../components/CalInviteCard';
 import './AssistantFeed.css';
 
@@ -59,6 +60,14 @@ export default function AssistantFeed() {
   const [params, setParams] = useSearchParams();
   const thread = params.get('thread') || 'general';
   const back = params.get('back') || '';
+  // A BRIEF-ONLY SECTION'S CONVERSATION (founder 2026-11-15: "went into the
+  // brain in drive and when i posted a prompt, it took me to the general
+  // brain, not the drive brain"): Drive/Maps/Inbox have no thread of their
+  // own — their exchanges file into general wearing the section's tag. ?sec=
+  // carries that section so the rail lights it, the head names it, the back
+  // arrow returns to its brief, and every send keeps the tag.
+  const secRaw = params.get('sec') || '';
+  const litSec = BRAIN_RAIL.some((it) => it.section === secRaw && !it.thread) ? secRaw : '';
   // THE UNIVERSAL BACK (founder 2026-11-02, crossing out the "← Back" pill:
   // "have the universal back button be a circle in the upper left with a
   // carrot"): the feed broadcasts its back to the TopBar's arrow beside the
@@ -72,7 +81,7 @@ export default function AssistantFeed() {
     // left and it goes back to the list of convos and the current status
     // update, like when you click into a signal thread").
     if (!listMode && personal && openConvo) {
-      navigate(`/assistant?section=${thread === 'general' ? 'home' : thread}`);
+      navigate(`/assistant?section=${litSec || (thread === 'general' ? 'home' : thread)}`);
       return;
     }
     navigate(-1);
@@ -675,7 +684,7 @@ export default function AssistantFeed() {
     const continuing = personal && openConvo && openConvo !== 'new' && !openConvo.startsWith('loose')
       ? openConvo : undefined;
     const row = await postToAssistantFeed(text, undefined, thread, images,
-      personal ? continuing : null);
+      personal ? continuing : null, litSec ? [litSec] : undefined);
     setPosts((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
     setAllRows((cur) => (cur.some((p) => p.id === row.id) ? cur : [...cur, row]));
     if (personal && row.convo_id && convoParam !== row.convo_id) {
@@ -822,7 +831,7 @@ export default function AssistantFeed() {
         return (
           <button
             key={it.section}
-            className={'afeed__thread' + (t && t.id === thread ? ' is-on' : '') + (off ? ' is-off' : '')}
+            className={'afeed__thread' + ((litSec ? it.section === litSec : t && t.id === thread) ? ' is-on' : '') + (off ? ' is-off' : '')}
             data-tip={it.label}
             aria-label={it.label}
             onClick={() => {
@@ -1001,6 +1010,8 @@ export default function AssistantFeed() {
               ? `${possessive(sctx?.name ?? 'This space')} Current-cy room — its treasury, its moves, kept with the ${sctx?.kind ?? 'space'}.`
               : spaceId
               ? `${possessive(sctx?.name ?? 'This space')} build thread — its page, its story, kept with the ${sctx?.kind ?? 'space'}.`
+              : litSec
+              ? `Your ${BRAIN_RAIL.find((it) => it.section === litSec)?.label ?? 'section'} conversations — kept with that section, and part of the whole weave.`
               : thread === 'general'
               ? 'Everything you’ve shared and asked — the whole weave, drawing on every thread.'
               : `The ${threadLabel(thread)} thread — this is where that work stays woven together.`}
@@ -1533,6 +1544,11 @@ export default function AssistantFeed() {
                     <div className="afeed__pubrow" key={`${p.id}:calinv:${a.event_id}`}>
                       <CalInviteCard eventId={a.event_id} title={a.title} members={a.members} emails={a.emails} calendar={a.calendar} />
                     </div>
+                  ))}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'cal_share' ? [a] : []))
+                  .map((a, i) => (
+                    <div className="afeed__pubrow" key={`${p.id}:csh:${i}`}><CalShareCard shareId={a.share_id} /></div>
                   ))}
                 {p.author === 'claude' && (p.attachments ?? [])
                   .flatMap((a) => (a.type === 'gdrive_import' ? [a] : []))

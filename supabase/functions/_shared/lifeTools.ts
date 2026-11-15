@@ -136,6 +136,18 @@ export const LIFE_TOOLS = [
     },
   },
   {
+    name: 'share_calendar',
+    description: 'Share the member\'s Lichen calendar with someone so it shows in THEIR Google/Apple/Outlook calendar. Each person gets their own private link that can be stopped alone. action=share (default): person = a name (exactly one Lichen member, or a name on their saved contacts), email/phone only as they typed them in THIS conversation; detail = "details" (titles, times, places, notes) or "busy" (times only). It never sends by itself: a card under your reply holds the message and the buttons (Lichen chat for members, text from their own phone, email) — say the card is waiting for their tap. ALWAYS tell them in plain words what that person will see (the result carries it), and if detail is "details" mention that session titles (client names) show too, and that "Only busy times" is one tap on the card. action=list shows who has a link; action=stop (person) ends one. Events they marked "Nothing" never appear and "Only that I\'m busy" events show as Busy either way; to-dos and the care plan never ride along.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['share', 'list', 'stop'] },
+        person: { type: 'string' }, email: { type: 'string' }, phone: { type: 'string' },
+        detail: { type: 'string', enum: ['details', 'busy'] },
+      },
+    },
+  },
+  {
     name: 'set_clinical_home',
     description: 'For licensed providers: name the HIPAA tool where their CLINICAL conversations and records live (SimplePractice, Spruce, Hushmail…), with an optional client-portal link and a short note for clients. Members see "For anything clinical, X uses …" on their profile and care team. Lichen is not a HIPAA platform yet — it points there and never holds clinical records. service empty clears it. A url only if they typed it in this conversation.',
     input_schema: { type: 'object', properties: { service: { type: 'string' }, url: { type: 'string' }, note: { type: 'string' } }, required: ['service'] },
@@ -196,7 +208,7 @@ export const LIFE_TOOLS = [
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', drive_doc: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
+  drive_folder: 'saved', drive_doc: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -687,6 +699,68 @@ export async function runLifeTool(
       ok: true,
       invite: { type: 'cal_invite', event_id: ev.id, title: ev.title ?? 'the event', members, emails, calendar },
       note: `A card under your reply lists who will be invited to "${ev.title}" — nothing is sent until they tap Send.${calendar ? ' Each person will also get a real calendar invitation by email.' : ''}${unplaced.length ? ' Could not match: ' + unplaced.join('; ') + '.' : ''}`,
+    };
+  }
+
+  if (name === 'share_calendar') {
+    const arr = <T,>(x: unknown) => (Array.isArray(x) ? x : []) as T[];
+    type Sh = { id: string; recipient_name: string; recipient_email: string | null; recipient_phone: string | null; recipient_profile_id: string | null; detail: string; channel: string | null; sent_at: string | null };
+    const shares = arr<Sh>(await (await sb(`calendar_feed_shares?owner_id=eq.${me}&revoked_at=is.null&select=id,recipient_name,recipient_email,recipient_phone,recipient_profile_id,detail,channel,sent_at&order=created_at.desc`)).json());
+    const seen = (d: string) => d === 'busy' ? 'only when they\'re busy (times, no titles)' : 'titles, times, places and notes of their events';
+    const action = String(input.action ?? 'share');
+    if (action === 'list') return { ok: true, shared_with: shares.map((x) => ({ name: x.recipient_name, sees: seen(x.detail), sent: x.sent_at ? `${x.channel ?? ''} ${x.sent_at.slice(0, 10)}`.trim() : 'not sent yet' })),
+      doors: [{ path: '/calendar/settings#shared', label: 'Open who you share with →' }] };
+    const person = String(input.person ?? '').trim();
+    const norm = (x: string) => x.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (action === 'stop') {
+      const hits = shares.filter((x) => norm(x.recipient_name) === norm(person) || norm(x.recipient_name).split(' ')[0] === norm(person));
+      if (hits.length !== 1) return { ok: false, error: hits.length ? `Several shares match "${person}" — ask which: ${hits.map((h) => h.recipient_name).join(', ')}.` : `They don't share their calendar with "${person}". Shared with: ${shares.map((x) => x.recipient_name).join(', ') || 'nobody'}.` };
+      await sb(`calendar_feed_shares?id=eq.${hits[0].id}&owner_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ revoked_at: new Date().toISOString() }) });
+      return { ok: true, change: `stopped sharing with ${hits[0].recipient_name} — their link no longer works (their calendar app will just stop updating)` };
+    }
+    const said = memberText.toLowerCase();
+    const saidDigits = said.replace(/[^\d]/g, ' ');
+    let email = String(input.email ?? '').trim().toLowerCase();
+    let phone = String(input.phone ?? '').trim();
+    if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !said.includes(email))) return { ok: false, error: `Use only an email they typed in this conversation (${email} wasn't).` };
+    const pd = phone.replace(/\D/g, '');
+    if (phone && (pd.length < 7 || !saidDigits.replace(/\s/g, '').includes(pd.slice(-7)))) return { ok: false, error: 'Use only a phone number they typed in this conversation.' };
+    let memberId: string | null = null; let name = person;
+    if (person) {
+      const hits = arr<{ id: string; full_name: string | null }>(await (await sb(`profiles?full_name=ilike.${encodeURIComponent(person)}&kind=eq.person&onboarded=eq.true&select=id,full_name&limit=3`)).json())
+        .filter((h) => h.id !== me);
+      if (hits.length > 1) return { ok: false, error: `More than one member is named "${person}" — ask for the full name.` };
+      if (hits.length === 1) { memberId = hits[0].id; name = hits[0].full_name ?? person; }
+      if (!email || !phone) {
+        const lists = arr<{ entries: { kind: string; name?: string; value?: string }[] }>(await (await sb(`guest_lists?owner_id=eq.${me}&select=entries`)).json());
+        for (const e of lists.flatMap((l) => l.entries)) {
+          if (!e.name || !e.value) continue;
+          if (norm(e.name) !== norm(person) && norm(e.name).split(' ')[0] !== norm(person)) continue;
+          if (e.kind === 'email' && !email) email = e.value.toLowerCase();
+          if (e.kind === 'phone' && !phone) phone = e.value;
+        }
+      }
+    }
+    if (!name) name = email || phone;
+    if (!memberId && !email && !phone) return { ok: false, error: `No member or saved contact called "${person}" — ask for their email or cell.` };
+    const detail = input.detail === 'busy' ? 'busy' : 'details';
+    const prior = shares.find((x) => (memberId && x.recipient_profile_id === memberId) || (email && x.recipient_email === email) || (phone && x.recipient_phone === phone));
+    let id = prior?.id;
+    if (prior) {
+      await sb(`calendar_feed_shares?id=eq.${prior.id}&owner_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ detail, recipient_email: email || prior.recipient_email, recipient_phone: phone || prior.recipient_phone, recipient_profile_id: memberId || prior.recipient_profile_id }) });
+    } else {
+      const r = await sb('calendar_feed_shares', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
+        owner_id: me, recipient_profile_id: memberId, recipient_name: name.slice(0, 120), recipient_email: email || null, recipient_phone: phone || null, detail,
+      }) });
+      id = ((await r.json().catch(() => null)) as { id: string }[] | null)?.[0]?.id;
+    }
+    if (!id) return { ok: false, error: 'The share didn\'t save — try again.' };
+    const ways = [memberId ? 'Lichen chat' : '', phone ? `a text to ${phone}` : '', email ? `email to ${email}` : ''].filter(Boolean).join(', ');
+    return {
+      ok: true,
+      share: { type: 'cal_share', share_id: id },
+      sees: `${name} will see ${seen(detail)} — the events on their Lichen calendar plus ones they're going to or invited to. Events they marked "Nothing" never show, "Only that I'm busy" events show as Busy, and to-dos and the care plan are never included. It updates on Google's schedule (often every 12–24 hours).`,
+      note: `${prior ? 'Reused their existing link. ' : ''}A card under your reply holds the message — nothing is sent until they tap ${ways || 'Copy'}.`,
     };
   }
 

@@ -45,7 +45,14 @@ Deno.serve(async (req) => {
   if (!/^[0-9a-f]{32,128}$/.test(token)) return new Response('Not found', { status: 404 });
 
   const feed = (await sb(`calendar_feeds?token=eq.${token}&select=profile_id`)) as { profile_id: string }[];
-  const me = feed?.[0]?.profile_id;
+  let me = feed?.[0]?.profile_id;
+  // A SHARED link (calendar_feed_shares) is someone else reading this
+  // calendar: per-event caps apply, and 'busy' detail strips every title.
+  let shared: { detail: string } | null = null;
+  if (!me) {
+    const sh = (await sb(`calendar_feed_shares?token=eq.${token}&revoked_at=is.null&select=owner_id,detail`)) as { owner_id: string; detail: string }[];
+    if (sh?.[0]) { me = sh[0].owner_id; shared = { detail: sh[0].detail }; }
+  }
   if (!me) return new Response('Not found', { status: 404 });
 
   const prof = (await sb(`profiles?id=eq.${me}&select=full_name,timezone`)) as { full_name: string | null; timezone: string | null }[];
@@ -57,7 +64,7 @@ Deno.serve(async (req) => {
   const today = new Date().toISOString().slice(0, 10);
   const lo = plusDays(today, -60);
   const hi = plusDays(today, 400);
-  const COLS = 'id,title,description,location,start_date,end_date,all_day,start_min,end_min,recurrence';
+  const COLS = 'id,title,description,location,start_date,end_date,all_day,start_min,end_min,recurrence,share_level';
   const [own, rsvp] = await Promise.all([
     sb(`events?owner_profile_id=eq.${me}&is_draft=not.is.true&select=${COLS}&start_date=lte.${hi}&or=(end_date.gte.${lo},start_date.gte.${lo},recurrence.not.is.null)&order=start_date&limit=1000`),
     sb(`event_attendees?profile_id=eq.${me}&status=in.(going,tentative,invited)&select=status,event:events(${COLS})&limit=1000`),
@@ -70,6 +77,14 @@ Deno.serve(async (req) => {
     if (!e || byId.has(e.id)) continue;
     if (e.start_date > hi || ((e.end_date ?? e.start_date) < lo && !e.recurrence)) continue;
     byId.set(e.id, { ...e, _tentative: row.status === 'tentative' || row.status === 'invited' });
+  }
+
+  if (shared) {
+    for (const [id, e] of byId) {
+      const lvl = (e as Ev & { share_level?: string | null }).share_level;
+      if (lvl === 'hidden') { byId.delete(id); continue; }
+      if (shared.detail === 'busy' || lvl === 'busy') byId.set(id, { ...e, title: 'Busy', description: '', location: '' });
+    }
   }
 
   const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');

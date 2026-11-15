@@ -16,7 +16,7 @@ export const GDRIVE_TOOLS = [
     name: 'google_drive',
     description: 'The member\'s connected Google Drives (same Google accounts as their Lichen Mail). action: "list" (a folder\'s files — folder = a folder id from an earlier list, empty = My Drive), "search" (query matches names and contents across that Drive), "recent", "shared" (shared with them), "trash_view" (what\'s in Google\'s Trash). account = one of their addresses (empty = the first). Returns files with id, name, kind (what it would become on Lichen), size and modified date. '
       + 'action "trash" moves file_ids to that account\'s Google Trash (recoverable 30 days) — ONLY when they asked in their own words, ONLY ids you listed in this conversation. action "restore" brings them back out of Google Trash. '
-      + 'action "import" puts an import card under your reply for file_ids — the card\'s button re-creates each file as a Lichen doc / spreadsheet / presentation / Drive file; set then_trash=true if they want the Google copy trashed after. It does NOT import by itself: say the card is waiting for their tap. Folders can\'t be imported whole — list inside them.',
+      + 'action "import" puts an import card under your reply for file_ids — the card\'s button re-creates each file as a Lichen doc / spreadsheet / presentation / Drive file; set then_trash=true if they want the Google copy trashed after. It does NOT import by itself: say the card is waiting for their tap. A FOLDER can be imported whole: it becomes a Lichen folder holding every file re-created (sub-folders become their own "Parent / Sub" folders).',
     input_schema: {
       type: 'object',
       properties: {
@@ -70,8 +70,8 @@ export async function runGDriveTool(profileId: string, input: Record<string, unk
       return { ok: true, account: acct.email, moved: t.done.map((id) => known.get(id)?.name ?? id), failed: t.failed, note: action === 'trash' ? 'In that account\'s Google Trash, recoverable for 30 days.' : 'Restored in Google.' };
     }
     if (action === 'import') {
-      const files = ids.map((id) => known.get(id)!).filter((f) => !['folder', 'none'].includes(lichenKindFor(f.mimeType, f.name).kind));
-      if (!files.length) return { ok: false, error: 'None of those can come over (folders, Forms and Sites can\'t).' };
+      const files = ids.map((id) => known.get(id)!).filter((f) => lichenKindFor(f.mimeType, f.name).kind !== 'none');
+      if (!files.length) return { ok: false, error: 'None of those can come over (Forms and Sites can\'t).' };
       return {
         ok: true, account: acct.email, waiting_for_tap: files.length,
         importCard: { type: 'gdrive_import', account_id: acct.id, account: acct.email, then_trash: input.then_trash === true,

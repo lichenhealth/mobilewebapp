@@ -40,6 +40,9 @@ export type FeedAttachment =
   | { type: 'mailref'; account_id: string; account: string; thread_id: string; subject: string; from: string }
   /** GOOGLE DRIVE → LICHEN (2026-11-15): files the brain picked; the card's
    *  tap re-creates each as a Lichen file through the member's own session. */
+  /** SHARE MY CALENDAR (2026-11-15): the brain made a private share row; the
+   *  card's tap sends it by Lichen chat, text or email. */
+  | { type: 'cal_share'; share_id: string }
   | { type: 'gdrive_import'; account_id: string; account: string; then_trash?: boolean; files: { id: string; name: string; mimeType: string; size?: string; modifiedTime?: string }[] }
   | { type: 'mail_reconnect'; accounts: string[] }
   /** An email the brain DRAFTED (founder 2026-11-15) — the card carries Send; the person's tap sends it. */

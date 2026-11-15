@@ -109,7 +109,7 @@
    bottom-aligned beside a white bubble, the updated-line lower right. Below
    the base rules on purpose (the same-file ordering doctrine). */
 .abrief__run { display: flex; flex-direction: column; gap: 3px; text-align: left; margin-bottom: var(--s-4); }
-.abrief__run-meta { display: flex; align-items: baseline; gap: 6px; margin-left: 38px; }
+.abrief__run-meta { display: flex; align-items: center; gap: 6px; }
 .abrief__run-name { font-size: 12px; font-weight: 600; color: var(--peach); }
 .abrief__run-role { font-size: 12px; color: var(--ink-faint); }
 .abrief__run-row { display: flex; align-items: flex-end; gap: 8px; }
@@ -117,7 +117,7 @@
   width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
   background: var(--bone-deep); border: 1px solid var(--peach); color: var(--peach-deep);
   display: inline-flex; align-items: center; justify-content: center;
-  margin-bottom: 2px;
+  margin-right: 2px;
 }
 .abrief__run .abrief__card {
   flex: 1; min-width: 0; margin-bottom: 0;
@@ -133,3 +133,13 @@
   border: 1px solid var(--bone-edge); background: #fff; color: var(--ink); cursor: pointer;
 }
 .abrief__filter.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+
+/* SUMMARY LEFT, ASK RIGHT (founder 2026-11-15) — side by side at desktop,
+   so the summary, the ask and the first old conversations all stand above
+   the fold; phones keep the stacked order. */
+@media (min-width: 1024px) {
+  .abrief:has(.abrief__split) { max-width: 1120px; }
+  .abrief__split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--s-6); align-items: start; }
+  .abrief__split .abrief__run { margin-bottom: 0; }
+  .abrief__split .abrief__ask { margin-top: 0; padding-top: 0; border-top: none; position: sticky; top: calc(var(--top-h) + var(--s-4)); }
+}

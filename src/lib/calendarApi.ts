@@ -742,3 +742,70 @@ export async function listCalendarDrafts(me: string): Promise<{ id: string; titl
     .order('created_at', { ascending: false }).limit(6);
   return (data as { id: string; title: string; start_date: string; created_at: string }[] | null) ?? [];
 }
+
+// ── SHARE YOUR LICHEN CALENDAR WITH SOMEONE (founder 2026-11-15) ──────────
+// Each person gets their OWN feed link (calendar_feed_shares), so one can be
+// stopped without touching anyone else's; detail 'details' | 'busy'.
+export type FeedShare = {
+  id: string; token: string; recipient_profile_id: string | null; recipient_name: string;
+  recipient_email: string | null; recipient_phone: string | null; detail: 'details' | 'busy';
+  channel: 'chat' | 'text' | 'email' | 'copy' | null; sent_at: string | null; created_at: string;
+};
+const SHARE_COLS = 'id,token,recipient_profile_id,recipient_name,recipient_email,recipient_phone,detail,channel,sent_at,created_at';
+
+export async function listFeedShares(): Promise<FeedShare[]> {
+  const { data } = await supabase.from('calendar_feed_shares').select(SHARE_COLS).is('revoked_at', null).order('created_at', { ascending: false });
+  return (data as FeedShare[] | null) ?? [];
+}
+export async function loadFeedShare(id: string): Promise<(FeedShare & { revoked_at: string | null }) | null> {
+  const { data } = await supabase.from('calendar_feed_shares').select(SHARE_COLS + ',revoked_at').eq('id', id).maybeSingle();
+  return (data as (FeedShare & { revoked_at: string | null }) | null) ?? null;
+}
+export async function createFeedShare(s: { recipientProfileId?: string | null; name: string; email?: string | null; phone?: string | null; detail?: 'details' | 'busy' }): Promise<FeedShare> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Sign in first');
+  const { data, error } = await supabase.from('calendar_feed_shares').insert({
+    owner_id: user.id, recipient_profile_id: s.recipientProfileId ?? null, recipient_name: s.name.trim().slice(0, 120),
+    recipient_email: s.email?.trim().toLowerCase() || null, recipient_phone: s.phone?.trim() || null, detail: s.detail ?? 'details',
+  }).select(SHARE_COLS).single();
+  if (error) throw error;
+  return data as FeedShare;
+}
+export async function setFeedShareDetail(id: string, detail: 'details' | 'busy'): Promise<void> {
+  const { error } = await supabase.from('calendar_feed_shares').update({ detail }).eq('id', id);
+  if (error) throw error;
+}
+export async function revokeFeedShare(id: string): Promise<void> {
+  const { error } = await supabase.from('calendar_feed_shares').update({ revoked_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+export async function markFeedShareSent(id: string, channel: 'chat' | 'text' | 'copy'): Promise<void> {
+  await supabase.from('calendar_feed_shares').update({ channel, sent_at: new Date().toISOString() }).eq('id', id);
+}
+/** Lichen chat: the member's own DM, in their own words. */
+export async function sendFeedShareChat(share: FeedShare, text: string): Promise<string> {
+  if (!share.recipient_profile_id) throw new Error('They aren\'t on Lichen — send it by text or email instead.');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Sign in first');
+  const { ensureDirectChat } = await import('./chatApi');
+  const chatId = await ensureDirectChat(share.recipient_profile_id);
+  const { error } = await supabase.from('chat_messages').insert({ chat_id: chatId, sender_id: user.id, body: text });
+  if (error) throw error;
+  await markFeedShareSent(share.id, 'chat');
+  return chatId;
+}
+/** Email: the server reads the address and link off the row. */
+export async function sendFeedShareEmail(shareId: string, note?: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('share-calendar', { body: { share_id: shareId, note: note ?? '' } });
+  if (error) {
+    const ctx = (error as { context?: Response }).context;
+    const msg = ctx ? ((await ctx.json().catch(() => null)) as { error?: string } | null)?.error : null;
+    throw new Error(msg || 'The email didn\'t go out — try again.');
+  }
+  if ((data as { error?: string } | null)?.error) throw new Error((data as { error: string }).error);
+}
+/** Text: opens the member's OWN Messages (no SMS provider, by doctrine). */
+export function feedShareSmsHref(phone: string, text: string): string {
+  const digits = phone.replace(/[^\d+]/g, '');
+  return `sms:${digits}?&body=${encodeURIComponent(text)}`;
+}
