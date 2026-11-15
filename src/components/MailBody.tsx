@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { mailAttachment, type MailFile, type MailMessage } from '../lib/mailApi';
+import { Link } from 'react-router-dom';
 import { Icon } from './Icon';
+import { uploadDriveFile, type DriveFileKind } from '../lib/driveFilesApi';
 import './MailBody.css';
 
 /** AN EMAIL AS ITS SENDER DESIGNED IT (founder 2026-11-15: "how can we make
@@ -15,8 +17,80 @@ import './MailBody.css';
  *  (cid:) are fetched from Gmail on demand; wide newsletters scale to fit,
  *  the way Gmail's app does. Plain-text mail keeps the simple text view. */
 export default function MailBody({ accountId, m }: { accountId: string; m: MailMessage }) {
-  if (!m.html) return <div className="mailb__text">{m.body || '(no text in this message)'}</div>;
-  return <HtmlFrame accountId={accountId} m={m} />;
+  const [showQuote, setShowQuote] = useState(false);
+  const textSplit = useMemo(() => (m.html ? null : splitTextQuote(m.body ?? '')), [m.html, m.body]);
+  const htmlQuoted = useMemo(() => (m.html ? hasHtmlQuote(m.html) : false), [m.html]);
+  const quoted = textSplit ? !!textSplit.quote : htmlQuoted;
+  const toggle = quoted ? (
+    <button className="mailb__quote" onClick={() => setShowQuote((v) => !v)} aria-expanded={showQuote}
+      data-tip={showQuote ? 'Hide quoted text' : 'Show quoted text'}>
+      {showQuote ? 'Hide quoted text' : '··· Show quoted text'}
+    </button>
+  ) : null;
+  if (textSplit) {
+    return (
+      <>
+        <div className="mailb__text">{(showQuote || !textSplit.quote ? m.body : textSplit.head) || '(no text in this message)'}</div>
+        {toggle}
+      </>
+    );
+  }
+  return (
+    <>
+      <HtmlFrame accountId={accountId} m={m} foldQuote={quoted && !showQuote} />
+      {toggle}
+    </>
+  );
+}
+
+/** QUOTED REPLIES FOLD (founder 2026-11-15, the not-yet-built list): the
+ *  earlier messages a reply carries below itself hide behind one "Show quoted
+ *  text" line, the way Gmail does — only when there's something of the reply's
+ *  own above them, so a bare forward never reads empty. */
+const QUOTE_SEL = '.gmail_quote, blockquote[type="cite"], .yahoo_quoted, #divRplyFwdMsg, #appendonsend, .moz-cite-prefix, div[id^="mail-editor-reference-message"]';
+
+function quoteRoots(doc: Document): Element[] {
+  const roots: Element[] = [];
+  doc.querySelectorAll(QUOTE_SEL).forEach((el) => {
+    if (!roots.some((r) => r.contains(el))) roots.push(el);
+  });
+  // Outlook: the "From: … Sent: …" header block and everything after it.
+  const out: Element[] = [];
+  for (const r of roots) {
+    out.push(r);
+    if (r.id === 'divRplyFwdMsg' || r.id === 'appendonsend') {
+      let n = r.nextElementSibling;
+      while (n) { out.push(n); n = n.nextElementSibling; }
+      const prev = r.previousElementSibling;
+      if (prev?.tagName === 'HR') out.push(prev);
+    }
+  }
+  return out;
+}
+
+function hasHtmlQuote(html: string): boolean {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const roots = quoteRoots(doc);
+  if (!roots.length) return false;
+  roots.forEach((r) => r.remove());
+  return (doc.body.textContent ?? '').trim().length > 0 || !!doc.body.querySelector('img');
+}
+
+function splitTextQuote(body: string): { head: string; quote: string } {
+  const lines = body.split('\n');
+  let at = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (/^-{2,}\s*(original message|forwarded message)\s*-{2,}$/i.test(l)
+      || (/^on .{4,200}wrote:$/i.test(l))
+      || (/^>/.test(l) && lines.slice(i).every((x) => !x.trim() || /^>/.test(x.trim())))) { at = i; break; }
+    // "On Mon, Nov 10, 2026 at 4:12 PM Jane <jane@x.com>" often wraps before "wrote:"
+    if (/^on .{4,200}$/i.test(l) && /wrote:$/i.test((lines[i + 1] ?? '').trim())) { at = i; break; }
+  }
+  if (at <= 0) return { head: body, quote: '' };
+  const head = lines.slice(0, at).join('\n').trimEnd();
+  if (!head.trim()) return { head: body, quote: '' };
+  return { head, quote: lines.slice(at).join('\n') };
 }
 
 const DROP = 'script,noscript,iframe,frame,frameset,object,embed,applet,form,input,button,select,textarea,link,meta,base,portal,template';
@@ -56,12 +130,16 @@ function b64ToBytes(b64url: string): Uint8Array<ArrayBuffer> {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
+async function fileBlob(accountId: string, messageId: string, f: MailFile): Promise<Blob> {
+  const { data } = await mailAttachment(accountId, messageId, f.attachment_id);
+  return new Blob([b64ToBytes(data)], { type: f.mime || 'application/octet-stream' });
+}
 async function fileUrl(accountId: string, messageId: string, f: MailFile): Promise<string> {
   const { data } = await mailAttachment(accountId, messageId, f.attachment_id);
   return URL.createObjectURL(new Blob([b64ToBytes(data)], { type: f.mime || 'application/octet-stream' }));
 }
 
-function HtmlFrame({ accountId, m }: { accountId: string; m: MailMessage }) {
+function HtmlFrame({ accountId, m, foldQuote }: { accountId: string; m: MailMessage; foldQuote: boolean }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [cids, setCids] = useState<Record<string, string>>({});
   const [h, setH] = useState(120);
@@ -88,9 +166,10 @@ function HtmlFrame({ accountId, m }: { accountId: string; m: MailMessage }) {
       if (cids[key]) img.setAttribute('src', cids[key]);
       else img.removeAttribute('src');
     });
+    if (foldQuote) quoteRoots(doc).forEach((el) => el.remove());
     const head = `<meta http-equiv="Content-Security-Policy" content="${CSP}"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>${FRAME_CSS}</style>`;
     return `<!doctype html><html><head>${head}${doc.head.innerHTML}</head><body>${doc.body.innerHTML}</body></html>`;
-  }, [m.html, cids]);
+  }, [m.html, cids, foldQuote]);
 
   // Size the frame to its content; scale a too-wide newsletter down to fit.
   useEffect(() => {
@@ -135,6 +214,7 @@ export function MailFiles({ accountId, m }: { accountId: string; m: MailMessage 
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState<Record<string, boolean>>({});
 
   // Small images preview as thumbnails without a tap.
   useEffect(() => {
@@ -171,6 +251,21 @@ export function MailFiles({ accountId, m }: { accountId: string; m: MailMessage 
     } finally { setBusy(null); }
   }
 
+  /** SAVE TO DRIVE: the attachment becomes a private file in your own Drive
+   *  (the 'drive' bucket, owner-only) — kept on Lichen, no trip to Gmail. */
+  async function toDrive(f: MailFile) {
+    setErr(''); setBusy(f.attachment_id + ':s');
+    try {
+      const blob = await fileBlob(accountId, m.id, f);
+      const kind: DriveFileKind = f.mime.startsWith('image/') ? 'photo' : f.mime.startsWith('video/') ? 'video'
+        : f.mime.startsWith('audio/') ? 'audio' : 'file';
+      await uploadDriveFile(new File([blob], f.name || 'attachment', { type: blob.type }), kind);
+      setSaved((cur) => ({ ...cur, [f.attachment_id]: true }));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'That file didn’t save to Drive.');
+    } finally { setBusy(null); }
+  }
+
   return (
     <div className="mailb__files">
       <p className="mailb__fileshead"><Icon name="paperclip" size={13} /> {files.length === 1 ? '1 attachment' : `${files.length} attachments`}</p>
@@ -191,6 +286,10 @@ export function MailFiles({ accountId, m }: { accountId: string; m: MailMessage 
               )}
               <button className="mailb__fileact" disabled={!!busy} onClick={() => void open(f, true)}>
                 {busy === f.attachment_id + ':d' ? 'Saving…' : 'Download'}</button>
+              {saved[f.attachment_id]
+                ? <Link className="mailb__fileact mailb__fileact--done" to="/drive">In your Drive ✓</Link>
+                : <button className="mailb__fileact" disabled={!!busy} onClick={() => void toDrive(f)}>
+                    {busy === f.attachment_id + ':s' ? 'Saving…' : 'Save to Drive'}</button>}
             </span>
           </li>
         ))}
