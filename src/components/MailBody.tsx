@@ -189,6 +189,27 @@ function HtmlFrame({ accountId, m, foldQuote }: { accountId: string; m: MailMess
       fit();
       const d = frame.contentDocument;
       if (!d?.body) return;
+      // LINKS OPEN EVEN WHEN SOMETHING SITS ON TOP OF THEM (founder 2026-11-15:
+      // a "Manage Billing" button showed a text cursor and wouldn't click —
+      // senders layer invisible spacers/tracking pixels over buttons). The
+      // email runs no script; Lichen looks under the pointer through every
+      // layer for a real link and opens it in a new tab itself.
+      const linkAt = (x: number, y: number): HTMLAnchorElement | null => {
+        for (const el of d.elementsFromPoint(x, y)) {
+          const a = (el as Element).closest?.('a[href]') as HTMLAnchorElement | null;
+          if (a && /^(https?:|mailto:|tel:)/i.test(a.getAttribute('href') ?? '')) return a;
+        }
+        return null;
+      };
+      d.addEventListener('click', (e) => {
+        const a = linkAt(e.clientX, e.clientY);
+        if (!a) return;
+        e.preventDefault();
+        window.open(a.href, '_blank', 'noopener,noreferrer');
+      });
+      d.addEventListener('mousemove', (e) => {
+        d.documentElement.style.cursor = linkAt(e.clientX, e.clientY) ? 'pointer' : '';
+      });
       d.querySelectorAll('img').forEach((img) => img.addEventListener('load', fit));
       ro = new ResizeObserver(fit);
       ro.observe(d.body);
