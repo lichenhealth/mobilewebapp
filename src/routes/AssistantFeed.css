@@ -274,6 +274,11 @@
   padding-top: var(--s-5);
   border-top: 1px solid var(--bone-edge);
 }
+.abrief__ask {
+  margin-top: var(--s-6, 24px);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--bone-edge);
+}
 .abrief__convos-h {
   margin: 0 0 6px; font-family: var(--font-mono); font-size: 11px;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted);

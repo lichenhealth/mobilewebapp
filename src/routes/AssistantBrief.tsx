@@ -1314,14 +1314,21 @@ export default function AssistantBrief() {
           with Claude" shouldn't forget why you came) — press enter to send
           it, or add more first (a website to read, a length, a tone).
           Keyed so a new ?ask always lands even if the composer is mounted. */}
+      {/* THE ASK STANDS APART FROM THE SUMMARY (founder 2026-11-15: "it
+          feels like a reply to the summary right now, when in fact i might
+          not want to address anything in the summary at all"): its own
+          section under a hairline, its own heading, a neutral placeholder. */}
+      <div className="abrief__ask">
+      <p className="abrief__convos-h">Ask Claude anything</p>
       <AssistantComposer
         key={params.get('ask') ?? 'blank'}
         onSend={sendToClaude}
         initialText={params.get('ask') ?? undefined}
         uploaderId={me || undefined}
         attachment={mailRef ? <MailRefCard m={mailRef} onRemove={() => setMailRef(null)} /> : undefined}
-        placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : undefined}
+        placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : 'Anything at all…'}
       />
+      </div>
 
       {/* EARLIER CONVERSATIONS (founder 2026-10-06) — the history log this
           screen was missing: the general brain lists every thread's
