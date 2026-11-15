@@ -951,7 +951,7 @@ export default function AssistantBrief() {
       text || (ref ? 'Summarize this email thread and suggest a reply.' : text),
       undefined, feedThread, images, convo, sectionTag ? [sectionTag] : undefined, briefCtx, ref ?? undefined);
     setMailRef(null);
-    navigate(`/assistant/feed?thread=${feedThread}${!spaceParam && row.convo_id ? `&convo=${row.convo_id}` : ''}`);
+    navigate(`/assistant/feed?thread=${feedThread}${!spaceParam && row.convo_id ? `&convo=${row.convo_id}` : ''}${sectionTag ? `&sec=${sectionTag}` : ''}`);
   }
 
   // THE HISTORY LOG ON THE BRIEF (founder 2026-10-06: "the conversation…
@@ -1162,7 +1162,7 @@ export default function AssistantBrief() {
               className="abrief__rail-btn abrief__tool"
               aria-label="Search your history with Claude"
               data-tip="Search"
-              onClick={() => navigate(`/assistant/feed?thread=${feedThread}&search=1${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
+              onClick={() => navigate(`/assistant/feed?thread=${feedThread}&search=1${sectionTag ? `&sec=${sectionTag}` : ''}${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
             >
               <Icon name="search" size={16} />
             </button>
@@ -1171,7 +1171,7 @@ export default function AssistantBrief() {
               className="abrief__rail-btn abrief__tool"
               aria-label="New conversation"
               data-tip="New conversation"
-              onClick={() => navigate(`/assistant/feed?thread=${feedThread}&convo=new${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
+              onClick={() => navigate(`/assistant/feed?thread=${feedThread}&convo=new${sectionTag ? `&sec=${sectionTag}` : ''}${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
             >
               <Icon name="plus" size={16} />
             </button>
@@ -1267,13 +1267,19 @@ export default function AssistantBrief() {
           role above, the face bottom-aligned beside a white bubble. The
           first pass's floating corner brain read as a decoration, not a
           speaker. */}
+      {/* SUMMARY LEFT, ASK RIGHT (founder 2026-11-15: "split summary left,
+          then ask something right. You can reply to the summary or ask
+          something new. That allows both above the fold and you can see the
+          old convos"): one row at ≥1024, stacked below. Claude's face rides
+          beside the name now, so the bubble runs the full column. */}
+      <div className="abrief__split">
       <div className="abrief__run">
         <div className="abrief__run-meta">
+          <span className="abrief__run-ava" aria-hidden><Icon name="brain" size={15} /></span>
           <span className="abrief__run-name">Claude</span>
           <span className="abrief__run-role">· AI Assistant</span>
         </div>
         <div className="abrief__run-row">
-          <span className="abrief__run-ava" aria-hidden><Icon name="brain" size={15} /></span>
       <div className="abrief__card">
         {!doorOn && (
           <p className="abrief__text">
@@ -1327,8 +1333,9 @@ export default function AssistantBrief() {
         initialText={params.get('ask') ?? undefined}
         uploaderId={me || undefined}
         attachment={mailRef ? <MailRefCard m={mailRef} onRemove={() => setMailRef(null)} /> : undefined}
-        placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : 'Anything at all…'}
+        placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : 'Reply to the summary, or ask anything at all…'}
       />
+      </div>
       </div>
 
       {/* EARLIER CONVERSATIONS (founder 2026-10-06) — the history log this
@@ -1342,7 +1349,7 @@ export default function AssistantBrief() {
           {briefConvos.map((c) => {
             const renaming = briefRename === c.id;
             const nameable = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(c.id);
-            const open = () => navigate(`/assistant/feed?thread=${encodeURIComponent(c.thread)}&convo=${encodeURIComponent(c.id)}`);
+            const open = () => navigate(`/assistant/feed?thread=${encodeURIComponent(c.thread)}&convo=${encodeURIComponent(c.id)}${sectionTag && c.thread !== section ? `&sec=${sectionTag}` : ''}`);
             return (
               <div className="afeed__convo" key={c.id} role="button" tabIndex={0}
                 onClick={() => { if (!renaming) open(); }}

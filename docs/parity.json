@@ -1,10 +1,10 @@
 {
- "_doc": "THE PARITY REGISTRY \u2014 see scripts/check-parity.mjs. Every member-facing write is tool | gap (ladder rung 1 private write, 2 member-sent draft, 3 confirm card) | exempt (why). npm run check:parity -- --list prints the open ladder.",
+ "_doc": "THE PARITY REGISTRY — see scripts/check-parity.mjs. Every member-facing write is tool | gap (ladder rung 1 private write, 2 member-sent draft, 3 confirm card) | exempt (why). npm run check:parity -- --list prints the open ladder.",
  "assistantApi:askAssistant": {
   "exempt": "plumbing / guest-token page / pipeline, not a member act"
  },
  "assistantConsentApi:setConsent": {
-  "exempt": "the assistant never flips its own consent (doctrine \u2014 the person taps)"
+  "exempt": "the assistant never flips its own consent (doctrine — the person taps)"
  },
  "assistantConsentApi:careConsent": {
   "exempt": "read-only RPC"
@@ -25,13 +25,13 @@
   "gap": "1"
  },
  "practiceApi:importPracticePayments": {
-  "exempt": "practice ledger of a provider's own clients \u2014 clinical-adjacent; assistant access waits on the founder's consent call (BUSINESS honesty rule 6)"
+  "exempt": "practice ledger of a provider's own clients — clinical-adjacent; assistant access waits on the founder's consent call (BUSINESS honesty rule 6)"
  },
  "practiceApi:savePracticeInfo": {
-  "exempt": "practice ledger \u2014 same consent hold as importPracticePayments"
+  "exempt": "practice ledger — same consent hold as importPracticePayments"
  },
  "practiceApi:savePracticeClient": {
-  "exempt": "client key holds client names \u2014 no assistant path until the founder decides"
+  "exempt": "client key holds client names — no assistant path until the founder decides"
  },
  "clinicalHomeApi:saveClinicalHome": {
   "tool": "set_clinical_home"
@@ -110,18 +110,18 @@
  },
  "bookingApi:startBookingCheckout": {
   "gap": "3",
-  "note": "money \u2014 confirm card + Always allow within \u26a1100/\u26a1300, >\u26a1500 waits 24h"
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
  },
  "bookingApi:setBookingPayChoice": {
   "gap": "2"
  },
  "bookingApi:requestCashout": {
   "gap": "3",
-  "note": "money \u2014 confirm card + Always allow within \u26a1100/\u26a1300, >\u26a1500 waits 24h"
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
  },
  "bookingApi:cancelCashout": {
   "gap": "3",
-  "note": "money \u2014 confirm card + Always allow within \u26a1100/\u26a1300, >\u26a1500 waits 24h"
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
  },
  "bookingApi:markPayoutPaid": {
   "exempt": "platform-admin desk"
@@ -446,7 +446,7 @@
  },
  "ledgerApi:startLoadCheckout": {
   "gap": "3",
-  "note": "money \u2014 confirm card + Always allow within \u26a1100/\u26a1300, >\u26a1500 waits 24h"
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
  },
  "locationApi:loadMyHome": {
   "exempt": "read-only RPC"
@@ -501,15 +501,15 @@
  },
  "postGuestsApi:requestPurchase": {
   "gap": "3",
-  "note": "money \u2014 confirm card + Always allow within \u26a1100/\u26a1300, >\u26a1500 waits 24h"
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
  },
  "postGuestsApi:cancelPurchase": {
   "gap": "3",
-  "note": "money \u2014 confirm card + Always allow within \u26a1100/\u26a1300, >\u26a1500 waits 24h"
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
  },
  "postGuestsApi:startPostCheckout": {
   "gap": "3",
-  "note": "money \u2014 confirm card + Always allow within \u26a1100/\u26a1300, >\u26a1500 waits 24h"
+  "note": "money — confirm card + Always allow within ⚡100/⚡300, >⚡500 waits 24h"
  },
  "postGuestsApi:addPostGuest": {
   "gap": "2"
@@ -713,7 +713,7 @@
   "exempt": "plumbing / guest-token page / pipeline, not a member act"
  },
  "assistantAllowanceApi:confirmProposal": {
-  "exempt": "the person's own tap on a confirm card \u2014 never the assistant's"
+  "exempt": "the person's own tap on a confirm card — never the assistant's"
  },
  "assistantAllowanceApi:cancelProposal": {
   "exempt": "the person's own tap on a confirm card"
@@ -752,7 +752,7 @@
   "exempt": "plumbing / guest-token page / pipeline, not a member act"
  },
  "calendarApi:syncDraftHold": {
-  "exempt": "Plumbing of Compose's draft autosave \u2014 the hold follows the post_drafts row; draft_event writes the draft, and the hold is minted when the member opens it."
+  "exempt": "Plumbing of Compose's draft autosave — the hold follows the post_drafts row; draft_event writes the draft, and the hold is minted when the member opens it."
  },
  "pollApi:createPollOptions": {
   "tool": "draft_event poll_times (Compose writes the options on the member's Post)"
@@ -764,22 +764,22 @@
   "gap": "2"
  },
  "pollApi:guestPoll": {
-  "exempt": "Off-Lichen guest page read by invitation token \u2014 no member, no assistant."
+  "exempt": "Off-Lichen guest page read by invitation token — no member, no assistant."
  },
  "pollApi:guestPollVote": {
-  "exempt": "Off-Lichen guest voting by invitation token \u2014 no member, no assistant."
+  "exempt": "Off-Lichen guest voting by invitation token — no member, no assistant."
  },
  "knockReplyApi:replyToKnock": {
   "tool": "draft_knock_reply"
  },
  "calendarApi:carryDraftZoom": {
-  "exempt": "Plumbing inside Compose's Post \u2014 moves the draft's Zoom room to the live event; not a member-facing act of its own."
+  "exempt": "Plumbing inside Compose's Post — moves the draft's Zoom room to the live event; not a member-facing act of its own."
  },
  "calendarApi:setEventLinkAccess": {
   "gap": "3"
  },
  "eventGuestsApi:joinEventByLink": {
-  "exempt": "A member coming to an event through its shareable link \u2014 the person's own tap on the guest page."
+  "exempt": "A member coming to an event through its shareable link — the person's own tap on the guest page."
  },
  "trashApi:trashPostDraft": {
   "tool": "delete_draft"
@@ -827,6 +827,24 @@
   "tool": "revenue_streams"
  },
  "assistantFeedApi:deleteConvo": {
-  "exempt": "erasing the conversation with the assistant itself is the member's own hand on its memory \u2014 the assistant never deletes its own history"
+  "exempt": "erasing the conversation with the assistant itself is the member's own hand on its memory — the assistant never deletes its own history"
+ },
+ "calendarApi:createFeedShare": {
+  "tool": "share_calendar"
+ },
+ "calendarApi:setFeedShareDetail": {
+  "tool": "share_calendar"
+ },
+ "calendarApi:revokeFeedShare": {
+  "tool": "share_calendar"
+ },
+ "calendarApi:markFeedShareSent": {
+  "exempt": "the PERSON's send tap on the share card — the brain proposes via share_calendar, never sends"
+ },
+ "calendarApi:sendFeedShareChat": {
+  "exempt": "the PERSON's send tap on the share card — the brain proposes via share_calendar, never sends"
+ },
+ "calendarApi:sendFeedShareEmail": {
+  "exempt": "the PERSON's send tap on the share card — the brain proposes via share_calendar, never sends"
  }
 }

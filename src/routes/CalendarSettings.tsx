@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import TimeField from '../components/TimeField';
 import FitSelect from '../components/FitSelect';
+import CalendarShares from '../components/CalendarShares';
 import { useAuth } from '../auth/AuthProvider';
 import { postAssistantHandoff, renameConvo } from '../lib/assistantFeedApi';
 import { supabase } from '../lib/supabase';
@@ -1516,6 +1517,7 @@ export default function CalendarSettings() {
             </>
           )}
         </div>
+        <CalendarShares />
         {/* ── My Lichen calendar — who sees it ── */}
         <div className="cedit__field">
           <span className="cedit__label">My Lichen calendar &mdash; who sees it</span>

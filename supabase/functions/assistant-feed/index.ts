@@ -343,7 +343,7 @@ const CALENDAR_TOOLS = [
   // no arguments, the trigger's profile is the only possible owner.
   {
     name: 'calendar_feed_link',
-    description: 'Their private link for seeing the LICHEN calendar inside Google/Apple/Outlook (the reverse of importing Google into Lichen). Mints the link if none exists, returns the standing one otherwise — no input. A "Copy your calendar link" button is attached under your reply automatically, so NEVER paste the raw URL or code fences into the reply text — the long link breaks the bubble. Give the steps: in Google Calendar, Settings \u2192 Add calendar \u2192 From URL, paste what the button copied. Say plainly: anyone holding the link can read their calendar, so keep it private (rotating it in Calendar settings kills a leaked link), and Google refreshes subscribed feeds on its own schedule, often every 12\u201324 hours.',
+    description: 'Their OWN private link for seeing the LICHEN calendar inside THEIR Google/Apple/Outlook (the reverse of importing Google into Lichen). To share their calendar with SOMEONE ELSE (a partner, a colleague), use share_calendar instead — that person gets their own link, a detail level, and a send card (Lichen chat / text / email); never hand this personal link to another person. Mints the link if none exists, returns the standing one otherwise — no input. A "Copy your calendar link" button is attached under your reply automatically, so NEVER paste the raw URL or code fences into the reply text — the long link breaks the bubble. Give the steps: in Google Calendar, Settings \u2192 Add calendar \u2192 From URL, paste what the button copied. Say plainly: anyone holding the link can read their calendar, so keep it private (rotating it in Calendar settings kills a leaked link), and Google refreshes subscribed feeds on its own schedule, often every 12\u201324 hours.',
     input_schema: { type: 'object', properties: {}, required: [] },
   },
   // THE CALENDAR BRAIN IS AN ADMIN (founder 2026-11-02: "I approve a therapy
@@ -645,6 +645,25 @@ const POST_TOOLS = [
         title: { type: 'string', description: 'The draft\'s title as they call it.' },
         which: { type: 'string', enum: ['only', 'all_but_newest', 'all'], description: 'Default "only" = there must be exactly one match.' },
         saved_on: { type: 'string', description: 'YYYY-MM-DD — delete only the copy last saved that day.' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    // EDITING A DRAFT IN PLACE (founder 2026-11-15, via her brain's own dev
+    // report: "my draft tools only let me create or delete — there's no
+    // edit"). The server holds the FULL draft, so nothing is ever truncated.
+    name: 'edit_draft',
+    description: 'Change one of their OWN unpublished post drafts in place, matched by title (my_post_drafts lists them) — nothing is retyped, the full body stays intact. areas REPLACES where it will post (marketplace, work, courses, food, art, places, library, travel; empty list = just the feeds); add_areas / remove_areas adjust it instead. new_title / new_body only when they asked for new words. Events can\'t be added here (the event composer owns RSVPs). Several drafts with the same title: pass saved_on (YYYY-MM-DD) or apply_to_all=true. Publishing stays their tap on Post — hand the Review door.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        areas: { type: 'array', items: { type: 'string' } },
+        add_areas: { type: 'array', items: { type: 'string' } },
+        remove_areas: { type: 'array', items: { type: 'string' } },
+        new_title: { type: 'string' }, new_body: { type: 'string' },
+        saved_on: { type: 'string' }, apply_to_all: { type: 'boolean' },
       },
       required: ['title'],
     },
@@ -1375,7 +1394,7 @@ Deno.serve(async (req) => {
       + '\n- EVENTS: draft_event fills the event composer as far as they have told you (date, time, place, guests, visibility, a guest list to save) — never tell them to go create it by hand. Anything not yet decided stays blank for them. Nothing is sent until their tap on Post.'
       + '\n- TIME POLLS: when they want guests to choose the time ("let them vote between Saturday and Sunday"), pass poll_times (2–12 options) to draft_event, plus a deadline, wait-for-everyone, auto-book vs confirm, and their rules for choosing if they said. Guests get one automatic reminder; the best-supported time (their rules first) is chosen and everyone is told.'
       + '\n- INVITATION DESIGN BY CONVERSATION: design_invite changes any Studio choice on a draft or posted event — template, words, typeface, colours, liner, backdrop, and the two photo slots (card front / inside). When they describe a look ("more elegant", "gold on navy", "the group photo outside, the candle photo inside"), DO it, say what you set, and offer the next tweak — the review-and-refine loop. Never send them to the Studio for something you can set.'
-      + '\n- my_post_drafts reads their unpublished drafts when they want help finishing one; delete_draft removes drafts they ask you to delete (several copies with one title → ask which, or keep the newest).'
+      + '\n- my_post_drafts reads their unpublished drafts when they want help finishing one; delete_draft removes drafts they ask you to delete (several copies with one title → ask which, or keep the newest); edit_draft changes a draft IN PLACE — where it posts (e.g. add Library), its title or body — with the full text intact, so never tell them to retarget a draft by hand or recreate it.'
       ;
   }
 
@@ -1383,6 +1402,7 @@ Deno.serve(async (req) => {
     ? '\n\nTHEIR LIFE, BY WORD (the parity rule — anything they can do by hand on a screen, you do from their words): my_lists then change_task (done, move, rename, delete), budget_line, drive_folder (create, add/remove a post), save_or_hide_post, rsvp, set_candle. Do these directly when asked and report exactly what changed — they are the member\'s own, private, and undoable. Never answer "go do it on the X screen" when one of these fits.'
       + '\n\nACTS THAT NEED THEIR YES (confirm card + Always allow): send_currentcy (money to another member), network_signal (trust / recommend / weave), space_membership (ask to join / leave), set_money_floor (their Current-cy floor — never Always allow). Use the names and figures exactly as they wrote them. Each one PROPOSES — the card under your reply is where THEY decide; never say it happened unless the tool says done. They can tap Always allow to skip the card next time (money stays capped at ⚡100 a send, ⚡300 a day; anything over ⚡500 waits 24 hours, cancellable). You can never grant that allowance yourself.'
       + '\n\nINVITATIONS & LINKS: add_calendar_event puts an event on their own calendar; invite_to_event invites people to an event they host by name or email (members get it in Lichen and, with calendar=true, as a real Google/Apple/Outlook invitation at their signup email — never say you can see that address; saved contacts on their own lists supply outside emails) — it never sends, the card under your reply is their Send; my_event with make_link=true makes the event\'s invite link and link_access sets who it lets in (anyone / invited [others ask, they approve] / members / circles with exact group names). DRAFTS: my_calendar_drafts lists their draft calendar events (with Open doors) and block=true/false makes a draft hold its time or stop holding it — an unblocked draft is a dotted outline that never reads as busy. Never tell them to go do it by hand.'
+      + '\n\nSHARING THEIR CALENDAR: share_calendar gives someone (by name, or an email/cell they typed) their OWN private link to see this calendar in Google/Apple/Outlook — a card under your reply holds the message and the send buttons (Lichen chat for members, a text from their own phone, email). Always say in plain words what that person will see (the result\'s `sees`), and when it is the full-detail level mention that session titles show too and "Only busy times" is one tap on the card. action=list / action=stop manage who has a link. Never hand their personal calendar_feed_link to another person — that is theirs alone.'
       + '\n\nREPLYING AT THE DOOR: my_knocks lists people waiting to join that they can answer; draft_knock_reply drafts a personal email back WITHOUT letting them in (their words, their booking link if asked). It never sends — the card under your reply is where they edit and tap Send. If the message already holds their booking link, don\'t add it again.'
     : '';
   const mailRule = canMail
@@ -1460,6 +1480,7 @@ Deno.serve(async (req) => {
   const gdriveImports: Record<string, unknown>[] = [];
   // Calendar invitations drafted this exchange — a Send card the PERSON taps.
   const calInvites: Record<string, unknown>[] = [];
+  const calShares: Record<string, unknown>[] = [];
   const mailReconnect: string[] = [];
   // The space-side twins of readPage/patchMe — scoped to the THREAD's space
   // (or General's verified selection), never a model-supplied id.
@@ -1524,6 +1545,7 @@ Deno.serve(async (req) => {
         .map((p: { body?: string }) => p.body ?? '').join(' ');
       const lr = await runLifeTool(sb, profile_id, name, input as Record<string, unknown>, offSections, trigger?.source_post_id ?? null, lifeMemberText);
       if (name === 'invite_to_event' && lr.ok && lr.invite) { calInvites.push(lr.invite as Record<string, unknown>); delete lr.invite; }
+      if (name === 'share_calendar' && lr.ok && lr.share) { calShares.push(lr.share as Record<string, unknown>); delete lr.share; }
       if (name === 'drive_doc' && lr.ok) {
         // The file it just built or touched rides as a real Open button.
         const door = lr.door as { path: string; label: string } | undefined;
@@ -3113,6 +3135,41 @@ Deno.serve(async (req) => {
         note: 'Moved to their trash (Drive → Drive trash, or /trash) — they can restore it until they empty it. An event draft\'s calendar hold went with it.' };
     }
 
+    if (name === 'edit_draft') {
+      const AREAS = ['marketplace', 'work', 'courses', 'food', 'art', 'places', 'library', 'travel'];
+      const t = String(input.title ?? '').trim().slice(0, 200);
+      if (!t) return { ok: false, error: 'Which draft? Name it by its title.' };
+      const rows = await (await sb(`post_drafts?profile_id=eq.${profile_id}&draft->>title=ilike.${encodeURIComponent(t)}&select=id,draft,updated_at&order=updated_at.desc`)).json();
+      let list = (Array.isArray(rows) ? rows : []) as { id: string; draft: Record<string, unknown>; updated_at: string }[];
+      if (!list.length) return { ok: false, error: `No draft of theirs is titled "${t}" — read my_post_drafts for the exact titles.` };
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(String(input.saved_on ?? '')) ? String(input.saved_on) : null;
+      if (day) list = list.filter((r) => r.updated_at.slice(0, 10) === day);
+      if (list.length > 1 && input.apply_to_all !== true) return { ok: false, error: `${list.length} drafts are titled "${t}" (saved ${list.map((r) => r.updated_at.slice(0, 16).replace('T', ' ')).join('; ')}) — ask which, then pass saved_on, or apply_to_all=true.` };
+      if (!list.length) return { ok: false, error: 'No draft matches that date.' };
+      const clean = (x: unknown) => (Array.isArray(x) ? x : []).map((a) => String(a).toLowerCase().trim()).filter((a) => AREAS.includes(a));
+      const asked = [...(Array.isArray(input.areas) ? input.areas : []), ...(Array.isArray(input.add_areas) ? input.add_areas : [])].map((a) => String(a).toLowerCase());
+      if (asked.includes('events')) return { ok: false, error: 'Events can\'t be added to a post draft — the event composer owns RSVPs. Offer draft_event instead.' };
+      const changes: string[] = [];
+      for (const r of list) {
+        const d = { ...r.draft };
+        const before = Array.isArray(d.areas) ? (d.areas as string[]) : [];
+        let areas = [...before];
+        if (Array.isArray(input.areas)) areas = clean(input.areas).concat(before.filter((a) => a === 'events'));
+        for (const a of clean(input.add_areas)) if (!areas.includes(a)) areas.push(a);
+        const rem = clean(input.remove_areas);
+        areas = areas.filter((a) => !rem.includes(a));
+        if (JSON.stringify(areas) !== JSON.stringify(before)) { d.areas = areas; changes.push(`where: ${before.join(', ') || 'just the feeds'} → ${areas.join(', ') || 'just the feeds'}`); }
+        if (typeof input.new_title === 'string' && input.new_title.trim()) { changes.push(`title: "${d.title ?? ''}" → "${input.new_title.trim()}"`); d.title = input.new_title.trim().slice(0, 200); }
+        if (typeof input.new_body === 'string' && input.new_body.trim()) { d.body = input.new_body; changes.push('new body text'); }
+        const u = await sb(`post_drafts?id=eq.${r.id}&profile_id=eq.${profile_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ draft: d, updated_at: new Date().toISOString() }) });
+        if (!u.ok) return { ok: false, error: `The draft wouldn't save: ${(await u.text()).slice(0, 140)}` };
+      }
+      if (!changes.length) return { ok: true, change: 'nothing needed changing — the draft already reads that way' };
+      for (const r of list) postDraftDoors.push({ id: r.id, title: String(r.draft.title ?? t) });
+      return { ok: true, change: `updated ${list.length} draft${list.length === 1 ? '' : 's'} titled "${t}" — ${[...new Set(changes)].join('; ')}`,
+        note: 'Still a draft — a Review & post button is under your reply; nothing is published until they press Post. Library is curtained for alpha (only admins see it yet).' };
+    }
+
     if (name === 'update_post') {
       const t = String(input.title ?? '').trim();
       if (!t) return { ok: false, error: 'Which post? Give its exact title from my_posts.' };
@@ -3298,7 +3355,7 @@ Deno.serve(async (req) => {
     set_booking_type_active: 'calendar', add_task: 'calendar',
     calendar_feed_link: 'calendar', my_event: 'events',
     my_courses: 'courses', create_course: 'courses', update_course: 'courses',
-    my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace', draft_event: 'events', design_invite: 'events', delete_draft: 'marketplace',
+    my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace', draft_event: 'events', design_invite: 'events', delete_draft: 'marketplace', edit_draft: 'marketplace',
     my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
     save_post_to_drive: 'drive', google_drive: 'drive',
     ...LIFE_TOOL_SECTION,
@@ -3566,6 +3623,7 @@ Deno.serve(async (req) => {
   for (const d of mailDrafts) replyAttachments.push(d);
   for (const d of gdriveImports) replyAttachments.push(d);
   for (const d of calInvites) replyAttachments.push(d);
+  for (const d of calShares) replyAttachments.push(d);
   // SAFETY NET (founder 2026-11-14 — asked for "the reconnect card" and the
   // model apologised that it had none, then called draft_mail instead): a
   // member who plainly asks to reconnect gets the card, whatever the model chose.

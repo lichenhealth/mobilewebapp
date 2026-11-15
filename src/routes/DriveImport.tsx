@@ -7,6 +7,7 @@ import { mailEnabled, listMailAccounts, connectMail, type MailAccount } from '..
 import {
   listGDrive, trashGDrive, importGDriveFile, listGDriveImports, lichenKindFor, fmtSize,
   type GFile, type GView, type ImportRow,
+  importGDriveFolder,
 } from '../lib/gdriveApi';
 import './DriveImport.css';
 
@@ -84,6 +85,21 @@ export default function DriveImport() {
 
   const toggle = (id: string) => setPicked((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const setRow = (id: string, s: RowState) => setRows((cur) => ({ ...cur, [id]: s }));
+
+  // A WHOLE FOLDER (founder 2026-11-15) — becomes a Lichen folder holding
+  // every file, re-created; sub-folders become "Parent / Sub" folders.
+  const bringFolder = async (f: GFile) => {
+    if (!account) return;
+    setRow(f.id, { status: 'busy' });
+    try {
+      const r = await importGDriveFolder(account, f, (n, name) => setWorking(`Bringing over “${f.name}” — ${n}: ${name}`));
+      setRow(f.id, {
+        status: r.done || !r.failed.length ? 'done' : 'error', path: r.folders[0] ? `/collections/${r.folders[0].id}` : '/drive',
+        msg: `${r.done} file${r.done === 1 ? '' : 's'} into ${r.folders.length} Lichen folder${r.folders.length === 1 ? '' : 's'}${r.failed.length ? ` · ${r.failed.length} couldn’t come over (${r.failed.slice(0, 3).map((x) => x.name).join(', ')}${r.failed.length > 3 ? '…' : ''})` : ''}`,
+      });
+    } catch (e) { setRow(f.id, { status: 'error', msg: e instanceof Error ? e.message : String(e) }); }
+    finally { setWorking(null); }
+  };
 
   const bringOver = async (list: GFile[]) => {
     if (!account || !list.length) return;
@@ -239,7 +255,7 @@ export default function DriveImport() {
                     <span className="gdi__meta">
                       {[isFolder ? 'Folder' : label, fmtSize(f.size), shortDate(f.modifiedTime), owner ? `from ${owner}` : ''].filter(Boolean).join(' · ')}
                     </span>
-                    {(st?.status === 'done' || (had && !st)) && (
+                    {!isFolder && (st?.status === 'done' || (had && !st)) && (
                       <span className="gdi__ok">
                         On Lichen ✓ <button className="link-cue" onClick={() => navigate(st?.path ?? (had?.lichen_kind && ['doc', 'sheet', 'slides'].includes(had.lichen_kind) ? `/docs/${had.lichen_id}` : '/drive'))}>Open</button>
                         {st?.msg && <span className="gdi__note"> · {st.msg}</span>}
@@ -248,6 +264,15 @@ export default function DriveImport() {
                     {st?.status === 'trashed' && <span className="gdi__meta">{st.msg ?? 'In Google Trash — recoverable there for 30 days'}{st.path ? ' · on Lichen ✓' : ''}</span>}
                     {st?.status === 'error' && <span className="gdi__bad">{st.msg}</span>}
                     {st?.status === 'busy' && <span className="gdi__meta">Working…</span>}
+                    {isFolder && view !== 'trash' && st?.status !== 'busy' && (
+                      <div className="gdi__acts">
+                        <button onClick={() => void bringFolder(f)}>{st?.status === 'done' ? 'Bring the folder over again' : 'Bring the whole folder to Lichen'}</button>
+                        <button className="gdi__act--trash" onClick={() => void trashThese([f])}>Trash in Google</button>
+                      </div>
+                    )}
+                    {isFolder && st?.status === 'done' && (
+                      <span className="gdi__ok">On Lichen ✓ <button className="link-cue" onClick={() => navigate(st.path ?? '/drive')}>Open</button> · <span className="gdi__note">{st.msg}</span></span>
+                    )}
                     {!isFolder && st?.status !== 'trashed' && st?.status !== 'busy' && (
                       <div className="gdi__acts">
                         {view === 'trash' ? (

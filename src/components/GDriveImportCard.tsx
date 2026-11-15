@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { importGDriveFile, trashGDrive, lichenKindFor, type GFile } from '../lib/gdriveApi';
+import { importGDriveFile, importGDriveFolder, trashGDrive, lichenKindFor, type GFile } from '../lib/gdriveApi';
 import './GDriveImportCard.css';
 
 /** FILES THE BRAIN PICKED FROM GOOGLE DRIVE (founder 2026-11-15: "import
@@ -21,8 +21,13 @@ export default function GDriveImportCard({ accountId, account, files, thenTrash:
     for (const f of files) {
       setState((s) => ({ ...s, [f.id]: { busy: true } }));
       try {
-        const r = await importGDriveFile({ id: accountId, email: account }, f);
-        setState((s) => ({ ...s, [f.id]: { ok: r.path } }));
+        if (lichenKindFor(f.mimeType, f.name).kind === 'folder') {
+          const r = await importGDriveFolder({ id: accountId, email: account }, f);
+          setState((s) => ({ ...s, [f.id]: { ok: r.folders[0] ? `/collections/${r.folders[0].id}` : '/drive' } }));
+        } else {
+          const r = await importGDriveFile({ id: accountId, email: account }, f);
+          setState((s) => ({ ...s, [f.id]: { ok: r.path } }));
+        }
         ok.push(f.id);
       } catch (e) { setState((s) => ({ ...s, [f.id]: { err: (e as Error).message } })); }
     }

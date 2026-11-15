@@ -177,3 +177,47 @@ export function fmtSize(size?: string): string {
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
+
+export type FolderImportResult = { folders: { id: string; name: string }[]; done: number; failed: { name: string; error: string }[] };
+
+/** A WHOLE GOOGLE FOLDER (founder 2026-11-15: "allow moving folders from
+ *  google drive and keep the contents within them as lichen spreadsheets,
+ *  slides, etc"). The folder becomes a Lichen folder holding every file,
+ *  each re-created as a Lichen doc/sheet/slides/file. Lichen folders don't
+ *  nest, so a sub-folder becomes its own folder named "Parent / Sub" (up to
+ *  3 levels, 200 files). */
+export async function importGDriveFolder(
+  account: { id: string; email: string }, folder: GFile,
+  onProgress?: (n: number, name: string) => void,
+): Promise<FolderImportResult> {
+  const { createCollection, addToCollection } = await import('./collectionsApi');
+  const out: FolderImportResult = { folders: [], done: 0, failed: [] };
+  let budget = 200;
+  async function walk(f: GFile, label: string, depth: number) {
+    const colId = await createCollection(label.slice(0, 120));
+    out.folders.push({ id: colId, name: label });
+    let page: string | undefined;
+    const subs: GFile[] = [];
+    do {
+      const r = await listGDrive(account.id, { folder: f.id, view: 'folder', pageToken: page });
+      for (const child of r.files) {
+        const k = lichenKindFor(child.mimeType, child.name).kind;
+        if (k === 'folder') { subs.push(child); continue; }
+        if (k === 'none') { out.failed.push({ name: child.name, error: 'can’t come over yet' }); continue; }
+        if (budget-- <= 0) { out.failed.push({ name: child.name, error: 'past the 200-file limit for one go' }); continue; }
+        try {
+          onProgress?.(out.done + 1, child.name);
+          const res = await importGDriveFile(account, child);
+          const target = ['doc', 'sheet', 'slides'].includes(res.kind) ? 'doc' : 'file';
+          await addToCollection(colId, res.id, target as 'doc' | 'file');
+          out.done++;
+        } catch (e) { out.failed.push({ name: child.name, error: (e as Error).message }); }
+      }
+      page = r.next ?? undefined;
+    } while (page);
+    if (depth < 3) for (const s of subs) await walk(s, `${label} / ${s.name}`, depth + 1);
+    else for (const s of subs) out.failed.push({ name: s.name, error: 'folder nested too deep — bring it over on its own' });
+  }
+  await walk(folder, folder.name, 1);
+  return out;
+}
