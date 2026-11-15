@@ -6,7 +6,7 @@ import { webSafeImage } from './heic';
  *  a PRIVATE bucket ('drive', signed URLs only) + a drive_files row. Strictly
  *  owner-only, no sharing, and NO assistant path ever reads them (the
  *  post_drafts posture — what sits in your Drive is yours until you post). */
-export type DriveFileKind = 'photo' | 'video' | 'audio';
+export type DriveFileKind = 'photo' | 'video' | 'audio' | 'file';
 
 export interface DriveFileRow {
   id: string;

@@ -185,6 +185,7 @@ export default function Saved() {
   const filePhotoRef = useRef<HTMLInputElement>(null);
   const fileVideoRef = useRef<HTMLInputElement>(null);
   const fileAudioRef = useRef<HTMLInputElement>(null);
+  const fileAnyRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!me) return;
     let live = true;
@@ -438,7 +439,7 @@ export default function Saved() {
     });
     for (const f of filesVisible) rows.push({
       t: f.created_at, key: 'file:' + f.id,
-      icon: f.kind === 'video' ? 'video' : f.kind === 'audio' ? 'mic' : 'image',
+      icon: f.kind === 'video' ? 'video' : f.kind === 'audio' ? 'mic' : f.kind === 'file' ? 'paperclip' : 'image',
       photo: f.kind === 'photo' ? fileUrls[f.path] : null,
       title: f.title ?? 'A file',
       meta: `${f.kind[0].toUpperCase() + f.kind.slice(1)} · added ${shortDate(f.created_at)}`,
@@ -758,6 +759,9 @@ export default function Saved() {
                 <button onClick={() => { setAddOpen(false); fileAudioRef.current?.click(); }}>
                   <Icon name="mic" size={16} /> Audio
                 </button>
+                <button onClick={() => { setAddOpen(false); fileAnyRef.current?.click(); }}>
+                  <Icon name="paperclip" size={16} /> File
+                </button>
                 <button onClick={() => { setAddOpen(false); setNewKind('collection'); setNewFolderOpen(true); }}>
                   <Icon name="drive" size={16} /> New folder
                 </button>
@@ -772,6 +776,8 @@ export default function Saved() {
               onChange={(e) => { void addFile('video', e.target.files?.[0]); e.target.value = ''; }} />
             <input ref={fileAudioRef} type="file" accept="audio/*" hidden
               onChange={(e) => { void addFile('audio', e.target.files?.[0]); e.target.value = ''; }} />
+            <input ref={fileAnyRef} type="file" hidden
+              onChange={(e) => { void addFile('file', e.target.files?.[0]); e.target.value = ''; }} />
           </div>
           <AssistantDoor section="saved" size={38} label="Your assistant — what you've been keeping" />
           <span className="saved__bar-divider" aria-hidden="true" />
@@ -1072,7 +1078,7 @@ export default function Saved() {
               onKeyDown={(e) => { if (e.key === 'Enter') void openFile(f); }}>
               {f.kind === 'photo' && fileUrls[f.path]
                 ? <img className="drive__row-thumb" src={fileUrls[f.path]} alt="" loading="lazy" />
-                : <span className="drive__row-icon"><Icon name={f.kind === 'video' ? 'video' : f.kind === 'audio' ? 'mic' : 'image'} size={16} /></span>}
+                : <span className="drive__row-icon"><Icon name={f.kind === 'video' ? 'video' : f.kind === 'audio' ? 'mic' : f.kind === 'file' ? 'paperclip' : 'image'} size={16} /></span>}
               <span className="drive__row-main">
                 <span className="drive__row-title">{f.title ?? 'A file'}</span>
                 <span className="drive__row-meta">{f.kind[0].toUpperCase() + f.kind.slice(1)} · added {shortDate(f.created_at)}{heldIn.get(f.id)?.length ? ` · in ${heldIn.get(f.id)!.join(', ')}` : ''}</span>
