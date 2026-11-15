@@ -207,9 +207,15 @@ function HtmlFrame({ accountId, m, foldQuote }: { accountId: string; m: MailMess
         e.preventDefault();
         window.open(a.href, '_blank', 'noopener,noreferrer');
       });
+      // The pointing hand over a link, the plain arrow everywhere else — an
+      // email's own cursor rules (a text I-beam on a covered button) never win.
+      const cur = d.createElement('style');
+      cur.textContent = 'html,html *{cursor:default!important}html.lichen-onlink,html.lichen-onlink *{cursor:pointer!important}';
+      d.head?.appendChild(cur);
       d.addEventListener('mousemove', (e) => {
-        d.documentElement.style.cursor = linkAt(e.clientX, e.clientY) ? 'pointer' : '';
+        d.documentElement.classList.toggle('lichen-onlink', !!linkAt(e.clientX, e.clientY));
       });
+      d.addEventListener('mouseleave', () => d.documentElement.classList.remove('lichen-onlink'));
       d.querySelectorAll('img').forEach((img) => img.addEventListener('load', fit));
       ro = new ResizeObserver(fit);
       ro.observe(d.body);
