@@ -31,7 +31,7 @@ export async function listMailAccounts(): Promise<MailAccount[]> {
   return (data as MailAccount[] | null) ?? [];
 }
 
-async function call<T>(fn: string, body: Record<string, unknown>): Promise<T> {
+export async function call<T>(fn: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke(fn, { body });
   if (error) {
     // The function's own words ride the response body.

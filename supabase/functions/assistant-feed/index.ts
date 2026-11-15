@@ -34,6 +34,7 @@ import { readPageState, writePageDraft, DRAFT_NOTE } from '../_shared/pageDraft.
 import { FILE_DEV_REPORT_TOOL, fileDevReport } from '../_shared/devReport.ts';
 import { LIFE_TOOLS, LIFE_TOOL_SECTION, runLifeTool } from '../_shared/lifeTools.ts';
 import { MAIL_TOOLS, MAIL_TOOL_NAMES, runMailTool } from '../_shared/mailTools.ts';
+import { GDRIVE_TOOLS, GDRIVE_TOOL_NAMES, runGDriveTool } from '../_shared/gdriveTools.ts';
 import { mailAccountsOf } from '../_shared/gmail.ts';
 import { mailTester } from '../_shared/gmail.ts';
 import { KNOCK_TOOLS, KNOCK_TOOL_NAMES, runKnockTool, type KnockDraft } from '../_shared/knockTools.ts';
@@ -1209,6 +1210,15 @@ Deno.serve(async (req) => {
       canMail = Array.isArray(n) && n.length > 0 && await mailTester(profile_id);
     } catch { canMail = false; }
   }
+  // GOOGLE DRIVE → LICHEN DRIVE (founder 2026-11-15): same Google connection
+  // as Mail; the Drive section's switch governs it.
+  let canGDrive = false;
+  if (canLife && !offSections.has('saved')) {
+    try {
+      const n = await (await sb(`mail_accounts?profile_id=eq.${profile_id}&select=id&limit=1`)).json();
+      canGDrive = Array.isArray(n) && n.length > 0 && await mailTester(profile_id);
+    } catch { canGDrive = false; }
+  }
   let canReadPostDrafts = !spaceId;
   let canReadIntake = !spaceId;
   if (!spaceId) {
@@ -1381,6 +1391,9 @@ Deno.serve(async (req) => {
       + ' RECONNECTING: whenever an inbox needs reconnecting (expired, or a new permission like filters) or they ask for a reconnect card, CALL mail_reconnect — it puts one-tap Reconnect buttons in this conversation that bring them straight back here. Never send them to the Mail screen for it, and never call another tool in its place.'
       + ' These abilities are newer than some earlier replies in this conversation: if you said before that you could not unsubscribe or hand a reconnect card, that was true then and is not now — use the tool.'
     : '';
+  const gdriveRule = canGDrive
+    ? '\n\nTHEIR GOOGLE DRIVES (the same Google accounts as their mail): google_drive lists, searches, shows recent/shared, and helps them clean up — "trash" moves files to that account\'s Google Trash (recoverable 30 days) only when they ask in their own words; "import" puts a card under your reply whose button re-creates each file as a Lichen doc, spreadsheet, presentation or Drive file (then_trash=true trashes the Google copy after). Help them sort: list, group what looks keep-worthy vs. clutter, and ask before trashing anything they did not name. Say an import is waiting for their tap — never that it already happened. The screen for this is Drive → + → From Google Drive (/drive/import). If an account needs a Reconnect for Drive, call mail_reconnect.'
+    : '';
   let calendarRule = '';
   if (canCalendar) {
     calendarRule = '\n\nYOU CAN ACTUALLY CHANGE THEIR CALENDAR SETTINGS. They have turned on "Let Claude edit my page directly", which arms your calendar tools here. How to hold it:'
@@ -1444,6 +1457,7 @@ Deno.serve(async (req) => {
   // Knock replies drafted this exchange — each a Send card the PERSON taps.
   const knockDrafts: KnockDraft[] = [];
   const mailDrafts: Record<string, unknown>[] = [];
+  const gdriveImports: Record<string, unknown>[] = [];
   // Calendar invitations drafted this exchange — a Send card the PERSON taps.
   const calInvites: Record<string, unknown>[] = [];
   const mailReconnect: string[] = [];
@@ -1493,6 +1507,14 @@ Deno.serve(async (req) => {
       for (const e of (mr.reconnect as string[] | undefined) ?? []) if (!mailReconnect.includes(e)) mailReconnect.push(e);
       if (mr.mailDraft) { mailDrafts.push({ type: 'mail_draft', ...(mr.mailDraft as Record<string, unknown>) }); delete mr.mailDraft; }
       return mr;
+    }
+    if (GDRIVE_TOOL_NAMES.has(name)) {
+      if (!canGDrive) return { ok: false, error: 'Google Drive isn\u2019t switched on for the assistant here.' };
+      const gr = await runGDriveTool(profile_id, input as Record<string, unknown>);
+      for (const e of gr.reconnect ?? []) if (!mailReconnect.includes(e)) mailReconnect.push(e);
+      delete gr.reconnect;
+      if (gr.importCard) { gdriveImports.push(gr.importCard); delete gr.importCard; }
+      return gr;
     }
     if (KNOCK_TOOL_NAMES.has(name)) {
       return await runKnockTool(sb, profile_id, isPlatformAdmin, name, input as Record<string, unknown>, knockDrafts);
@@ -3278,7 +3300,7 @@ Deno.serve(async (req) => {
     my_courses: 'courses', create_course: 'courses', update_course: 'courses',
     my_posts: 'marketplace', draft_post: 'marketplace', update_post: 'marketplace', draft_event: 'events', design_invite: 'events', delete_draft: 'marketplace',
     my_money_activity: 'currentcy', open_space_treasury: 'currentcy',
-    save_post_to_drive: 'drive',
+    save_post_to_drive: 'drive', google_drive: 'drive',
     ...LIFE_TOOL_SECTION,
     ...CONFIRM_TOOL_SECTION,
   };
@@ -3380,7 +3402,7 @@ Deno.serve(async (req) => {
         // inside the cached block it would bust the doctrine's prompt cache
         // on every exchange.
         system: [
-          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${identityRule}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${postsRule}${lifeRule}${mailRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${identityRule}${webRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${postsRule}${lifeRule}${mailRule}${gdriveRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
           ...(pulse ? [{ type: 'text', text: pulse }] : []),
         ],
         messages,
@@ -3405,6 +3427,7 @@ Deno.serve(async (req) => {
                      ...(canPosts ? POST_TOOLS : []),
                      ...(canLife ? [...LIFE_TOOLS, ...CONFIRM_TOOLS, ...KNOCK_TOOLS] : []),
                      ...(canMail ? MAIL_TOOLS : []),
+                     ...(canGDrive ? GDRIVE_TOOLS : []),
                      ...(canReadPostDrafts ? [READ_POST_DRAFTS_TOOL] : []),
                      ...(canReadIntake ? [READ_INTAKE_DRAFT_TOOL] : []),
                      ...(!spaceId ? [SEND_APP_DOOR_TOOL, SEARCH_HISTORY_TOOL] : [])],
@@ -3541,6 +3564,7 @@ Deno.serve(async (req) => {
   for (const d of confirmDoors) replyAttachments.push(d);
   for (const d of knockDrafts) replyAttachments.push(d);
   for (const d of mailDrafts) replyAttachments.push(d);
+  for (const d of gdriveImports) replyAttachments.push(d);
   for (const d of calInvites) replyAttachments.push(d);
   // SAFETY NET (founder 2026-11-14 — asked for "the reconnect card" and the
   // model apologised that it had none, then called draft_mail instead): a

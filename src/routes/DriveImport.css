@@ -1,0 +1,52 @@
+/* GOOGLE DRIVE → LICHEN DRIVE (founder 2026-11-15). Drive's row grammar. */
+.gdi { display: flex; flex-direction: column; gap: var(--s-4); padding-bottom: var(--s-8); }
+.gdi__connect { text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--s-3); color: var(--ink-soft); }
+.gdi__accts, .gdi__views { display: flex; flex-wrap: wrap; gap: 6px; }
+.gdi__pill { border: 1px solid var(--bone-edge); background: #fff; border-radius: var(--r-full); padding: 6px 12px;
+  font-size: 13px; color: var(--ink-soft); cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gdi__pill.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+.gdi__pill--add { border-style: dashed; border-color: var(--peach); color: var(--peach-deep); background: none; }
+.gdi__view { background: none; border: none; padding: 4px 2px; margin-right: 10px; font-size: 14px; font-weight: 300;
+  color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; }
+.gdi__view.is-on { font-weight: 400; color: var(--ink); border-bottom-color: var(--peach); }
+.gdi__search { display: flex; align-items: center; gap: var(--s-2); border: 1px solid var(--bone-edge); border-radius: var(--r-full);
+  background: #fff; padding: 6px 12px; color: var(--ink-muted); }
+.gdi__search:focus-within { border-color: var(--peach); }
+.gdi__search input { flex: 1; min-width: 0; border: none; outline: none; background: none; font: inherit; font-size: 14px; color: var(--ink); }
+.gdi__search input:focus-visible { outline: none; box-shadow: none; }
+.gdi__clear { background: none; border: none; color: var(--peach-deep); font-size: 13px; cursor: pointer; }
+.gdi__trail { font-size: 13px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.gdi__trail button { background: none; border: none; padding: 0; font: inherit; color: var(--peach-deep); cursor: pointer; }
+.gdi__err { border: 1px solid var(--red-deep); border-radius: var(--r-md, 12px); padding: var(--s-3); display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start; }
+.gdi__err p { margin: 0; font-size: 14px; color: var(--ink-soft); text-wrap: pretty; }
+.gdi__bar { display: flex; flex-direction: column; gap: var(--s-2); padding-bottom: var(--s-2); border-bottom: 1px solid var(--bone-edge); }
+.gdi__all, .gdi__then { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
+.gdi__bulk { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.gdi__trashbtn { background: none; border: 1px solid var(--bone-edge); border-radius: var(--r-full); padding: 6px 14px;
+  font-size: 13px; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+.gdi__trashbtn:hover { color: var(--red-deep); border-color: var(--red-deep); }
+.gdi__trashbtn.is-sure { background: var(--red-deep); border-color: var(--red-deep); color: #fff; }
+.gdi__working, .gdi__empty { margin: 0; font-size: 13px; color: var(--ink-muted); }
+.gdi__empty { text-align: center; margin: var(--s-6) 0; }
+.gdi__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.gdi__row { display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3) 0; border-bottom: 1px solid var(--bone-edge); }
+.gdi__row.is-gone { opacity: 0.55; }
+.gdi__check { flex: 0 0 18px; margin-top: 9px; width: 18px; height: 18px; accent-color: var(--peach-deep); }
+.gdi__icon { flex: 0 0 34px; height: 34px; border-radius: 50%; background: #fff; border: 1px solid var(--bone-edge);
+  display: grid; place-items: center; color: var(--peach-deep); }
+.gdi__main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gdi__name { font-size: 15px; color: var(--ink); overflow-wrap: anywhere; text-align: left; }
+.gdi__name--folder { background: none; border: none; padding: 0; font: inherit; font-size: 15px; cursor: pointer; }
+.gdi__name--folder:hover { color: var(--peach-deep); }
+.gdi__meta { font-size: 12px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.gdi__ok { font-size: 12px; color: var(--green-deep); }
+.gdi__ok button { background: none; border: none; padding: 0; font: inherit; color: var(--ink); cursor: pointer; }
+.gdi__note { color: var(--ink-muted); }
+.gdi__bad { font-size: 12px; color: var(--red-deep); text-wrap: pretty; }
+.gdi__acts { display: flex; flex-wrap: wrap; gap: var(--s-3); margin-top: 4px; }
+.gdi__acts button { background: none; border: none; padding: 2px 0; font-size: 13px; color: var(--peach-deep); cursor: pointer; white-space: nowrap; }
+.gdi__acts button:hover { text-decoration: underline; }
+.gdi__acts .gdi__act--trash { color: var(--ink-muted); }
+.gdi__acts .gdi__act--trash:hover { color: var(--red-deep); }
+.gdi__more { align-self: center; background: none; border: 1px solid var(--bone-edge); border-radius: var(--r-full); padding: 6px 16px; font-size: 13px; cursor: pointer; color: var(--ink-soft); }
+.gdi__fine { margin: 0; font-size: 12px; color: var(--ink-muted); text-wrap: pretty; }

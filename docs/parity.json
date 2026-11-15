@@ -808,8 +808,11 @@
  "trashApi:emptySpamKnocks": {
   "gap": "1"
  },
- "mailApi:listMailAccounts": {
-  "exempt": "read-only list of the member's connected inboxes"
+ "mailApi:call": {
+  "exempt": "plumbing: the one edge-fn caller every Mail/Drive helper rides; each act is decided on its own"
+ },
+ "gdriveApi:importGDriveFile": {
+  "tool": "google_drive"
  },
  "conciergeApi:setCareFunding": {
   "tool": "set_care_funding"

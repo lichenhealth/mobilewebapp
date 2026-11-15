@@ -762,6 +762,9 @@ export default function Saved() {
                 <button onClick={() => { setAddOpen(false); fileAnyRef.current?.click(); }}>
                   <Icon name="paperclip" size={16} /> File
                 </button>
+                <button onClick={() => { setAddOpen(false); navigate('/drive/import'); }}>
+                  <Icon name="drive" size={16} /> From Google Drive
+                </button>
                 <button onClick={() => { setAddOpen(false); setNewKind('collection'); setNewFolderOpen(true); }}>
                   <Icon name="drive" size={16} /> New folder
                 </button>
