@@ -85,7 +85,8 @@ export default function ValueFlowCard() {
       <h2 className="budg__h2">Value you&rsquo;ve given and received</h2>
       <p className="budg__empty vflow__lead">
         Every exchange — gift, trade or sale — with what changed hands, and beside
-        it what you feel it was truly worth. Only you see this. It&rsquo;s a record
+        it what you feel it was truly worth. Your word counts the moment you
+        set it; a Lichen steward takes a look after. Only you and the stewards see it. It&rsquo;s a record
         of your part in the rebalancing, never a balance owed: gifts flow to need,
         and giving earns no claim on receiving.
       </p>
@@ -152,7 +153,7 @@ export default function ValueFlowCard() {
                   } else {
                     const { data, error } = await supabase.from('true_values').update({ true_cents: tc, note }).eq('id', tv!.id).select('id').single();
                     if (error || !data) throw new Error(error?.message || 'Could not save.');
-                    upsert({ ...tv!, true_cents: tc, note });
+                    upsert({ ...tv!, true_cents: tc, note, review_status: 'pending', review_note: null });
                   }
                   setEditing(null);
                 }}
@@ -161,7 +162,10 @@ export default function ValueFlowCard() {
             ) : (
               <p className="vflow__tv">
                 {tv
-                  ? <>Truly worth <strong>{dollars(tv.true_cents)}</strong>{tv.note ? ` — ${tv.note}` : ''} · </>
+                  ? <>Truly worth <strong>{dollars(tv.true_cents)}</strong>{tv.note ? ` — ${tv.note}` : ''}
+                      {' · '}<span className={'vflow__rev vflow__rev--' + tv.review_status}>
+                        {tv.review_status === 'reviewed' ? 'reviewed ✓' : tv.review_status === 'questioned' ? `a steward has a question${tv.review_note ? `: ${tv.review_note}` : ''}` : 'a steward will take a look'}
+                      </span>{' · '}</>
                   : null}
                 <button className="vflow__tvbtn" onClick={() => setEditing(key)}>{tv ? 'Edit' : 'What was it truly worth? ›'}</button>
               </p>
@@ -256,7 +260,7 @@ function ManualForm({ onSaved, onCancel }: { onSaved: (t: TrueValue) => void; on
         <input className="budg__offer-in vflow__amt" inputMode="decimal" placeholder="$ truly worth" value={tr} onChange={(e) => setTr(numericAmount(e.target.value))} />
       </div>
       <input className="budg__offer-in" placeholder="Why — optional" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
-      {being && <p className="budg__empty vflow__fine">Naming {being.full_name} lets Lichen&rsquo;s stewards see — as a total, never your note — where a being has given more than it&rsquo;s received, so donations can go toward restoring it.</p>}
+      {being && <p className="budg__empty vflow__fine">Naming {being.full_name} adds to the totals Lichen&rsquo;s stewards use to see where a being has given more than it&rsquo;s received, so donations can go toward restoring it.</p>}
       <div className="vflow__formacts">
         <button className="btn btn-primary vflow__save" onClick={() => void go()}>Record it</button>
         <button className="vflow__tvbtn" onClick={onCancel}>Cancel</button>
