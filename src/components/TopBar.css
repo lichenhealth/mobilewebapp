@@ -247,3 +247,9 @@
 /* Reconnecting — a session on disk we can't reach yet. Quieter than the
    Sign in pill: nothing is wrong with the member, only the network. */
 .top-bar__signin--wait { opacity: 0.65; font-style: italic; cursor: default; }
+
+/* Phones: the section mark sits a touch lower (founder 2026-11-16, an arrow
+   drawn down from Drive's cloud — it read cramped against the top edge). */
+@media (max-width: 1023px) {
+  .top-bar__logo { margin-top: 10px; }
+}

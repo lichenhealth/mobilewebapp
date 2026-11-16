@@ -63,6 +63,8 @@ export type IconName =
   | 'slides'
   | 'palette'
   | 'paperclip'
+  | 'link'
+  | 'pencil'
   | 'phone'
   | 'pin'
   | 'plus'
@@ -335,6 +337,16 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0.25 0.73 24 24',
     strokeWidth: 1.6,
     content: <><path d="M20 12.5 12.5 20a5 5 0 0 1-7-7L13 5.5a3.5 3.5 0 1 1 5 5l-7.5 7.5a2 2 0 0 1-3-3l7-7" /></>,
+  },
+  'link': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2" /></>,
+  },
+  'pencil': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M15.5 4.5l4 4L8.5 19.5 4 20.5l1-4.5z" /><path d="M13.5 6.5l4 4" /></>,
   },
   'pin': {
     viewBox: '0 1.25 24 24',

@@ -50,6 +50,13 @@ import DriveContacts from '../components/DriveContacts';
 
 const DRIVE_LENSES = ['All', 'Saved', 'Created'];
 
+/** A post that is mostly a pointer elsewhere — an external resource, or one
+ *  carrying link previews — answers to the Links bubble. */
+function isLinkPost(p: { details?: Record<string, unknown> | null }): boolean {
+  const d = (p.details ?? {}) as { isResource?: boolean; previews?: unknown[] };
+  return !!d.isResource || (Array.isArray(d.previews) && d.previews.length > 0);
+}
+
 /** Which time shelf an item sits on — a drive's scannable chronology. */
 function groupOf(iso: string): string {
   const d = new Date(iso);
@@ -309,7 +316,12 @@ export default function Saved() {
   const [pick, setPick] = useState<string>(() =>
     new URLSearchParams(window.location.search).get('contacts') ? 'contacts' : 'recents');
   const [contactCount, setContactCount] = useState(0);
-  const foldOpen = (id: string) => !!query.trim() || (wide ? id === activePick : !!folds[id]);
+  // THE BUBBLES (founder 2026-11-16: "Maybe these should be bubbles not
+  // drop downs, so you can have (All) be a bubble that replaces Chronological
+  // and then you can select Folders and it shows just folders"): every width
+  // shows ONE section at a time — a bubble row on phones, the left list on
+  // desktop. A search still opens every section with its heads.
+  const foldOpen = (id: string) => !!query.trim() || id === activePick;
   const toggleFold = (id: string) => setFolds((cur) => {
     const next = { ...cur, [id]: !cur[id] };
     try { localStorage.setItem('lichen.driveFolds', JSON.stringify(next)); } catch { /* per-device nicety */ }
@@ -320,8 +332,8 @@ export default function Saved() {
 
   const toggleArea = (a: ServiceArea) => {
     setAreas((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
-    // Picking a section is asking to SEE its items — unfold them.
-    setFolds((cur) => (cur.items ? cur : { ...cur, items: true }));
+    // Picking a section lens is asking to SEE those items — show All.
+    setPick('recents');
   };
 
   const visible = useMemo(() => {
@@ -409,6 +421,9 @@ export default function Saved() {
   type RecentRow = {
     t: string; key: string; icon: IconName; photo?: string | null;
     title: string; meta: string; areas?: string[]; go: () => void;
+    post?: FeedPost;
+    /** Which bubble it answers to + whether it was saved (vs created). */
+    kind: string; saved?: boolean;
   };
   /** A folder's right-edge section icons: the union of what's inside — or,
    *  for a COURSE folder with nothing in it yet, the courses mark itself
@@ -425,7 +440,7 @@ export default function Saved() {
   const recents = useMemo<RecentRow[]>(() => {
     const rows: RecentRow[] = [];
     for (const c of foldersVisible) rows.push({
-      t: c.created_at, key: 'col:' + c.id, icon: folderIcon(c),
+      kind: 'folders', t: c.created_at, key: 'col:' + c.id, icon: folderIcon(c),
       title: c.name,
       meta: `Folder · ${c.item_count === 1 ? '1 item' : `${c.item_count} items`}`,
       areas: folderAreaList(c),
@@ -442,22 +457,25 @@ export default function Saved() {
         meta: `${p.author_id === me ? 'Created' : 'Saved'} ${shortDate(driveTime(p))}`,
         areas: postAreas(p),
         go: () => navigate(postOpenPath(p)),
+        post: p,
+        kind: isLinkPost(p) ? 'links' : 'posts',
+        saved: p.author_id !== me,
       });
     }
     for (const d of draftsVisible) rows.push({
-      t: d.updated_at, key: 'draft:' + d.id, icon: 'newsfeed',
+      kind: 'drafts', t: d.updated_at, key: 'draft:' + d.id, icon: 'newsfeed',
       title: draftLabel(d.draft), meta: `Draft · saved ${shortDate(d.updated_at)}`,
       areas: Array.isArray((d.draft as { areas?: string[] }).areas)
         ? ((d.draft as { areas?: string[] }).areas as string[]) : [],
       go: () => navigate(`/compose?draft=${d.id}`),
     });
     for (const d of pdocsVisible) rows.push({
-      t: d.updated_at, key: 'doc:' + d.id, icon: DOC_KIND_ICON[d.kind],
+      kind: d.kind === 'slides' ? 'slides' : d.kind === 'sheet' ? 'sheets' : 'docs', t: d.updated_at, key: 'doc:' + d.id, icon: DOC_KIND_ICON[d.kind],
       title: d.title, meta: `${DOC_KIND_LABEL[d.kind]} · edited ${shortDate(d.updated_at)}`,
       go: () => navigate(`/docs/${d.id}`),
     });
     for (const f of filesVisible) rows.push({
-      t: f.created_at, key: 'file:' + f.id,
+      kind: f.kind === 'photo' || f.kind === 'video' ? 'photos' : 'files', t: f.created_at, key: 'file:' + f.id,
       icon: f.kind === 'video' ? 'video' : f.kind === 'audio' ? 'mic' : f.kind === 'file' ? 'paperclip' : 'image',
       photo: f.kind === 'photo' ? fileUrls[f.path] : null,
       title: f.title ?? 'A file',
@@ -467,6 +485,7 @@ export default function Saved() {
     for (const m of msgsVisible) {
       if (!m.chatId) continue; // an unreadable stub isn't a place to jump to
       rows.push({
+        kind: 'messages', saved: true,
         t: m.savedAt, key: 'msg:' + m.messageId, icon: 'chat',
         title: m.body?.trim() || (m.hasMedia ? '📎 An attachment' : 'A message'),
         meta: `Message · saved ${shortDate(m.savedAt)}${m.senderName ? ` · from ${m.senderName}` : ''}`,
@@ -714,20 +733,65 @@ export default function Saved() {
     );
   }
 
+  const postCard = (p: FeedPost) => (
+    <FeedCard
+    key={p.id}
+    {...postToCard(p, me || undefined, spaceNames)}
+    {...weaveProps(p, myWebSet, me || undefined)}
+    trusted={myMyc.has(posterTrustKey(p))}
+    recommended={myRecs.has('post:' + p.id)}
+    saved={!unsaved.has(p.id)}
+    mycelium={overlays[p.id]}
+    availability={{ trust: !!me && p.author_id !== me }}
+    onTrust={(on) => { void trustPostPoster(p, on).catch(console.error); }}
+    onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
+    viewerIsAuthor={p.author_id === me}
+    onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
+    onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
+    onDelete={!p.linked_event_id ? () => { void trashPost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+    onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
+    onSave={(on) => {
+      setUnsaved((cur) => { const n = new Set(cur); on ? n.delete(p.id) : n.add(p.id); return n; });
+      void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error);
+    }}
+    keepMenu
+    extraMenuItems={[{
+      label: 'Add to collection…',
+      hint: collections.length ? undefined : 'Create your first folder above',
+      onClick: () => openPicker(p.id),
+    }]}
+    onMessage={me ? () => messageAbout(p) : undefined}
+    onOpen={() => navigate(postOpenPath(p))}
+    onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
+      />
+  );
+
   // The split's section list: the same sections the folds carry, in the
   // same order, presence-gated the same way (a section with nothing in it
   // doesn't appear on phones either). A pick that's since gone empty falls
   // to the first section standing.
-  const navItems: { id: string; label: string; icon: IconName; count: number }[] = [
-    ...(recents.length > 0 ? [{ id: 'recents', label: 'Chronological', icon: 'calendar' as IconName, count: recents.length }] : []),
-    { id: 'folders', label: 'Folders', icon: 'drive' as IconName, count: foldersVisible.length },
-    ...(draftsVisible.length > 0 ? [{ id: 'drafts', label: 'Drafts', icon: 'newsfeed' as IconName, count: draftsVisible.length }] : []),
+  // Row 2's bubbles (founder 2026-11-16: "Folders, Drafts, Contacts, Slides,
+  // Docs, Spreadsheets, Photos, Posts and Links" — with All / Saved / Created
+  // on the row above): each shows just that kind; a bubble with nothing in it
+  // steps aside, Contacts always stands. None picked = everything.
+  const lensRecents = recents.filter((r) => lens === 'All'
+    || (lens === 'Saved' ? !!r.saved : !r.saved));
+  const kindCount = (k: string) => lensRecents.filter((r) => r.kind === k).length;
+  const navItems: { id: string; label: string; icon: IconName; count: number }[] = ([
+    { id: 'folders', label: 'Folders', icon: 'drive' as IconName, count: lens === 'Saved' ? 0 : foldersVisible.length },
+    { id: 'drafts', label: 'Drafts', icon: 'pencil' as IconName, count: lens === 'Saved' ? 0 : draftsVisible.length },
     { id: 'contacts', label: 'Contacts', icon: 'user-multiple' as IconName, count: contactCount },
-    ...(filesVisible.length + pdocsVisible.length > 0 ? [{ id: 'files', label: 'Files & docs', icon: 'paperclip' as IconName, count: filesVisible.length + pdocsVisible.length }] : []),
-    ...(msgsVisible.length > 0 ? [{ id: 'messages', label: 'Messages', icon: 'chat' as IconName, count: msgsVisible.length }] : []),
-    ...(posts.length > 0 ? [{ id: 'items', label: 'Items', icon: 'bookmark' as IconName, count: visible.length }] : []),
-  ];
-  const activePick = navItems.some((n) => n.id === pick) ? pick : (navItems[0]?.id ?? 'folders');
+    { id: 'slides', label: 'Slides', icon: 'slides' as IconName, count: kindCount('slides') },
+    { id: 'docs', label: 'Docs', icon: 'newsfeed' as IconName, count: kindCount('docs') },
+    { id: 'sheets', label: 'Spreadsheets', icon: 'sheet' as IconName, count: kindCount('sheets') },
+    { id: 'photos', label: 'Photos', icon: 'image' as IconName, count: kindCount('photos') },
+    { id: 'posts', label: 'Posts', icon: 'bookmark' as IconName, count: kindCount('posts') },
+    { id: 'links', label: 'Links', icon: 'link' as IconName, count: kindCount('links') },
+  ]).filter((n) => n.id === 'contacts' || n.count > 0);
+  const activePick = navItems.some((n) => n.id === pick) ? pick : 'recents';
+  const ROW_KINDS = ['recents', 'slides', 'docs', 'sheets', 'photos', 'posts', 'links'];
+  const shownRecents = activePick === 'recents' ? lensRecents
+    : lensRecents.filter((r) => r.kind === activePick);
 
   // The hat gate's other half: never render YOUR drive under an entity's
   // name. A space is being redirected by the effect above; a being gates.
@@ -881,26 +945,29 @@ export default function Saved() {
         />
       )}
 
-      <div className={wide ? 'drive__split' : undefined}>
+      <div className={wide ? 'drive__split' : 'drive__stack'}>
       {/* The desktop split's LEFT list — the same sections, one per row,
           the picked one lit; its contents drop down in the pane beside it. */}
-      {wide && me && ready && (
-        <nav className="drive__nav" aria-label="Drive sections">
+      {me && ready && (
+        <nav className={wide ? 'drive__nav' : 'drive__bubbles'} aria-label="Drive sections">
           {navItems.map((n) => (
             <button key={n.id} type="button"
-              className={'drive__navitem' + (n.id === activePick && !query.trim() ? ' is-on' : '')}
+              className={(wide ? 'drive__navitem' : 'drive__bubble') + (n.id === activePick && !query.trim() ? ' is-on' : '')}
               aria-current={n.id === activePick ? 'true' : undefined}
-              onClick={() => { setQuery(''); setPick(n.id); }}>
+              aria-pressed={n.id === activePick}
+              onClick={() => { setQuery(''); setPick(n.id === activePick ? 'recents' : n.id); }}>
               <Icon name={n.icon} size={16} />
               <span className="drive__navlabel">{n.label}</span>
-              <span className="drive__count">{n.count}</span>
+              {!wide && n.count > 0 && <span className="drive__bubblecount">{n.count}</span>}
+              {wide && <span className="drive__count">{n.count}</span>}
             </button>
           ))}
         </nav>
       )}
-      <div className={wide ? 'drive__pane' + (query.trim() ? ' is-searching' : '') : undefined}>
+      <div className={'drive__pane' + (query.trim() ? ' is-searching' : '')}>
+      {fileBusy && <p className="drive__uploading-line">Uploading…</p>}
       {wide && me && ready && !query.trim() && (
-        <h2 className="drive__panetitle">{navItems.find((n) => n.id === activePick)?.label}</h2>
+        <h2 className="drive__panetitle">{navItems.find((n) => n.id === activePick)?.label ?? (lens === 'All' ? 'Everything' : lens)}</h2>
       )}
       {/* ── CHRONOLOGICAL — the top of the drive (founder 2026-10-21's
           Recents, renamed + fully shut 2026-10-22: "Let's have the recents be
@@ -909,8 +976,8 @@ export default function Saved() {
           closed shows nothing, the carrot opens EVERYTHING of every kind in
           recency order). Hidden while searching — the search holds every
           section open instead. ── */}
-      {me && ready && !query.trim() && recents.length > 0 && (
-        <section className="drive__recents">
+      {me && ready && !query.trim() && ROW_KINDS.includes(activePick) && (
+        <section className={'drive__recents' + (view === 'cards' ? ' drive__recents--cards' : '')}>
           <div className="drive__items-head">
             <button type="button" className="drive__foldhead" aria-expanded={recentsAll}
               onClick={() => setRecentsAll((v) => !v)}>
@@ -923,7 +990,15 @@ export default function Saved() {
               </span>
             </button>
           </div>
-          {(wide ? activePick === 'recents' : recentsAll) && recents.map((r) => (
+          {shownRecents.length === 0 && (
+            <div className="myc__empty">
+              <span className="display-italic">Your Drive is empty.</span>
+              <p>Tap the bookmark on any post to save it here — and everything you create lands here on its own.</p>
+            </div>
+          )}
+          {shownRecents.map((r) => r.post ? (
+            view === 'cards' ? postCard(r.post) : <DriveRow key={r.key} p={r.post} />
+          ) : (
             <div key={r.key} className="drive__row" role="button" tabIndex={0} onClick={r.go}
               onKeyDown={(e) => { if (e.key === 'Enter') r.go(); }}>
               {r.photo
@@ -1099,7 +1174,7 @@ export default function Saved() {
           rows, nothing here is visible to anyone, and no assistant reads it.
           A doc/sheet row opens its editor; a file opens via a fresh signed
           URL; Delete asks twice and really deletes. ── */}
-      {me && ready && (filesVisible.length > 0 || pdocsVisible.length > 0 || fileBusy) && (
+      {me && ready && query.trim() && (filesVisible.length > 0 || pdocsVisible.length > 0) && (
         <section className="drive__drafts">
           <div className="drive__items-head">
             {foldHead('files', 'Files & docs', filesVisible.length + pdocsVisible.length,
@@ -1164,7 +1239,7 @@ export default function Saved() {
           2026-10-21). A row opens its room; one you can no longer read
           (a room you left, a message since deleted) says so and offers
           only Remove. ── */}
-      {me && ready && msgsVisible.length > 0 && (
+      {me && ready && query.trim() && msgsVisible.length > 0 && (
         <section className="drive__drafts">
           <div className="drive__items-head">
             {foldHead('messages', 'Messages', msgsVisible.length)}
@@ -1206,7 +1281,7 @@ export default function Saved() {
 
       {/* ── ITEMS — compact rows in list view, full cards in large view;
           the one toggle for all of it lives at the top now. ── */}
-      {me && ready && posts.length > 0 && (
+      {me && ready && query.trim() && posts.length > 0 && (
         <div className="drive__items-head">
           {foldHead('items', 'Items', visible.length)}
         </div>
@@ -1214,12 +1289,6 @@ export default function Saved() {
 
       <section className={view === 'rows' ? 'drive__list' : 'myc__feed'}>
         {!ready && <p className="myc__sub">Loading…</p>}
-        {ready && posts.length === 0 && (
-          <div className="myc__empty">
-            <span className="display-italic">Your Drive is empty.</span>
-            <p>Tap the bookmark on any post to save it here — and everything you create lands here on its own.</p>
-          </div>
-        )}
         {ready && posts.length > 0 && foldOpen('items') && visible.length === 0 && (
           <div className="myc__empty">
             <span className="display-italic">Nothing matches.</span>
@@ -1232,38 +1301,7 @@ export default function Saved() {
             {g.items.map((p) => <DriveRow key={p.id} p={p} />)}
           </div>
         ))}
-        {foldOpen('items') && view === 'cards' && visible.map((p) => (
-          <FeedCard
-            key={p.id}
-            {...postToCard(p, me || undefined, spaceNames)}
-            {...weaveProps(p, myWebSet, me || undefined)}
-            trusted={myMyc.has(posterTrustKey(p))}
-            recommended={myRecs.has('post:' + p.id)}
-            saved={!unsaved.has(p.id)}
-            mycelium={overlays[p.id]}
-            availability={{ trust: !!me && p.author_id !== me }}
-            onTrust={(on) => { void trustPostPoster(p, on).catch(console.error); }}
-            onRecommend={(on) => { void setRecommend('post', p.id, on).catch(console.error); }}
-            viewerIsAuthor={p.author_id === me}
-            onManage={p.linked_event_id ? () => navigate(`/events/${p.id}`) : undefined}
-            onEdit={!p.linked_event_id ? () => navigate(`/compose?post=${p.id}`) : undefined}
-            onDelete={!p.linked_event_id ? () => { void trashPost(p.id).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-            onHide={me ? () => { void setHidden(p.id, true).then(() => setPosts((cur) => cur.filter((x) => x.id !== p.id))).catch(console.error); } : undefined}
-            onSave={(on) => {
-              setUnsaved((cur) => { const n = new Set(cur); on ? n.delete(p.id) : n.add(p.id); return n; });
-              void setSaved('post', p.id, on).then(() => { if (on) promptSaved(p.id); }).catch(console.error);
-            }}
-            keepMenu
-            extraMenuItems={[{
-              label: 'Add to collection…',
-              hint: collections.length ? undefined : 'Create your first folder above',
-              onClick: () => openPicker(p.id),
-            }]}
-            onMessage={me ? () => messageAbout(p) : undefined}
-            onOpen={() => navigate(postOpenPath(p))}
-            onAuthor={() => navigate(p.author_space_id ? `/spaces/${p.author_space_id}` : `/members/${p.author_id}`)}
-          />
-        ))}
+        {foldOpen('items') && view === 'cards' && visible.map((p) => postCard(p))}
       </section>
 
       </div>

@@ -288,3 +288,20 @@
 }
 .drive__pane:not(.is-searching) .drive__items-head { display: none; }
 .drive__pane .drive__recents { margin-top: 0; }
+
+/* THE BUBBLES (founder 2026-11-16): on phones Drive's kinds are one wrapping
+   row of chips under All · Saved · Created — tap one to see just that kind,
+   tap it again to see everything. */
+.drive__bubbles { display: flex; flex-wrap: wrap; gap: 8px; margin: var(--s-2) 0 var(--s-4); padding: 0 var(--s-5); }
+.drive__bubble {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--r-full);
+  border: 1px solid var(--bone-edge); background: #fff;
+  font-size: 13px; color: var(--ink-soft); white-space: nowrap; cursor: pointer;
+}
+.drive__bubble:hover { color: var(--ink); }
+.drive__bubble.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+.drive__bubblecount { font-family: var(--font-mono); font-size: 10px; color: var(--ink-muted); }
+.drive__bubble.is-on .drive__bubblecount { color: var(--peach-deep); }
+.drive__stack { display: block; }
+.drive__uploading-line { font-size: 13px; color: var(--ink-muted); margin: 0 0 var(--s-3); }
