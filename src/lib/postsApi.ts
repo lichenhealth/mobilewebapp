@@ -81,6 +81,11 @@ export type NewPost = {
    *  machinery — no circles picked writes 'invite', circles keep the
    *  ordinary 'space' path). Null/omitted = not an event. */
   eventVisibility?: 'anyone' | 'lichen' | 'invited' | null;
+  /** POST TO PEOPLE (founder 2026-11-16, posting to a contact list): members
+   *  named here read the post (posts RLS arm) and are belled once by trigger.
+   *  With no other audience the row is 'invite' — just these people.
+   *  Omitted on an update = leave the column as it is. */
+  audienceProfileIds?: string[];
 };
 
 // Upload a file (or recorded blob) into the post-media bucket; returns a public URL.
@@ -104,7 +109,8 @@ export async function createPost(input: NewPost) {
     (input.eventVisibility === 'lichen' && input.isPublic) ? 'lichen'
     : input.isPublic ? 'public'
     : input.toMycelium ? 'mycelium'
-    : (input.eventVisibility === 'invited' && input.audienceSpaceIds.length === 0) ? 'invite'
+    : ((input.eventVisibility === 'invited' || (input.audienceProfileIds?.length ?? 0) > 0)
+        && input.audienceSpaceIds.length === 0) ? 'invite'
     : 'space';
   const { data, error } = await supabase.from('posts').insert({
     // Acting as a being you steward puts THEM in the author seat — the RLS
@@ -128,6 +134,7 @@ export async function createPost(input: NewPost) {
     image_url: input.image_url ?? null,
     details: input.details ?? {},
     slug: input.slug?.trim() || null,
+    audience_profile_ids: input.audienceProfileIds ?? [],
   }).select('id').single();
   if (error) throw error;
   return data;
@@ -141,7 +148,8 @@ export async function updatePost(id: string, input: NewPost): Promise<void> {
     (input.eventVisibility === 'lichen' && input.isPublic) ? 'lichen'
     : input.isPublic ? 'public'
     : input.toMycelium ? 'mycelium'
-    : (input.eventVisibility === 'invited' && input.audienceSpaceIds.length === 0) ? 'invite'
+    : ((input.eventVisibility === 'invited' || (input.audienceProfileIds?.length ?? 0) > 0)
+        && input.audienceSpaceIds.length === 0) ? 'invite'
     : 'space';
   const { error } = await supabase.from('posts').update({
     author_space_id: input.authorSpaceId ?? null,
@@ -161,6 +169,7 @@ export async function updatePost(id: string, input: NewPost): Promise<void> {
     image_url: input.image_url ?? null,
     details: input.details ?? {},
     slug: input.slug?.trim() || null,
+    ...(input.audienceProfileIds ? { audience_profile_ids: input.audienceProfileIds } : {}),
   }).eq('id', id);
   if (error) throw error;
 }

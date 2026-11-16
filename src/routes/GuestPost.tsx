@@ -71,11 +71,11 @@ export default function GuestPost() {
   if (!info) return (
     <div className="gev">
       <div className="gev__brand"><LichenMark size={40} /><span>Lichen</span></div>
-      <p className="gev__muted">This link isn’t valid, or the listing has been taken down.</p>
+      <p className="gev__muted">This link isn’t valid, or the post has been taken down.</p>
     </div>
   );
 
-  const title = info.title?.trim() || (info.body ?? '').trim().slice(0, 60) || 'A listing';
+  const title = info.title?.trim() || (info.body ?? '').trim().slice(0, 60) || 'A post';
   const photo = info.photos[photoIx] ?? null;
   const ccyOnly = !!info.currentcy_only;
   const buyable = !ccyOnly && (info.price_cents ?? 0) >= 100 && (info.price_cents ?? 0) <= 500000;
@@ -117,7 +117,7 @@ export default function GuestPost() {
         <p className="gev__member">
           You’re signed in to Lichen —{' '}
           <button className="gev__joinlink" onClick={() => navigate(`/posts/${info.post_id}`)}>
-            open this listing inside
+            open this post inside
           </button>{' '}
           to message {seller} or trade as yourself.
         </p>

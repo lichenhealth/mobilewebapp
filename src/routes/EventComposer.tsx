@@ -21,6 +21,7 @@ import { SmartLocation } from './Calendar';
 import { classifyCareContact } from '../lib/careTeamApi';
 import { listGuestLists, createGuestList, updateGuestList, type GuestList, type ListEntry } from '../lib/guestListsApi';
 import EventLinkPanel, { LINK_TIERS, type LinkTier } from '../components/EventLinkPanel';
+import ContactPicker from '../components/ContactPicker';
 import './Concierge.css';
 import './Calendar.css';
 
@@ -77,6 +78,10 @@ export default function EventComposer() {
   // anyone off Lichen on it carries into a formal event's guest list.
   const [guestLists, setGuestLists] = useState<GuestList[]>([]);
   const [offGuests, setOffGuests] = useState<ListEntry[]>([]);
+  // PICK FROM YOUR CONTACTS (founder 2026-11-16) — members take a calendar
+  // seat; emails/phones join the off-Lichen guests (Send to their calendars
+  // carries the emails).
+  const [picking, setPicking] = useState(false);
   useEffect(() => { if (me) void listGuestLists(me).then(setGuestLists).catch(() => {}); }, [me]);
   // SEND TO THEIR CALENDAR (founder 2026-11-13): a real calendar invitation
   // by email — members (address resolved server-side, never shown here) and
@@ -1185,6 +1190,25 @@ export default function EventComposer() {
             autoCapitalize="none" autoCorrect="off" spellCheck={false}
             value={query} onChange={(e) => setQuery(e.target.value)}
           />
+          {me && (
+            <button type="button" className="cpick-door calp__pickdoor" onClick={() => setPicking(true)}>
+              <Icon name="contacts" size={14} /> Pick from your contacts
+            </button>
+          )}
+          {picking && me && (
+            <ContactPicker me={me} verb="Invite"
+              already={new Set([
+                ...invitees.map((m) => `m:${m.id}`),
+                ...offGuests.map((g) => g.kind === 'member' ? `m:${g.id}` : `${g.kind}:${g.value}`),
+              ])}
+              onClose={() => setPicking(false)}
+              onAdd={(entries) => {
+                const seats = entries.flatMap((e) => (e.kind === 'member' ? [{ id: e.id, full_name: e.name }] : []));
+                setInvitees((cur) => [...cur, ...seats.filter((m) => !cur.some((c) => c.id === m.id))]);
+                const off = entries.filter((e) => e.kind !== 'member');
+                setOffGuests((cur) => [...cur, ...off.filter((e) => !cur.some((c) => c.kind === e.kind && 'value' in c && 'value' in e && c.value === e.value))]);
+              }} />
+          )}
           {guestLists.length === 1 && !query.trim() && (
             <div className="calp__glists">
               <span className="calp__match-soft">Your guest lists:</span>

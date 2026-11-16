@@ -31,6 +31,9 @@ import { allTimeZones, viewerZone, zoomMintAllowed, zoneAbbr } from '../lib/book
 import { slugify } from '../lib/bookingApi';
 import { classifyCareContact } from '../lib/careTeamApi';
 import { inviteEventGuest, inviteEventGuestByPhone, mintEventLink } from '../lib/eventGuestsApi';
+import ContactPicker from '../components/ContactPicker';
+import { addPostGuest, emailPostGuest } from '../lib/postGuestsApi';
+import type { ListEntry } from '../lib/guestListsApi';
 import LocationField from '../components/LocationField';
 import type { GeoPoint } from '../lib/geoApi';
 import { resolvePreviews } from '../lib/conciergeApi';
@@ -396,6 +399,13 @@ export default function Compose() {
   // members on lichen"): member_by_contact — exact match, findable only.
   const [invContactHit, setInvContactHit] = useState<{ id: string; full_name: string | null } | null>(null);
   const [genLink, setGenLink] = useState(false);
+  // PICK FROM YOUR CONTACTS (founder 2026-11-16) — 'event' fills the invite
+  // list; 'post' fills SEND TO PEOPLE, a post's own audience of named people:
+  // members see it on Lichen (posts RLS arm + a bell), everyone else gets
+  // their private /p/ link by email or a text from your own phone.
+  const [pickerFor, setPickerFor] = useState<null | 'event' | 'post'>(null);
+  const [postPeople, setPostPeople] = useState<ListEntry[]>([]);
+  const peopleKey = (e: ListEntry) => e.kind === 'member' ? `m:${e.id}` : `${e.kind}:${e.value}`;
   // REUSABLE GUEST LISTS (founder 2026-11-06: "build the reusable guest
   // lists next" — Paperless Post's address book): guest_lists is the
   // member's own private shelf of invitees (+ circles). Load merges a list
@@ -778,7 +788,7 @@ export default function Compose() {
 
   function draftSnapshot(): Record<string, unknown> {
     return {
-      contentType, title, body, linkName, invitees, genLink, evLichen, evAnyone,
+      contentType, title, body, linkName, invitees, genLink, evLichen, evAnyone, postPeople,
       areas: [...areas], isPublic, toMycelium, audienceSpaces: [...audienceSpaces],
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
       giftTo, forIdents, modeNotes, tradeFor,
@@ -863,6 +873,7 @@ export default function Compose() {
       s(d.contentType, setContentType);
       s(d.title, setTitle); s(d.body, setBody); s(d.linkName, setLinkName);
       if (Array.isArray(d.invitees)) setInvitees(d.invitees); s(d.genLink, setGenLink);
+      if (Array.isArray(d.postPeople)) setPostPeople(d.postPeople);
       s(d.evLichen, setEvLichen); s(d.evAnyone, setEvAnyone);
       if (Array.isArray(d.areas)) setAreas(new Set(d.areas));
       s(d.isPublic, setIsPublic); s(d.toMycelium, setToMycelium);
@@ -1190,7 +1201,7 @@ export default function Compose() {
   // goes live" — no silent default).
   const hasAudience = isEvent
     ? (evAnyone || evLichen || toMycelium || audienceSpaces.size > 0 || invitees.length > 0 || genLink)
-    : (isPublic || toMycelium || audienceSpaces.size > 0);
+    : (isPublic || toMycelium || audienceSpaces.size > 0 || postPeople.length > 0);
   // Courses & Library posts are "targeted feed stories" (founder + Melanie,
   // 2026-07-26): no Type row (they're educational by nature), an Organize-into
   // picker, and — everything being an exchange — the offer block.
@@ -1610,6 +1621,8 @@ export default function Compose() {
           image_url: firstPhoto, details,
           slug: linkName,
           eventVisibility: evVisOut,
+          audienceProfileIds: isEvent ? undefined
+            : postPeople.flatMap((e) => (e.kind === 'member' ? [e.id] : [])),
         });
         createdId = created?.id ?? null;
         // EVENT INVITES (founder 2026-11-04): emails send the pretty
@@ -1633,6 +1646,19 @@ export default function Compose() {
           if (genLink) sends.push(mintEventLink(evId));
           const settled = await Promise.allSettled(sends);
           settled.forEach((r) => { if (r.status === 'rejected') console.error('event invite:', r.reason); });
+        }
+        // SEND TO PEOPLE off Lichen: each gets a private /p/ link — emailed
+        // from Lichen now; phones wait on the post page as "Text ›" rows
+        // (the author's own Messages, no SMS provider). Never fails the post.
+        if (!isEvent && created?.id && user) {
+          const off = postPeople.filter((e) => e.kind !== 'member');
+          const settled = await Promise.allSettled(off.map(async (e) => {
+            const g = await addPostGuest(created.id, user.id, e.kind === 'email'
+              ? { name: e.name, email: e.value }
+              : { name: e.name, phone: (e as Extract<ListEntry, { kind: 'phone' }>).sms || (e as Extract<ListEntry, { kind: 'phone' }>).value });
+            if (e.kind === 'email') await emailPostGuest(g.id);
+          }));
+          settled.forEach((r) => { if (r.status === 'rejected') console.error('send to people:', r.reason); });
         }
         // In-kind donation offer: record it for the routing desk + the
         // donor's private My-giving dashboard. Fire-and-forget — the post
@@ -1690,7 +1716,10 @@ export default function Compose() {
       if (isPopup) window.close();
       // A new EVENT lands on its own page — the guest panel is right there
       // (phone invites' Text › buttons, the shareable link, the RSVP tab).
-      navigate(isEvent && createdId ? `/events/${createdId}` : afterPostDestination(isEvent));
+      navigate(isEvent && createdId ? `/events/${createdId}`
+        // Phones still need the author's tap to text — land where the Text › rows are.
+        : (createdId && postPeople.some((e) => e.kind === 'phone')) ? `/posts/${createdId}`
+        : afterPostDestination(isEvent));
     } catch (e) {
       setBusy(false);
       const msg = (e as Error)?.message || '';
@@ -1780,6 +1809,7 @@ export default function Compose() {
               ...(isPublic ? ['Everyone'] : []),
               ...(toMycelium ? ['My-celium'] : []),
               ...mySpaces.filter((sp) => audienceSpaces.has(sp.id)).map((sp) => sp.name),
+              ...(postPeople.length ? [`${postPeople.length} ${postPeople.length === 1 ? 'person' : 'people'}`] : []),
             ].map((name) => (
               <span key={name} className="cmp__where-tag">{name}</span>
             ))}
@@ -1820,7 +1850,47 @@ export default function Compose() {
         </div>
       )}
       </div>)}
+      {!editing && (
+        <div className="cmp__people">
+          <label className="cmp__label">Send to people</label>
+          <p className="cmp__hint-ev">
+            Pick people or whole lists from your contacts. Those on Lichen see it here;
+            everyone else gets it by email, or a text from your phone.
+          </p>
+          {postPeople.length > 0 && (
+            <div className="cmp__invchips">
+              {postPeople.map((e) => (
+                <span key={peopleKey(e)} className={'cmp__invchip' + (e.kind === 'member' ? '' : ' cmp__invchip--off')}>
+                  <Icon name={e.kind === 'member' ? 'profile' : e.kind === 'email' ? 'send' : 'phone'} size={12} />
+                  {e.kind === 'member' ? e.name : (e.name ? `${e.name} · ${e.value}` : e.value)}
+                  <button className="cmp__invchip-x" aria-label="Remove"
+                    onClick={() => setPostPeople((cur) => cur.filter((x) => peopleKey(x) !== peopleKey(e)))}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <button className="cpick-door" onClick={() => setPickerFor('post')}>
+            <Icon name="contacts" size={14} /> {postPeople.length ? 'Add more from your contacts' : 'Pick from your contacts'}
+          </button>
+        </div>
+      )}
       </>)}
+      {pickerFor && user && (
+        <ContactPicker me={user.id} verb={pickerFor === 'event' ? 'Invite' : 'Send to'}
+          already={new Set(pickerFor === 'event'
+            ? invitees.map((x) => x.kind === 'member' ? `m:${x.id}` : `${x.kind}:${x.value}`)
+            : postPeople.map(peopleKey))}
+          onClose={() => setPickerFor(null)}
+          onAdd={(entries) => {
+            if (pickerFor === 'event') {
+              entries.forEach((e) => addInvitee(e.kind === 'member' ? { kind: 'member', id: e.id, name: e.name }
+                : e.kind === 'email' ? { kind: 'email', value: e.value, name: e.name }
+                : { kind: 'phone', value: e.value, sms: e.sms, name: e.name }));
+            } else {
+              setPostPeople((cur) => [...cur, ...entries.filter((e) => !cur.some((c) => peopleKey(c) === peopleKey(e)))]);
+            }
+          }} />
+      )}
 
       {/* WHO'S INVITED — the one section for events (founder 2026-11-04):
           typed people (members / email / phone), whole circles, the
@@ -1948,6 +2018,9 @@ export default function Compose() {
             <input ref={invInputRef} className="cmp__input" value={invQ} onChange={(e) => setInvQ(e.target.value)}
               placeholder={glEditing ? `Add to ${guestLists.find((g) => g.id === glEditing)?.name ?? 'the list'} — name, email or phone` : 'Name, circle, email or phone'}
               autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+            <button className="cpick-door cmp__invpick" onClick={() => setPickerFor('event')}>
+              <Icon name="contacts" size={14} /> Pick from your contacts
+            </button>
             {(memberHits.length > 0 || spaceHits.length > 0 || listHits.length > 0 || contact.kind === 'email' || contact.kind === 'phone') && (
               <div className="cmp__invsug">
                 {/* A typed email/phone that belongs to a member files them
