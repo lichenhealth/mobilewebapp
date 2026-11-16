@@ -294,7 +294,22 @@ export default function Saved() {
     }
     catch { return {}; }
   });
-  const foldOpen = (id: string) => !!query.trim() || !!folds[id];
+  // DESKTOP SPLIT (founder 2026-11-16: "like chat, on desktop, have whatever
+  // natural top left bar item is selected to the right with all the data
+  // dropped down"): at ≥1024 the section heads become a list on the left and
+  // the PICKED section fills the right pane, fully open — Chat's split view.
+  // Phones keep the folds. A search still opens every section in the pane.
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const on = () => setWide(mq.matches);
+    on(); mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const [pick, setPick] = useState<string>(() =>
+    new URLSearchParams(window.location.search).get('contacts') ? 'contacts' : 'recents');
+  const [contactCount, setContactCount] = useState(0);
+  const foldOpen = (id: string) => !!query.trim() || (wide ? id === activePick : !!folds[id]);
   const toggleFold = (id: string) => setFolds((cur) => {
     const next = { ...cur, [id]: !cur[id] };
     try { localStorage.setItem('lichen.driveFolds', JSON.stringify(next)); } catch { /* per-device nicety */ }
@@ -699,6 +714,21 @@ export default function Saved() {
     );
   }
 
+  // The split's section list: the same sections the folds carry, in the
+  // same order, presence-gated the same way (a section with nothing in it
+  // doesn't appear on phones either). A pick that's since gone empty falls
+  // to the first section standing.
+  const navItems: { id: string; label: string; icon: IconName; count: number }[] = [
+    ...(recents.length > 0 ? [{ id: 'recents', label: 'Chronological', icon: 'calendar' as IconName, count: recents.length }] : []),
+    { id: 'folders', label: 'Folders', icon: 'drive' as IconName, count: foldersVisible.length },
+    ...(draftsVisible.length > 0 ? [{ id: 'drafts', label: 'Drafts', icon: 'newsfeed' as IconName, count: draftsVisible.length }] : []),
+    { id: 'contacts', label: 'Contacts', icon: 'user-multiple' as IconName, count: contactCount },
+    ...(filesVisible.length + pdocsVisible.length > 0 ? [{ id: 'files', label: 'Files & docs', icon: 'paperclip' as IconName, count: filesVisible.length + pdocsVisible.length }] : []),
+    ...(msgsVisible.length > 0 ? [{ id: 'messages', label: 'Messages', icon: 'chat' as IconName, count: msgsVisible.length }] : []),
+    ...(posts.length > 0 ? [{ id: 'items', label: 'Items', icon: 'bookmark' as IconName, count: visible.length }] : []),
+  ];
+  const activePick = navItems.some((n) => n.id === pick) ? pick : (navItems[0]?.id ?? 'folders');
+
   // The hat gate's other half: never render YOUR drive under an entity's
   // name. A space is being redirected by the effect above; a being gates.
   if (!actingReady || actor.type === 'space') return null;
@@ -851,6 +881,27 @@ export default function Saved() {
         />
       )}
 
+      <div className={wide ? 'drive__split' : undefined}>
+      {/* The desktop split's LEFT list — the same sections, one per row,
+          the picked one lit; its contents drop down in the pane beside it. */}
+      {wide && me && ready && (
+        <nav className="drive__nav" aria-label="Drive sections">
+          {navItems.map((n) => (
+            <button key={n.id} type="button"
+              className={'drive__navitem' + (n.id === activePick && !query.trim() ? ' is-on' : '')}
+              aria-current={n.id === activePick ? 'true' : undefined}
+              onClick={() => { setQuery(''); setPick(n.id); }}>
+              <Icon name={n.icon} size={16} />
+              <span className="drive__navlabel">{n.label}</span>
+              <span className="drive__count">{n.count}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+      <div className={wide ? 'drive__pane' + (query.trim() ? ' is-searching' : '') : undefined}>
+      {wide && me && ready && !query.trim() && (
+        <h2 className="drive__panetitle">{navItems.find((n) => n.id === activePick)?.label}</h2>
+      )}
       {/* ── CHRONOLOGICAL — the top of the drive (founder 2026-10-21's
           Recents, renamed + fully shut 2026-10-22: "Let's have the recents be
           renamed Chronological and don't have 3 items auto load, e.g. have
@@ -872,7 +923,7 @@ export default function Saved() {
               </span>
             </button>
           </div>
-          {recentsAll && recents.map((r) => (
+          {(wide ? activePick === 'recents' : recentsAll) && recents.map((r) => (
             <div key={r.key} className="drive__row" role="button" tabIndex={0} onClick={r.go}
               onKeyDown={(e) => { if (e.key === 'Enter') r.go(); }}>
               {r.photo
@@ -1041,7 +1092,7 @@ export default function Saved() {
       {/* ── CONTACTS — guest lists, your private address book (founder
           2026-11-06). Its own section: a list opens in place to manage,
           export (CSV/vCard) or send to an event. ── */}
-      {me && ready && <DriveContacts me={me} query={query} foldHead={foldHead} foldOpen={foldOpen} />}
+      {me && ready && <DriveContacts me={me} query={query} foldHead={foldHead} foldOpen={foldOpen} onCount={setContactCount} />}
 
       {/* ── FILES & DOCS — what Drive's + created or uploaded (founder
           2026-10-21). Private by construction: a private bucket + owner-only
@@ -1214,6 +1265,9 @@ export default function Saved() {
           />
         ))}
       </section>
+
+      </div>
+      </div>
 
       {/* THE TRASH (founder 2026-11-10): what you delete in Drive waits there
           until you empty it. */}

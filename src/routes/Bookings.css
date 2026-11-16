@@ -63,7 +63,7 @@
   font-size: 12px; color: var(--ink); cursor: pointer;
 }
 .bkg__slot:hover { border-color: var(--peach); }
-.bkg__slot.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
+.bkg__slot.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
 /* "Availability for the both of you" (founder 2026-11-01): a slot that
  * overlaps the signed-in viewer's OWN calendar dims but stays bookable —
  * their calendar may hold soft blocks, the pick is theirs. */

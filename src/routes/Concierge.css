@@ -118,9 +118,9 @@
 }
 .conc__tool-circle:hover { border-color: var(--ink-muted); }
 .conc__tool-circle.is-active {
-  background: var(--peach);
+  background: var(--peach-tint);
   border-color: var(--peach);
-  color: var(--bone-warm);
+  color: var(--peach-deep);
 }
 
 .conc__brain {
@@ -137,9 +137,9 @@
   transition: all var(--d-fast) var(--ease-out);
 }
 .conc__brain.is-on {
-  background: var(--peach);
+  background: var(--peach-tint);
   border-color: var(--peach);
-  color: var(--bone-warm);
+  color: var(--peach-deep);
 }
 .conc__brain:hover { transform: scale(1.05); }
 .conc__brain:active { transform: scale(0.95); }
@@ -1052,7 +1052,7 @@
   padding: 6px 12px; border-radius: var(--r-full); border: 1px solid var(--bone-edge);
   background: var(--bone-warm); color: var(--ink-soft); font-size: 12px; font-weight: 400;
 }
-.cpost-compose__dim.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
+.cpost-compose__dim.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
 
 /* Board: overall score + dimension filter chips */
 .wow__overall { text-align: center; padding: var(--s-2) var(--s-5) 0; }
@@ -1070,7 +1070,7 @@
   flex: 0 0 auto; padding: 6px 12px; border-radius: var(--r-full); border: 1px solid var(--bone-edge);
   background: var(--bone-warm); color: var(--ink-soft); font-size: 12px; white-space: nowrap;
 }
-.wow__chip.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
+.wow__chip.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
 .board__post-btn {
   display: flex; align-items: center; justify-content: center;
   width: 40px; height: 40px; border-radius: var(--r-full);
@@ -1254,7 +1254,7 @@
   border: 1px solid var(--bone-edge); background: var(--bone-warm); color: var(--ink);
   font-size: 12px; font-weight: 600;
 }
-.rec__day.is-on { background: var(--peach); border-color: var(--peach); color: #fff; }
+.rec__day.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
 .rec__ends { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
 .rec__radio { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
 .rec__summary { font-family: var(--font-mono); font-size: 12px; color: var(--peach-deep); margin: 2px 0 0; }

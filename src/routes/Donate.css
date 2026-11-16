@@ -57,7 +57,7 @@
               color var(--d-fast) var(--ease-out);
 }
 .donate__preset:hover { border-color: var(--peach); }
-.donate__preset.is-active { background: var(--peach); border-color: var(--peach); color: #fff; }
+.donate__preset.is-active { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
 
 .donate__fields { display: grid; grid-template-columns: 1fr 1.2fr; gap: var(--s-6); }
 .donate__field { display: flex; flex-direction: column; gap: var(--s-2); }

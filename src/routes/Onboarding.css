@@ -42,7 +42,7 @@
   color: var(--ink-muted); border-radius: calc(var(--r-sm) - 2px);
   transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
-.onb__seg-btn.is-on { background: var(--peach); color: #fff; }
+.onb__seg-btn.is-on { background: var(--peach-tint); color: var(--peach-deep); border-color: var(--peach); }
 .onb__remove {
   width: 30px; height: 30px; font-size: 20px; line-height: 1;
   color: var(--ink-faint); border-radius: var(--r-sm); flex-shrink: 0;

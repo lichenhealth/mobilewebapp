@@ -19,7 +19,7 @@
   transition: all var(--d-fast) var(--ease-out);
 }
 .cfeed__area.is-active .cfeed__area-circle {
-  background: var(--peach); border-color: var(--peach); color: var(--bone-warm);
+  background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep);
 }
 .cfeed__area-gap { width: 1px; align-self: stretch; background: var(--bone-edge); flex-shrink: 0; margin: 2px var(--s-1); }
 .cfeed__area-label {

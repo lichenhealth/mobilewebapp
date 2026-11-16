@@ -41,7 +41,7 @@
   background: var(--bone-warm); font-size: var(--t-sm); color: var(--ink-soft);
   transition: all var(--d-fast) var(--ease-out);
 }
-.cmp__chip.is-on { background: var(--peach); color: var(--bone-warm); border-color: var(--peach); }
+.cmp__chip.is-on { background: var(--peach-tint); color: var(--peach-deep); border-color: var(--peach); }
 
 .cmp__input {
   padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: var(--r-md);
