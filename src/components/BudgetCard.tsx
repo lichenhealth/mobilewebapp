@@ -5,7 +5,7 @@ import { myBalance, fmtCurrentNum, numericAmount } from '../lib/ledgerApi';
 import {
   BudgetItem, BudgetBucket, BudgetCadence,
   listBudget, addBudgetManual, removeBudgetItem, ledgerFlows,
-  listMyMarketplaceTexts, passiveIncome, saveNeedOffer,
+  listMyMarketplaceTexts, passiveIncome, saveNeedOffer, saveNeedProvider, searchProviders,
 } from '../lib/budgetApi';
 import { Bolt } from './CurrentcyCard';
 import './BudgetCard.css';
@@ -386,6 +386,7 @@ function NeedOffer({ item, onSaved }: { item: BudgetItem; onSaved: (p: Partial<B
           value={trade} onChange={(e) => setTrade(e.target.value)}
           onBlur={() => void save({ offer_trade: trade.trim() || null })} />
       )}
+      <ProviderField item={item} onSaved={onSaved} />
       <label className="budg__share">
         <input type="checkbox" checked={!!item.matchable} onChange={(e) => void save({ matchable: e.target.checked })} />
         <span>
@@ -393,9 +394,66 @@ function NeedOffer({ item, onSaved }: { item: BudgetItem; onSaved: (p: Partial<B
           <small>Only Lichen&rsquo;s stewards see it, never other members. Gifts go where the need is greatest; giving earns no claim on receiving, and nothing is promised.</small>
         </span>
       </label>
+      {item.funded_cents ? (
+        <p className="budg__giftnote budg__funded">Lichen will fund {'$' + (item.funded_cents / 100).toFixed(item.funded_cents % 100 ? 2 : 0)} of this from donations — a steward will be in touch to arrange it.</p>
+      ) : null}
       {item.gift_offered_post_id && (
         <Link className="budg__giftnote link-cue" to={`/posts/${item.gift_offered_post_id}`}>A gift may meet this need — take a look ›</Link>
       )}
+      {err && <p className="budg__err">{err}</p>}
+    </div>
+  );
+}
+
+// WHO PROVIDES IT (founder 2026-11-16: "what we need can be a good or service
+// - on or off lichen, and you can be as specific as an organization's good…
+// or service (body work with cherlynn)"): a member or space on Lichen, or a
+// plain name for anyone off it. The need's amount is their fee.
+function ProviderField({ item, onSaved }: { item: BudgetItem; onSaved: (p: Partial<BudgetItem>) => void }) {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const [hits, setHits] = useState<Awaited<ReturnType<typeof searchProviders>>>([]);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    if (!open || q.trim().length < 2) { setHits([]); return; }
+    const t = setTimeout(() => { void searchProviders(q).then(setHits).catch(() => setHits([])); }, 250);
+    return () => clearTimeout(t);
+  }, [q, open]);
+  const save = async (p: { provider_profile_id: string | null; provider_space_id: string | null; provider_name: string | null }) => {
+    setErr(''); onSaved(p); setOpen(false); setQ('');
+    try { await saveNeedProvider(item.id, p); } catch (e) { setErr((e as Error).message); }
+  };
+  const named = item.provider_name;
+  if (named && !open) {
+    return (
+      <p className="budg__offer-q budg__prov">
+        From <strong>{named}</strong>{item.provider_profile_id || item.provider_space_id ? ' · on Lichen' : ''}
+        {' · '}<button type="button" className="budg__provbtn" onClick={() => setOpen(true)}>change</button>
+        {' · '}<button type="button" className="budg__provbtn" onClick={() => void save({ provider_profile_id: null, provider_space_id: null, provider_name: null })}>remove</button>
+        {err && <span className="budg__err"> {err}</span>}
+      </p>
+    );
+  }
+  if (!open) {
+    return <button type="button" className="budg__provbtn budg__provadd" onClick={() => setOpen(true)}>+ Who provides it? (a person, business or practitioner — on Lichen or off)</button>;
+  }
+  return (
+    <div className="budg__provform">
+      <input className="budg__offer-in" autoFocus placeholder="e.g. Cherlynn Resager, or Dynamite (DM Plus vitamins)" maxLength={120}
+        value={q} onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && q.trim()) void save({ provider_profile_id: null, provider_space_id: null, provider_name: q.trim() }); if (e.key === 'Escape') setOpen(false); }} />
+      {hits.map((h) => (
+        <button key={h.type + h.id} type="button" className="budg__provhit"
+          onClick={() => void save({ provider_profile_id: h.type === 'profile' ? h.id : null, provider_space_id: h.type === 'space' ? h.id : null, provider_name: h.name })}>
+          {h.name} <em>· {h.sub} on Lichen</em>
+        </button>
+      ))}
+      {q.trim() && (
+        <button type="button" className="budg__provhit budg__provhit--off" onClick={() => void save({ provider_profile_id: null, provider_space_id: null, provider_name: q.trim() })}>
+          Use &ldquo;{q.trim()}&rdquo; <em>· not on Lichen</em>
+        </button>
+      )}
+      <button type="button" className="budg__provbtn" onClick={() => setOpen(false)}>Cancel</button>
       {err && <p className="budg__err">{err}</p>}
     </div>
   );

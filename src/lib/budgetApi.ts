@@ -44,6 +44,16 @@ export interface BudgetItem {
   matchable?: boolean;
   gift_offered_post_id?: string | null;
   gift_offered_at?: string | null;
+  /** WHO provides what's needed (founder 2026-11-16: "as specific as an
+   *  organization's good… or service (body work with cherlynn)") — a member,
+   *  a space, or just a name for someone off Lichen. */
+  provider_profile_id?: string | null;
+  provider_space_id?: string | null;
+  provider_name?: string | null;
+  /** Set only by a Lichen steward (approve_need_funding) — the donation
+   *  wells will fund this much of it. */
+  funded_cents?: number | null;
+  funded_at?: string | null;
   /** Resolved for post-linked rows at render. */
   postTitle?: string;
   /** Null = the listing names no number (gift, trade, unpriced). */
@@ -61,7 +71,7 @@ export function priceCents(text: string | undefined | null): number | null {
 
 export async function listBudget(me: string): Promise<BudgetItem[]> {
   const { data, error } = await supabase.from('budget_items')
-    .select('id, post_id, label, amount_cents, direction, bucket, cadence, on_date, created_at, offer_kind, offer_cents, offer_trade, matchable, gift_offered_post_id, gift_offered_at')
+    .select('id, post_id, label, amount_cents, direction, bucket, cadence, on_date, created_at, offer_kind, offer_cents, offer_trade, matchable, gift_offered_post_id, gift_offered_at, provider_profile_id, provider_space_id, provider_name, funded_cents, funded_at')
     .eq('profile_id', me)
     .order('created_at', { ascending: false });
   if (error) { console.warn('listBudget:', error.message); return []; }
@@ -121,6 +131,25 @@ export async function addBudgetManual(me: string, item: {
 export async function saveNeedOffer(id: string, patch: Partial<Pick<BudgetItem, 'offer_kind' | 'offer_cents' | 'offer_trade' | 'matchable'>>): Promise<void> {
   const { error } = await supabase.from('budget_items').update(patch).eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+/** Name who provides a need — on Lichen (ids) or off (a name). */
+export async function saveNeedProvider(id: string, p: { provider_profile_id: string | null; provider_space_id: string | null; provider_name: string | null }): Promise<void> {
+  const { error } = await supabase.from('budget_items').update(p).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+/** Members and organizations/places on Lichen who could provide a need. */
+export async function searchProviders(q: string): Promise<{ type: 'profile' | 'space'; id: string; name: string; sub: string }[]> {
+  const n = q.trim(); if (n.length < 2) return [];
+  const [p, s] = await Promise.all([
+    supabase.from('profiles').select('id, full_name').eq('findable', true).eq('kind', 'person').ilike('full_name', `%${n}%`).limit(4),
+    supabase.from('spaces').select('id, name, kind').eq('findable', true).ilike('name', `%${n}%`).limit(4),
+  ]);
+  return [
+    ...((p.data as { id: string; full_name: string }[] | null) ?? []).map((r) => ({ type: 'profile' as const, id: r.id, name: r.full_name, sub: 'member' })),
+    ...((s.data as { id: string; name: string; kind: string }[] | null) ?? []).map((r) => ({ type: 'space' as const, id: r.id, name: r.name, sub: r.kind })),
+  ];
 }
 
 export async function removeBudgetItem(id: string): Promise<void> {
