@@ -63,6 +63,7 @@ export type IconName =
   | 'slides'
   | 'palette'
   | 'paperclip'
+  | 'contacts'
   | 'link'
   | 'pencil'
   | 'phone'
@@ -337,6 +338,12 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0.25 0.73 24 24',
     strokeWidth: 1.6,
     content: <><path d="M20 12.5 12.5 20a5 5 0 0 1-7-7L13 5.5a3.5 3.5 0 1 1 5 5l-7.5 7.5a2 2 0 0 1-3-3l7-7" /></>,
+  },
+  // CONTACTS (2026-11-16) — an address book: the card, its index tabs, a person.
+  'contacts': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><rect x="4.5" y="3" width="13" height="18" rx="2" /><path d="M17.5 7.5h2M17.5 12h2M17.5 16.5h2" /><circle cx="11" cy="10" r="2.5" /><path d="M7 17a4 4 0 0 1 8 0" /></>,
   },
   'link': {
     viewBox: '0 0 24 24',

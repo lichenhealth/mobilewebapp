@@ -23,8 +23,9 @@ import './DriveContacts.css';
 type Props = {
   me: string;
   query: string;
-  foldHead: (id: string, label: string, count: number, extra?: React.ReactNode) => React.ReactNode;
-  foldOpen: (id: string) => boolean;
+  /** Inside Drive these folded the section; Contacts' own screen passes neither. */
+  foldHead?: (id: string, label: string, count: number, extra?: React.ReactNode) => React.ReactNode;
+  foldOpen?: (id: string) => boolean;
   /** The desktop split's section list shows the count without rendering the head. */
   onCount?: (n: number) => void;
 };
@@ -132,10 +133,12 @@ export default function DriveContacts({ me, query, foldHead, foldOpen, onCount }
 
   return (
     <section className="drive__drafts dcon">
-      <div className="drive__items-head">
-        {foldHead('contacts', 'Contacts', cardCount)}
-      </div>
-      {foldOpen('contacts') && (<>
+      {foldHead && (
+        <div className="drive__items-head">
+          {foldHead('contacts', 'Contacts', cardCount)}
+        </div>
+      )}
+      {(!foldOpen || foldOpen('contacts')) && (<>
         <div className="dcon__tabs" role="tablist">
           <button role="tab" aria-selected={tab === 'cards'} className={'dcon__tab' + (tab === 'cards' ? ' is-on' : '')} onClick={() => setTab('cards')}>Cards</button>
           <button role="tab" aria-selected={tab === 'lists'} className={'dcon__tab' + (tab === 'lists' ? ' is-on' : '')} onClick={() => setTab('lists')}>Lists{lists.length ? ` · ${lists.length}` : ''}</button>

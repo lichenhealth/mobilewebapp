@@ -26,7 +26,6 @@ import AssistantDoor from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
 import { useActing } from '../acting/ActingProvider';
 import { ActingGate } from '../components/ActingGate';
-import DriveContacts from '../components/DriveContacts';
 
 // DRIVE (founder 2026-08-14): "saving something is different than having it
 // in a drive." The section holds BOTH what you saved and what you created —
@@ -296,8 +295,7 @@ export default function Saved() {
   const [folds, setFolds] = useState<Record<string, boolean>>(() => {
     try {
       const f = JSON.parse(localStorage.getItem('lichen.driveFolds') ?? '{}') as Record<string, boolean>;
-      // /drive?contacts=1 (the contact-joined bell, the brain's door) opens Contacts.
-      return new URLSearchParams(window.location.search).get('contacts') ? { ...f, contacts: true } : f;
+      return f;
     }
     catch { return {}; }
   });
@@ -313,9 +311,14 @@ export default function Saved() {
     on(); mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
-  const [pick, setPick] = useState<string>(() =>
-    new URLSearchParams(window.location.search).get('contacts') ? 'contacts' : 'recents');
-  const [contactCount, setContactCount] = useState(0);
+  const [pick, setPick] = useState<string>('recents');
+  // CONTACTS LEFT DRIVE FOR ITS OWN DOOR (founder 2026-11-16: "let's build
+  // contacts as a side nav… under profile, but not nested under it"). Old
+  // links (/drive?contacts=1 — the contact-joined bell, the brain's door)
+  // land there.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('contacts')) navigate('/contacts', { replace: true });
+  }, [navigate]);
   // THE BUBBLES (founder 2026-11-16: "Maybe these should be bubbles not
   // drop downs, so you can have (All) be a bubble that replaces Chronological
   // and then you can select Folders and it shows just folders"): every width
@@ -773,21 +776,20 @@ export default function Saved() {
   // Row 2's bubbles (founder 2026-11-16: "Folders, Drafts, Contacts, Slides,
   // Docs, Spreadsheets, Photos, Posts and Links" — with All / Saved / Created
   // on the row above): each shows just that kind; a bubble with nothing in it
-  // steps aside, Contacts always stands. None picked = everything.
+  // steps aside. None picked = everything. (Contacts has its own door now.)
   const lensRecents = recents.filter((r) => lens === 'All'
     || (lens === 'Saved' ? !!r.saved : !r.saved));
   const kindCount = (k: string) => lensRecents.filter((r) => r.kind === k).length;
   const navItems: { id: string; label: string; icon: IconName; count: number }[] = ([
     { id: 'folders', label: 'Folders', icon: 'drive' as IconName, count: lens === 'Saved' ? 0 : foldersVisible.length },
     { id: 'drafts', label: 'Drafts', icon: 'pencil' as IconName, count: lens === 'Saved' ? 0 : draftsVisible.length },
-    { id: 'contacts', label: 'Contacts', icon: 'user-multiple' as IconName, count: contactCount },
     { id: 'slides', label: 'Slides', icon: 'slides' as IconName, count: kindCount('slides') },
     { id: 'docs', label: 'Docs', icon: 'newsfeed' as IconName, count: kindCount('docs') },
     { id: 'sheets', label: 'Spreadsheets', icon: 'sheet' as IconName, count: kindCount('sheets') },
     { id: 'photos', label: 'Photos', icon: 'image' as IconName, count: kindCount('photos') },
     { id: 'posts', label: 'Posts', icon: 'bookmark' as IconName, count: kindCount('posts') },
     { id: 'links', label: 'Links', icon: 'link' as IconName, count: kindCount('links') },
-  ]).filter((n) => n.id === 'contacts' || n.count > 0);
+  ]).filter((n) => n.count > 0);
   const activePick = navItems.some((n) => n.id === pick) ? pick : 'recents';
   const ROW_KINDS = ['recents', 'slides', 'docs', 'sheets', 'photos', 'posts', 'links'];
   const shownRecents = activePick === 'recents' ? lensRecents
@@ -1167,7 +1169,6 @@ export default function Saved() {
       {/* ── CONTACTS — guest lists, your private address book (founder
           2026-11-06). Its own section: a list opens in place to manage,
           export (CSV/vCard) or send to an event. ── */}
-      {me && ready && <DriveContacts me={me} query={query} foldHead={foldHead} foldOpen={foldOpen} onCount={setContactCount} />}
 
       {/* ── FILES & DOCS — what Drive's + created or uploaded (founder
           2026-10-21). Private by construction: a private bucket + owner-only

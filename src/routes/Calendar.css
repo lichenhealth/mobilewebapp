@@ -917,3 +917,4 @@
 .calp__leave-title { margin: 0 0 6px; font-weight: 600; font-size: 16px; color: var(--ink); }
 .calp__leave-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .calp__leave-stay { margin-left: auto; }
+.calp__pickdoor { margin: 6px 0 2px; }

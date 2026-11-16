@@ -1,0 +1,2 @@
+.contacts__body { padding: 0 var(--s-5) var(--s-8, 48px); }
+@media (min-width: 1024px) { .contacts__body { max-width: 760px; } }

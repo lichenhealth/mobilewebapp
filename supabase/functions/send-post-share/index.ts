@@ -58,7 +58,7 @@ function firstPhoto(p: any): string | null {
   return media.find((m) => m?.type === 'photo' && m?.url)?.url ?? p?.image_url ?? null;
 }
 // deno-lint-ignore no-explicit-any
-const postTitle = (p: any) => (p?.title?.trim() || String(p?.body ?? '').trim().slice(0, 60) || 'A listing');
+const postTitle = (p: any) => (p?.title?.trim() || String(p?.body ?? '').trim().slice(0, 60) || 'A post');
 
 // deno-lint-ignore no-explicit-any
 async function sellerName(p: any): Promise<string> {
@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
       eyebrow: 'Shared with you', title: postTitle(p), price, seller,
       body: esc(snippet) + (String(p.body ?? '').length > 220 ? '…' : ''),
       link, cta: 'See it', photo: firstPhoto(p),
-      fine: `${first ? esc(first) + ', ' : ''}${esc(seller)} shared this with you on Lichen — a community marketplace. You don't need an account to look${price ? ' or to buy it by card' : ''}. This link is just for you.`,
+      fine: `${first ? esc(first) + ', ' : ''}${esc(seller)} shared this with you on Lichen — a community network. You don't need an account to look${price ? ' or to buy it by card' : ''}. This link is just for you.`,
     });
     const text = `${seller} shared "${postTitle(p)}" with you on Lichen.\n${price ? price + '\n' : ''}\nSee it: ${link}\n\nYou don't need an account to look${price ? ' or to buy it by card' : ''}. This link is just for you.`;
     try {

@@ -56,6 +56,9 @@ const PRIMARY: { to: string; label: string; icon: IconName }[] = [
   { to: '/currentcy', label: 'Current-cy', icon: 'currentcy' },
   { to: '/maps',      label: 'Maps',      icon: 'maps' },
   { to: '/profile',   label: 'Profile',   icon: 'profile' },
+  // CONTACTS (founder 2026-11-16: "a side nav, maybe under profile, but not
+  // nested under it") — its own door right below Profile.
+  { to: '/contacts',  label: 'Contacts',  icon: 'contacts' },
   { to: '/invite',    label: 'Invite to Lichen', icon: 'user-multiple' },
   { to: '/mail',      label: 'Mail',      icon: 'mail' },
   { to: '/trash',     label: 'Trash',     icon: 'trash' },

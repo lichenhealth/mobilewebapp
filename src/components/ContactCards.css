@@ -39,3 +39,6 @@
 .lshare__sugg { display: flex; flex-direction: column; border: 1px solid var(--bone-edge); border-radius: 8px; background: #fff; }
 .lshare__sugg button { text-align: left; border: 0; background: none; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
 .lshare__sugg button:hover { background: var(--bone-warm); }
+/* ConfirmCard.css owns a bare .ccard (the assistant's confirm card) — stand its
+   frame down here so contact rows don't wear a peach box. */
+.ccards .ccard { border: 0; background: none; border-radius: 0; padding: 0; gap: 0; max-width: none; display: block; }
