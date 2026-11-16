@@ -30,6 +30,43 @@ interface SharedNeed {
   amount_cents: number | null; offer_kind: 'pay' | 'trade' | 'none' | null;
   offer_cents: number | null; offer_trade: string | null; created_at: string;
   gift_offered_post_id: string | null;
+  provider_name: string | null; provider_profile_id: string | null; provider_space_id: string | null;
+  funded_cents: number | null; funded_at: string | null;
+  gifts_received_180d: number; funded_180d_cents: number;
+}
+interface Being {
+  being_id: string; name: string | null; kind: string | null; jurisdiction: string | null;
+  received_cents: number; exchanged_cents: number; returned_cents: number; records: number;
+}
+
+/** What the wells would fund: the whole fee when they can't pay, else the
+ *  part beyond what they can afford (founder 2026-11-16: "the totality of
+ *  her fee… or a portion based on how much you can afford"). */
+function fundGap(n: SharedNeed): number | null {
+  if (!n.amount_cents) return null;
+  const can = n.offer_kind === 'pay' ? (n.offer_cents ?? 0) : 0;
+  return Math.max(0, n.amount_cents - can);
+}
+
+/** THE SUGGESTION — deterministic, by NEED, never by what someone has given
+ *  ("Gifts flow to need. Giving earns no claim on receiving."). A steward
+ *  reads the reasons and decides; nothing moves on the score. */
+function needScore(n: SharedNeed): { score: number; why: string[] } {
+  let score = 0; const why: string[] = [];
+  if (n.offer_kind === 'none') { score += 3; why.push("can't pay right now"); }
+  else if (n.offer_kind === 'trade') { score += 1; why.push('can only trade'); }
+  else if (n.offer_kind === 'pay' && n.amount_cents && (n.offer_cents ?? 0) < n.amount_cents) {
+    score += 1; why.push(`can afford ${dollars(n.offer_cents ?? 0)} of ${dollars(n.amount_cents)}`);
+  }
+  const days = (Date.now() - +new Date(n.created_at)) / 86400000;
+  const wait = Math.min(3, Math.floor(days / 14));
+  if (wait > 0) { score += wait; why.push(`waiting ${Math.round(days)} days`); }
+  const recent = n.gifts_received_180d + Math.floor((n.funded_180d_cents ?? 0) / 10000);
+  if (recent > 0) { score -= Math.min(4, recent); why.push('already received recently'); }
+  else why.push('nothing received lately');
+  if (n.gift_offered_post_id) { score -= 1; why.push('a gift was already offered'); }
+  if (n.provider_name) why.push(`from ${n.provider_name}`);
+  return { score, why };
 }
 const needWords = (n: SharedNeed) => new Set(n.label.toLowerCase().replace(/[^a-z0-9\s]/g, ' ')
   .split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)));
@@ -73,6 +110,8 @@ export default function RoutingDesk() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [shared, setShared] = useState<SharedNeed[]>([]);
+  const [beings, setBeings] = useState<Being[]>([]);
+  const [fundAmt, setFundAmt] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let live = true;
@@ -116,6 +155,8 @@ export default function RoutingDesk() {
       setMatches(m);
       const { data: sn } = await supabase.rpc('routing_needs');
       if (live) setShared((sn as SharedNeed[] | null) ?? []);
+      const { data: bg } = await supabase.rpc('routing_beings');
+      if (live) setBeings(((bg as Being[] | null) ?? []).filter((b) => b.received_cents - b.returned_cents > 0));
 
       // In-kind offers waiting for acceptance (quietly absent pre-migration).
       const { data: ik } = await supabase.from('inkind_donations')
@@ -161,6 +202,21 @@ export default function RoutingDesk() {
     setNote(`Offered — ${need.full_name ?? 'they'} got a bell with a door to the gift. Nothing moves until they take it up.`);
     setShared((cur) => cur.map((x) => x.id === need.id ? { ...x, gift_offered_post_id: postId } : x));
   };
+  const fundNeed = async (n: SharedNeed) => {
+    const raw = fundAmt[n.id] ?? String((fundGap(n) ?? 0) / 100);
+    const c = Math.round(parseFloat(raw) * 100);
+    if (!c || c <= 0) { setNote('Name an amount to fund.'); return; }
+    setBusy(true); setNote('');
+    const { error } = await supabase.rpc('approve_need_funding', { p_need: n.id, p_cents: c });
+    setBusy(false);
+    if (error) { setNote(error.message); return; }
+    setNote(`Approved ${dollars(c)} for ${n.full_name ?? 'them'} — they got a bell. Arrange the payment${n.provider_name ? ` with ${n.provider_name}` : ''} by hand.`);
+    setShared((cur) => cur.map((x) => x.id === n.id ? { ...x, funded_cents: c, funded_at: new Date().toISOString() } : x));
+  };
+  const suggested = shared.filter((n) => !n.funded_cents)
+    .map((n) => ({ n, ...needScore(n) }))
+    .sort((a, b) => b.score - a.score || +new Date(a.n.created_at) - +new Date(b.n.created_at))
+    .slice(0, 5);
   const needsFor = (o: Listing) => {
     const ow = tokens(o);
     return shared.filter((n) => n.profile_id !== o.author_id)
@@ -181,6 +237,63 @@ export default function RoutingDesk() {
       </p>
 
       {note && <p className="curc__error">{note}</p>}
+
+      {/* SUGGESTED ROUTING (founder 2026-11-16: "the algo to suggest
+          routing, although its manual now"). Ranked by need; the steward
+          approves each one, and v1 arranges the payment by hand. */}
+      {(suggested.length > 0 || beings.length > 0) && (
+        <div className="curc__routing-suggest">
+          <h3 className="adminc__h2">Suggested next — by need</h3>
+          <p className="adminc__sub">
+            Ranked by who can least afford it, how long they&rsquo;ve waited, and
+            whether they&rsquo;ve received lately — never by what they&rsquo;ve given.
+            You decide; approving bells them, and you arrange the payment.
+          </p>
+          {suggested.map(({ n, why }) => {
+            const gap = fundGap(n);
+            return (
+              <div className="curc__routing-match" key={'s' + n.id}>
+                <div className="curc__routing-match-head">
+                  <strong>{n.full_name ?? 'A member'}</strong>
+                  <span>{n.label}{n.provider_name ? ` · ${n.provider_name}` : ''}{n.amount_cents ? ` · ${dollars(n.amount_cents)}` : ''}</span>
+                </div>
+                <p className="curc__routing-why">{why.join(' · ')}</p>
+                <div className="curc__routing-acts">
+                  <button className="curc__keep" onClick={() => void message(n.profile_id)}>Message them</button>
+                  <span className="curc__routing-fund">
+                    $<input inputMode="decimal" aria-label="Amount to fund"
+                      value={fundAmt[n.id] ?? (gap != null ? String(gap / 100) : '')}
+                      placeholder="amount"
+                      onChange={(e) => setFundAmt((c) => ({ ...c, [n.id]: e.target.value.replace(/[^0-9.]/g, '') }))} />
+                  </span>
+                  <button className="btn btn-primary curc__go" disabled={busy} onClick={() => void fundNeed(n)}>Fund from donations</button>
+                </div>
+              </div>
+            );
+          })}
+          {beings.length > 0 && (<>
+            <h3 className="adminc__h2 curc__routing-needs-h">Beings owed restoration</h3>
+            <p className="adminc__sub">Where members recorded that a plant, animal, place or element gave more than it received. Totals only — never anyone&rsquo;s note.</p>
+            {beings.map((b) => (
+              <div className="curc__routing-match" key={b.being_id}>
+                <div className="curc__routing-match-head">
+                  <strong>{b.name ?? 'A being'}</strong>
+                  <span>{b.kind}{b.jurisdiction ? ` · ${b.jurisdiction}` : ''}</span>
+                </div>
+                <p className="curc__routing-why">
+                  gave {dollars(Number(b.received_cents))} in true value
+                  {Number(b.exchanged_cents) ? ` (${dollars(Number(b.exchanged_cents))} changed hands)` : ''}
+                  {' · '}received back {dollars(Number(b.returned_cents))}
+                  {' · '}{b.records} record{b.records === 1 ? '' : 's'}
+                </p>
+                <div className="curc__routing-acts">
+                  <button className="curc__keep" onClick={() => navigate(`/members/${b.being_id}`)}>See {b.name ?? 'them'}</button>
+                </div>
+              </div>
+            ))}
+          </>)}
+        </div>
+      )}
 
       {entrusted.length === 0 && (
         <p className="curc__empty">
@@ -264,9 +377,9 @@ export default function RoutingDesk() {
         <div className="curc__routing-match" key={n.id}>
           <div className="curc__routing-match-head">
             <strong>{n.full_name ?? 'A member'}</strong>
-            <span>{n.label}{n.amount_cents ? ` · about ${dollars(n.amount_cents)}` : ''}</span>
+            <span>{n.label}{n.provider_name ? ` · ${n.provider_name}` : ''}{n.amount_cents ? ` · about ${dollars(n.amount_cents)}` : ''}</span>
           </div>
-          <p className="curc__routing-why">{offerLine(n)} · shared {new Date(n.created_at).toLocaleDateString()}{n.gift_offered_post_id ? ' · a gift was offered' : ''}</p>
+          <p className="curc__routing-why">{offerLine(n)} · shared {new Date(n.created_at).toLocaleDateString()}{n.gift_offered_post_id ? ' · a gift was offered' : ''}{n.funded_cents ? ` · funded ${dollars(n.funded_cents)}` : ''}</p>
           <div className="curc__routing-acts">
             <button className="curc__keep" onClick={() => void message(n.profile_id)}>Message them</button>
           </div>

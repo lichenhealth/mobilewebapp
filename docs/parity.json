@@ -882,5 +882,17 @@
  },
  "contactsApi:listSharedWithMe": {
   "exempt": "a read (the rpc call is a lookup, not a write)"
+ },
+ "trueValueApi:saveTrueValueFor": {
+  "gap": "1"
+ },
+ "trueValueApi:addManualTrueValue": {
+  "gap": "1"
+ },
+ "trueValueApi:deleteTrueValue": {
+  "gap": "1"
+ },
+ "budgetApi:saveNeedProvider": {
+  "gap": "1"
  }
 }

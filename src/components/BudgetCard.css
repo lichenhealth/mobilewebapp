@@ -90,3 +90,36 @@
 .vflow__sum { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--bone-edge); border-radius: 10px; background: #fff; font-size: 12.5px; color: var(--ink-soft); }
 .vflow__sum-k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-muted); }
 .vflow__lead { max-width: none; } .vflow__more { align-self: flex-start; }
+.vflow__item { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--bone-edge-soft, var(--bone-edge)); }
+.vflow__tv { margin: 0; font-size: 12.5px; color: var(--ink-muted); }
+.vflow__tv strong { color: var(--ink); font-weight: 500; }
+.vflow__tvbtn { background: none; border: 0; padding: 0; font: inherit; font-size: 12.5px; color: var(--peach-deep); cursor: pointer; }
+.vflow__tvbtn:hover { text-decoration: underline; }
+.vflow__rm { color: var(--red-deep, #a4442f); }
+.vflow__truth { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--bone); margin-bottom: 8px; }
+.vflow__truth p { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.vflow__truth strong { color: var(--ink); font-weight: 500; }
+.vflow__truth em { font-style: normal; color: var(--peach-deep); }
+.vflow__form { display: flex; flex-direction: column; gap: 6px; padding: 6px 0 4px; }
+.vflow__form--manual { padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: 10px; background: #fff; margin-top: 6px; }
+.vflow__form .budg__offer-in { max-width: none; width: 100%; box-sizing: border-box; }
+.vflow__pair { display: flex; gap: 6px; flex-wrap: wrap; }
+.vflow__pair .vflow__amt { flex: 1 1 140px; width: auto; }
+.vflow__formacts { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.vflow__save { padding: 6px 16px; font-size: 13px; }
+.vflow__who { display: flex; flex-direction: column; gap: 4px; }
+.vflow__hit { text-align: left; background: var(--peach-tint); border: 1px solid var(--peach); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; }
+.vflow__hit em { font-style: normal; color: var(--ink-muted); }
+.vflow__fine { font-size: 12px; }
+.vflow__add { align-self: flex-start; margin-top: 8px; }
+.budg__prov { margin: 0; }
+.budg__prov strong { color: var(--ink); font-weight: 500; }
+.budg__provbtn { background: none; border: 0; padding: 0; font: inherit; font-size: 12.5px; color: var(--peach-deep); cursor: pointer; }
+.budg__provadd { align-self: flex-start; text-align: left; }
+.budg__provform { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.budg__provform .budg__offer-in { width: 100%; box-sizing: border-box; }
+.budg__provhit { text-align: left; background: #fff; border: 1px solid var(--bone-edge); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; width: 100%; max-width: 360px; }
+.budg__provhit:hover { border-color: var(--peach); }
+.budg__provhit em { font-style: normal; color: var(--ink-muted); }
+.budg__funded { color: var(--green-deep, #3e5c3a); margin: 0; }
+.vflow__add { margin-left: 0 !important; }
