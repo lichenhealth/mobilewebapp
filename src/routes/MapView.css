@@ -32,7 +32,7 @@
   transition: all var(--d-fast) var(--ease-out);
 }
 .mapv__bar-btn:hover { border-color: var(--peach); color: var(--ink); }
-.mapv__bar-btn.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
+.mapv__bar-btn.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
 
 .mapv__layers {
   display: flex;

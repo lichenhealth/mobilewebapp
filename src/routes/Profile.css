@@ -22,7 +22,7 @@
   line-height: 1.2;
   transition: border-color var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out), background var(--d-fast) var(--ease-out);
 }
-.prof__notif-opt.is-on { background: var(--peach); border-color: var(--peach); color: var(--bone-warm); }
+.prof__notif-opt.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
 
 .prof__push { margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--bone-edge); }
 .prof__push-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
@@ -116,7 +116,7 @@
   border: 1px solid var(--bone-edge); background: var(--bone-warm); color: var(--ink-muted);
   transition: border-color var(--d-fast) var(--ease-out), background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
-.prof__cap.is-on { border-color: var(--peach); background: var(--peach); color: #fff; }
+.prof__cap.is-on { border-color: var(--peach); background: var(--peach-tint); color: var(--peach-deep); }
 
 .prof__empty { font-size: var(--t-sm); color: var(--ink-faint); margin-bottom: var(--s-3); }
 .prof__spaces { display: flex; flex-direction: column; gap: var(--s-2); }
@@ -135,7 +135,7 @@
 .prof__add { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-3); padding: var(--s-3); border: 1px dashed var(--bone-edge); border-radius: var(--r-md); }
 .prof__add-seg { display: flex; gap: 4px; background: var(--bone); border-radius: var(--r-sm); padding: 3px; }
 .prof__add-seg button { flex: 1; padding: 6px 4px; font-size: var(--t-xs); font-weight: 600; color: var(--ink-muted); border-radius: calc(var(--r-sm) - 2px); transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out); }
-.prof__add-seg button.is-on { background: var(--peach); color: #fff; }
+.prof__add-seg button.is-on { background: var(--peach-tint); color: var(--peach-deep); border-color: var(--peach); }
 .prof__add-row { display: flex; gap: var(--s-2); align-items: stretch; }
 .prof__add-row .prof__input { flex: 1; }
 

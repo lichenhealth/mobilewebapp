@@ -25,6 +25,8 @@ type Props = {
   query: string;
   foldHead: (id: string, label: string, count: number, extra?: React.ReactNode) => React.ReactNode;
   foldOpen: (id: string) => boolean;
+  /** The desktop split's section list shows the count without rendering the head. */
+  onCount?: (n: number) => void;
 };
 
 /** "Rick Countryman rick@barn.com" → "Rick Countryman" (the contact stripped). */
@@ -35,7 +37,7 @@ function nameFrom(line: string): string {
     .replace(/[<>,]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) {
+export default function DriveContacts({ me, query, foldHead, foldOpen, onCount }: Props) {
   const navigate = useNavigate();
   const [lists, setLists] = useState<GuestList[]>([]);
   const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
@@ -52,6 +54,7 @@ export default function DriveContacts({ me, query, foldHead, foldOpen }: Props) 
   // others share land under Shared with you.
   const [tab, setTab] = useState<'cards' | 'lists' | 'shared'>('cards');
   const [cardCount, setCardCount] = useState(0);
+  useEffect(() => { onCount?.(cardCount); }, [cardCount, onCount]);
   const [shared, setShared] = useState<SharedList[]>([]);
   const [sharing, setSharing] = useState<string | null>(null);
 

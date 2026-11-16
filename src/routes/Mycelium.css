@@ -87,9 +87,8 @@
   background: var(--peach-tint);
 }
 .myc__kind.is-on .myc__kind-circle {
-  background: var(--peach);
-  color: var(--bone-warm);
-}
+  background: var(--peach-tint);
+  color: var(--peach-deep); border-color: var(--peach); }
 
 /* ─── Service-area lens row (multi-select) ──────────────────────────── */
 .myc__areas {
@@ -112,8 +111,8 @@
 .myc__area:hover { border-color: var(--ink-muted); color: var(--ink); }
 .myc__area.is-on {
   border-color: var(--peach);
-  background: var(--peach);
-  color: var(--bone-warm);
+  background: var(--peach-tint);
+  color: var(--peach-deep);
 }
 /* The directory DOOR at the row's end — never lights up like a lens;
    a touch of left margin sets it apart from the toggles. */

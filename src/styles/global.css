@@ -332,8 +332,8 @@ input, textarea, select { font: inherit; color: inherit; }
 /* Admin wears peach like everything else now (founder 2026-09-26: "get rid
    of the blue and have it all be the peach") — the old blue = stewardship
    color split is retired on controls and badges. */
-.view-toggle__side--admin.is-on { background: var(--peach); color: #fff; }
-.view-toggle__side--admin.is-on .view-toggle__badge { background: #fff; color: var(--peach-deep); }
+.view-toggle__side--admin.is-on { background: var(--peach-tint); color: var(--peach-deep); border-color: var(--peach); }
+.view-toggle__side--admin.is-on .view-toggle__badge { background: var(--peach); color: #fff; }
 .view-toggle__badge {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; padding: 0 5px;
