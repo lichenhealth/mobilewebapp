@@ -32,7 +32,16 @@ interface SharedNeed {
   gift_offered_post_id: string | null;
   provider_name: string | null; provider_profile_id: string | null; provider_space_id: string | null;
   funded_cents: number | null; funded_at: string | null;
+  paid_at: string | null; paid_note: string | null;
   gifts_received_180d: number; funded_180d_cents: number;
+  /** The suggestion, computed server-side (_need_score — one source). */
+  score: number; reasons: string[];
+}
+interface TvReview {
+  id: string; owner_id: string; owner_name: string | null; source: string; direction: 'given' | 'received';
+  title: string | null; counterparty: string | null; being_name: string | null;
+  exchanged_cents: number | null; true_cents: number; note: string | null; at: string;
+  review_status: 'pending' | 'questioned'; review_note: string | null;
 }
 interface Being {
   being_id: string; name: string | null; kind: string | null; jurisdiction: string | null;
@@ -48,26 +57,7 @@ function fundGap(n: SharedNeed): number | null {
   return Math.max(0, n.amount_cents - can);
 }
 
-/** THE SUGGESTION — deterministic, by NEED, never by what someone has given
- *  ("Gifts flow to need. Giving earns no claim on receiving."). A steward
- *  reads the reasons and decides; nothing moves on the score. */
-function needScore(n: SharedNeed): { score: number; why: string[] } {
-  let score = 0; const why: string[] = [];
-  if (n.offer_kind === 'none') { score += 3; why.push("can't pay right now"); }
-  else if (n.offer_kind === 'trade') { score += 1; why.push('can only trade'); }
-  else if (n.offer_kind === 'pay' && n.amount_cents && (n.offer_cents ?? 0) < n.amount_cents) {
-    score += 1; why.push(`can afford ${dollars(n.offer_cents ?? 0)} of ${dollars(n.amount_cents)}`);
-  }
-  const days = (Date.now() - +new Date(n.created_at)) / 86400000;
-  const wait = Math.min(3, Math.floor(days / 14));
-  if (wait > 0) { score += wait; why.push(`waiting ${Math.round(days)} days`); }
-  const recent = n.gifts_received_180d + Math.floor((n.funded_180d_cents ?? 0) / 10000);
-  if (recent > 0) { score -= Math.min(4, recent); why.push('already received recently'); }
-  else why.push('nothing received lately');
-  if (n.gift_offered_post_id) { score -= 1; why.push('a gift was already offered'); }
-  if (n.provider_name) why.push(`from ${n.provider_name}`);
-  return { score, why };
-}
+
 const needWords = (n: SharedNeed) => new Set(n.label.toLowerCase().replace(/[^a-z0-9\s]/g, ' ')
   .split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)));
 const dollars = (c: number) => '$' + (c % 100 ? (c / 100).toFixed(2) : String(c / 100));
@@ -112,6 +102,8 @@ export default function RoutingDesk() {
   const [shared, setShared] = useState<SharedNeed[]>([]);
   const [beings, setBeings] = useState<Being[]>([]);
   const [fundAmt, setFundAmt] = useState<Record<string, string>>({});
+  const [tvq, setTvq] = useState<TvReview[]>([]);
+  const [askNote, setAskNote] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let live = true;
@@ -155,6 +147,8 @@ export default function RoutingDesk() {
       setMatches(m);
       const { data: sn } = await supabase.rpc('routing_needs');
       if (live) setShared((sn as SharedNeed[] | null) ?? []);
+      const { data: tq } = await supabase.rpc('true_value_review_queue');
+      if (live) setTvq((tq as TvReview[] | null) ?? []);
       const { data: bg } = await supabase.rpc('routing_beings');
       if (live) setBeings(((bg as Being[] | null) ?? []).filter((b) => b.received_cents - b.returned_cents > 0));
 
@@ -170,6 +164,13 @@ export default function RoutingDesk() {
     })();
     return () => { live = false; };
   }, []);
+
+  // The daily suggestion bell lands here (#routing) once the desk has loaded.
+  useEffect(() => {
+    if (entrusted === null || typeof location === 'undefined' || location.hash !== '#routing') return;
+    const el = document.getElementById('routing');
+    if (el) setTimeout(() => el.scrollIntoView({ block: 'start' }), 150);
+  }, [entrusted]);
 
   if (entrusted === null) return null;
 
@@ -213,10 +214,25 @@ export default function RoutingDesk() {
     setNote(`Approved ${dollars(c)} for ${n.full_name ?? 'them'} — they got a bell. Arrange the payment${n.provider_name ? ` with ${n.provider_name}` : ''} by hand.`);
     setShared((cur) => cur.map((x) => x.id === n.id ? { ...x, funded_cents: c, funded_at: new Date().toISOString() } : x));
   };
+  const markPaid = async (n: SharedNeed) => {
+    setBusy(true); setNote('');
+    const { error } = await supabase.rpc('mark_need_paid', { p_need: n.id, p_note: null });
+    setBusy(false);
+    if (error) { setNote(error.message); return; }
+    setShared((cur) => cur.map((x) => x.id === n.id ? { ...x, paid_at: new Date().toISOString(), paid_note: 'Paid from Relay' } : x));
+  };
+  const reviewTv = async (t: TvReview, ok: boolean) => {
+    setBusy(true); setNote('');
+    const { error } = await supabase.rpc('review_true_value', { p_id: t.id, p_ok: ok, p_note: ok ? null : (askNote[t.id] ?? '').trim() || null });
+    setBusy(false);
+    if (error) { setNote(error.message); return; }
+    setTvq((cur) => ok ? cur.filter((x) => x.id !== t.id) : cur.map((x) => x.id === t.id ? { ...x, review_status: 'questioned' as const, review_note: (askNote[t.id] ?? '').trim() || null } : x));
+  };
   const suggested = shared.filter((n) => !n.funded_cents)
-    .map((n) => ({ n, ...needScore(n) }))
-    .sort((a, b) => b.score - a.score || +new Date(a.n.created_at) - +new Date(b.n.created_at))
+    .map((n) => ({ n, why: [...(n.reasons ?? []), ...(n.provider_name ? [`from ${n.provider_name}`] : [])] }))
+    .sort((a, b) => (b.n.score ?? 0) - (a.n.score ?? 0) || +new Date(a.n.created_at) - +new Date(b.n.created_at))
     .slice(0, 5);
+  const toPay = shared.filter((n) => n.funded_cents && !n.paid_at);
   const needsFor = (o: Listing) => {
     const ow = tokens(o);
     return shared.filter((n) => n.profile_id !== o.author_id)
@@ -228,7 +244,7 @@ export default function RoutingDesk() {
   const label = (l: Listing) => l.title || (l.body.length > 60 ? l.body.slice(0, 57) + '…' : l.body);
 
   return (
-    <div className="adminc__gift curc__mint">
+    <div className="adminc__gift curc__mint" id="routing" style={{ scrollMarginTop: 'calc(var(--top-h, 64px) + 10px)' }}>
       <h2 className="adminc__h2">The routing desk</h2>
       <p className="adminc__sub">
         Offerings entrusted to Lichen&rsquo;s routing, matched against open
@@ -241,13 +257,14 @@ export default function RoutingDesk() {
       {/* SUGGESTED ROUTING (founder 2026-11-16: "the algo to suggest
           routing, although its manual now"). Ranked by need; the steward
           approves each one, and v1 arranges the payment by hand. */}
-      {(suggested.length > 0 || beings.length > 0) && (
+      {(suggested.length > 0 || beings.length > 0 || toPay.length > 0) && (
         <div className="curc__routing-suggest">
           <h3 className="adminc__h2">Suggested next — by need</h3>
           <p className="adminc__sub">
             Ranked by who can least afford it, how long they&rsquo;ve waited, and
             whether they&rsquo;ve received lately — never by what they&rsquo;ve given.
-            You decide; approving bells them, and you arrange the payment.
+            You decide; approving bells them, then you pay it from Relay and mark it paid here.
+            A daily bell brings you new suggestions.
           </p>
           {suggested.map(({ n, why }) => {
             const gap = fundGap(n);
@@ -271,6 +288,21 @@ export default function RoutingDesk() {
               </div>
             );
           })}
+          {toPay.length > 0 && (<>
+            <h3 className="adminc__h2 curc__routing-needs-h">Approved — pay from Relay</h3>
+            {toPay.map((n) => (
+              <div className="curc__routing-match" key={'p' + n.id}>
+                <div className="curc__routing-match-head">
+                  <strong>{n.full_name ?? 'A member'}</strong>
+                  <span>{n.label}{n.provider_name ? ` · ${n.provider_name}` : ''} · {dollars(n.funded_cents ?? 0)}</span>
+                </div>
+                <div className="curc__routing-acts">
+                  <button className="curc__keep" onClick={() => void message(n.profile_id)}>Message them</button>
+                  <button className="btn btn-primary curc__go" disabled={busy} onClick={() => void markPaid(n)}>Mark paid from Relay</button>
+                </div>
+              </div>
+            ))}
+          </>)}
           {beings.length > 0 && (<>
             <h3 className="adminc__h2 curc__routing-needs-h">Beings owed restoration</h3>
             <p className="adminc__sub">Where members recorded that a plant, animal, place or element gave more than it received. Totals only — never anyone&rsquo;s note.</p>
@@ -368,6 +400,35 @@ export default function RoutingDesk() {
         </div>
       ))}
 
+      {/* TRUE VALUES — honor system, with a check (founder 2026-11-16). They
+          already count; this is the steward's look after. */}
+      {tvq.length > 0 && (<>
+        <h3 className="adminc__h2 curc__routing-needs-h">True values to look over · {tvq.filter((t) => t.review_status === 'pending').length}</h3>
+        <p className="adminc__sub">Each person sets their own; they count right away. Mark one looked over, or ask about it — they get a bell.</p>
+        {tvq.map((t) => (
+          <div className="curc__routing-match" key={'tv' + t.id}>
+            <div className="curc__routing-match-head">
+              <strong>{t.owner_name ?? 'A member'}</strong>
+              <span>{t.direction === 'received' ? 'received' : 'gave'} {t.title ?? 'a value'}{t.being_name ? ` · ${t.being_name}` : t.counterparty ? ` · ${t.counterparty}` : ''}</span>
+            </div>
+            <p className="curc__routing-why">
+              {t.exchanged_cents != null ? `${dollars(t.exchanged_cents)} changed hands · ` : ''}truly worth {dollars(t.true_cents)}
+              {t.note ? ` · “${t.note}”` : ''}
+              {t.review_status === 'questioned' ? ` · you asked${t.review_note ? `: ${t.review_note}` : ''}` : ''}
+            </p>
+            <div className="curc__routing-acts">
+              <button className="curc__keep" onClick={() => void message(t.owner_id)}>Message them</button>
+              {t.review_status === 'pending' && (
+                <input className="curc__routing-ask" placeholder="A question (optional)" maxLength={500}
+                  value={askNote[t.id] ?? ''} onChange={(e) => setAskNote((c) => ({ ...c, [t.id]: e.target.value }))} />
+              )}
+              {t.review_status === 'pending' && <button className="curc__keep" disabled={busy} onClick={() => void reviewTv(t, false)}>Ask about it</button>}
+              <button className="btn btn-primary curc__go" disabled={busy} onClick={() => void reviewTv(t, true)}>Looks right ✓</button>
+            </div>
+          </div>
+        ))}
+      </>)}
+
       {/* SHARED NEEDS — what members chose to show the matcher. Gifts flow
           to need; giving earns no claim on receiving. Judge by need. */}
       <h3 className="adminc__h2 curc__routing-needs-h">Needs shared with the matcher · {shared.length}</h3>
@@ -379,7 +440,7 @@ export default function RoutingDesk() {
             <strong>{n.full_name ?? 'A member'}</strong>
             <span>{n.label}{n.provider_name ? ` · ${n.provider_name}` : ''}{n.amount_cents ? ` · about ${dollars(n.amount_cents)}` : ''}</span>
           </div>
-          <p className="curc__routing-why">{offerLine(n)} · shared {new Date(n.created_at).toLocaleDateString()}{n.gift_offered_post_id ? ' · a gift was offered' : ''}{n.funded_cents ? ` · funded ${dollars(n.funded_cents)}` : ''}</p>
+          <p className="curc__routing-why">{offerLine(n)} · shared {new Date(n.created_at).toLocaleDateString()}{n.gift_offered_post_id ? ' · a gift was offered' : ''}{n.funded_cents ? ` · funded ${dollars(n.funded_cents)}` : ''}{n.paid_at ? ` · ${n.paid_note ?? 'paid'}` : ''}</p>
           <div className="curc__routing-acts">
             <button className="curc__keep" onClick={() => void message(n.profile_id)}>Message them</button>
           </div>

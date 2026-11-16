@@ -155,3 +155,4 @@
 .curc__routing-suggest .curc__routing-match { border-top-color: var(--peach); }
 .curc__routing-fund { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: var(--ink-soft); }
 .curc__routing-fund input { width: 72px; border: 1px solid var(--bone-edge); border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 13px; background: #fff; }
+.curc__routing-ask { flex: 1 1 180px; min-width: 0; border: 1px solid var(--bone-edge); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; background: #fff; }

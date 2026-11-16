@@ -20,9 +20,13 @@ export interface TrueValue {
   true_cents: number;
   note: string | null;
   at: string;
+  /** Honor system, with a check: counts the moment it's set; a steward's
+   *  look follows (reviewed ✓ or a question), never a gate. */
+  review_status: 'pending' | 'reviewed' | 'questioned';
+  review_note: string | null;
 }
 
-const COLS = 'id, source, source_id, direction, title, counterparty, being_id, exchanged_cents, true_cents, note, at, being:profiles!true_values_being_id_fkey(full_name, kind)';
+const COLS = 'id, source, source_id, direction, title, counterparty, being_id, exchanged_cents, true_cents, note, at, review_status, review_note, being:profiles!true_values_being_id_fkey(full_name, kind)';
 
 export async function listTrueValues(): Promise<TrueValue[]> {
   const { data, error } = await supabase.from('true_values').select(COLS).order('at', { ascending: false }).limit(300);

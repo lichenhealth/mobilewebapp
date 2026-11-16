@@ -123,3 +123,6 @@
 .budg__provhit em { font-style: normal; color: var(--ink-muted); }
 .budg__funded { color: var(--green-deep, #3e5c3a); margin: 0; }
 .vflow__add { margin-left: 0 !important; }
+.vflow__rev { color: var(--ink-muted); }
+.vflow__rev--reviewed { color: var(--green-deep, #3e5c3a); }
+.vflow__rev--questioned { color: var(--red-deep, #a4442f); }
