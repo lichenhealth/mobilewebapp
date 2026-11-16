@@ -22,6 +22,24 @@ interface Listing {
   author?: { full_name: string | null } | null;
 }
 interface Match { need: Listing; score: number; words: string[]; styles: string[] }
+/** A need a member SHARED with Lichen's matcher from their Budget (the gift
+ *  economy, 2026-11-16: "Gifts flow to need. Giving earns no claim on
+ *  receiving."). Only routing_needs() reads these — admin-gated server-side. */
+interface SharedNeed {
+  id: string; profile_id: string; full_name: string | null; label: string;
+  amount_cents: number | null; offer_kind: 'pay' | 'trade' | 'none' | null;
+  offer_cents: number | null; offer_trade: string | null; created_at: string;
+  gift_offered_post_id: string | null;
+}
+const needWords = (n: SharedNeed) => new Set(n.label.toLowerCase().replace(/[^a-z0-9\s]/g, ' ')
+  .split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)));
+const dollars = (c: number) => '$' + (c % 100 ? (c / 100).toFixed(2) : String(c / 100));
+function offerLine(n: SharedNeed): string {
+  if (n.offer_kind === 'pay') return n.offer_cents ? `can put ${dollars(n.offer_cents)} toward it` : 'can pay some';
+  if (n.offer_kind === 'trade') return n.offer_trade ? `could trade: ${n.offer_trade}` : 'could trade';
+  if (n.offer_kind === 'none') return "can't pay right now";
+  return 'no offer named';
+}
 
 const STOP = new Set([
   'the', 'a', 'an', 'and', 'or', 'for', 'of', 'to', 'in', 'on', 'with', 'my',
@@ -54,6 +72,7 @@ export default function RoutingDesk() {
   const [inkind, setInkind] = useState<Record<string, { id: string; kind: string }>>({});
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  const [shared, setShared] = useState<SharedNeed[]>([]);
 
   useEffect(() => {
     let live = true;
@@ -95,6 +114,8 @@ export default function RoutingDesk() {
       }
       setEntrusted(offerings);
       setMatches(m);
+      const { data: sn } = await supabase.rpc('routing_needs');
+      if (live) setShared((sn as SharedNeed[] | null) ?? []);
 
       // In-kind offers waiting for acceptance (quietly absent pre-migration).
       const { data: ik } = await supabase.from('inkind_donations')
@@ -131,6 +152,21 @@ export default function RoutingDesk() {
       setNote((e as { message?: string } | null)?.message || 'Could not accept.');
     }
     setBusy(false);
+  };
+  const offerGift = async (need: SharedNeed, postId: string) => {
+    setBusy(true); setNote('');
+    const { error } = await supabase.rpc('offer_gift_for_need', { p_need: need.id, p_post: postId });
+    setBusy(false);
+    if (error) { setNote(error.message); return; }
+    setNote(`Offered — ${need.full_name ?? 'they'} got a bell with a door to the gift. Nothing moves until they take it up.`);
+    setShared((cur) => cur.map((x) => x.id === need.id ? { ...x, gift_offered_post_id: postId } : x));
+  };
+  const needsFor = (o: Listing) => {
+    const ow = tokens(o);
+    return shared.filter((n) => n.profile_id !== o.author_id)
+      .map((n) => ({ n, words: [...needWords(n)].filter((w) => ow.has(w)) }))
+      .filter((x) => x.words.length > 0)
+      .sort((a, b) => b.words.length - a.words.length).slice(0, 3);
   };
   const name = (l: Listing) => l.author?.full_name ?? 'A member';
   const label = (l: Listing) => l.title || (l.body.length > 60 ? l.body.slice(0, 57) + '…' : l.body);
@@ -201,6 +237,39 @@ export default function RoutingDesk() {
               </div>
             ))
           )}
+          {needsFor(o).map(({ n, words }) => (
+            <div className="curc__routing-match" key={n.id}>
+              <div className="curc__routing-match-head">
+                <strong>{n.full_name ?? 'A member'}</strong>
+                <span>shared need: {n.label}</span>
+              </div>
+              <p className="curc__routing-why">shares &ldquo;{words.slice(0, 4).join('", "')}&rdquo; · {offerLine(n)}</p>
+              <div className="curc__routing-acts">
+                <button className="curc__keep" onClick={() => void message(n.profile_id)}>Message them</button>
+                {n.gift_offered_post_id === o.id
+                  ? <span className="curc__routing-none">Offered ✓</span>
+                  : <button className="btn btn-primary curc__go" disabled={busy} onClick={() => void offerGift(n, o.id)}>Offer this gift</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+
+      {/* SHARED NEEDS — what members chose to show the matcher. Gifts flow
+          to need; giving earns no claim on receiving. Judge by need. */}
+      <h3 className="adminc__h2 curc__routing-needs-h">Needs shared with the matcher · {shared.length}</h3>
+      {shared.length === 0 ? (
+        <p className="curc__empty">No one has shared a need yet — members tick &ldquo;Let Lichen match gifts to this need&rdquo; in their Budget.</p>
+      ) : shared.map((n) => (
+        <div className="curc__routing-match" key={n.id}>
+          <div className="curc__routing-match-head">
+            <strong>{n.full_name ?? 'A member'}</strong>
+            <span>{n.label}{n.amount_cents ? ` · about ${dollars(n.amount_cents)}` : ''}</span>
+          </div>
+          <p className="curc__routing-why">{offerLine(n)} · shared {new Date(n.created_at).toLocaleDateString()}{n.gift_offered_post_id ? ' · a gift was offered' : ''}</p>
+          <div className="curc__routing-acts">
+            <button className="curc__keep" onClick={() => void message(n.profile_id)}>Message them</button>
+          </div>
         </div>
       ))}
     </div>
