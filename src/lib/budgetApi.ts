@@ -34,6 +34,16 @@ export interface BudgetItem {
    *  every view — legacy rows and bolt-added listings). */
   on_date: string | null;
   created_at: string;
+  /** THE GIFT ECONOMY (founder 2026-11-16: "Gifts flow to need. Giving earns
+   *  no claim on receiving."): a NEED may say what its holder can offer for
+   *  it, and whether Lichen's matcher may see it (off by default — a budget
+   *  is private until its owner shares a line). */
+  offer_kind?: 'pay' | 'trade' | 'none' | null;
+  offer_cents?: number | null;
+  offer_trade?: string | null;
+  matchable?: boolean;
+  gift_offered_post_id?: string | null;
+  gift_offered_at?: string | null;
   /** Resolved for post-linked rows at render. */
   postTitle?: string;
   /** Null = the listing names no number (gift, trade, unpriced). */
@@ -51,7 +61,7 @@ export function priceCents(text: string | undefined | null): number | null {
 
 export async function listBudget(me: string): Promise<BudgetItem[]> {
   const { data, error } = await supabase.from('budget_items')
-    .select('id, post_id, label, amount_cents, direction, bucket, cadence, on_date, created_at')
+    .select('id, post_id, label, amount_cents, direction, bucket, cadence, on_date, created_at, offer_kind, offer_cents, offer_trade, matchable, gift_offered_post_id, gift_offered_at')
     .eq('profile_id', me)
     .order('created_at', { ascending: false });
   if (error) { console.warn('listBudget:', error.message); return []; }
@@ -105,6 +115,12 @@ export async function addBudgetManual(me: string, item: {
     on_date: item.cadence === 'once' ? (item.onDate || null) : null,
   });
   if (error) throw error;
+}
+
+/** A need's offer + its share with Lichen's matcher (owner RLS). */
+export async function saveNeedOffer(id: string, patch: Partial<Pick<BudgetItem, 'offer_kind' | 'offer_cents' | 'offer_trade' | 'matchable'>>): Promise<void> {
+  const { error } = await supabase.from('budget_items').update(patch).eq('id', id);
+  if (error) throw new Error(error.message);
 }
 
 export async function removeBudgetItem(id: string): Promise<void> {

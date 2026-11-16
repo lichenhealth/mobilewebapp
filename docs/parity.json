@@ -141,6 +141,9 @@
  "budgetApi:removeBudgetItem": {
   "tool": "budget_line"
  },
+ "budgetApi:saveNeedOffer": {
+  "gap": "3"
+ },
  "calendarApi:createEvent": {
   "tool": "draft_event (Compose creates it on the member's Post)"
  },

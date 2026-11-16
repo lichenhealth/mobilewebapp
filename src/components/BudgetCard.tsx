@@ -5,7 +5,7 @@ import { myBalance, fmtCurrentNum, numericAmount } from '../lib/ledgerApi';
 import {
   BudgetItem, BudgetBucket, BudgetCadence,
   listBudget, addBudgetManual, removeBudgetItem, ledgerFlows,
-  listMyMarketplaceTexts, passiveIncome,
+  listMyMarketplaceTexts, passiveIncome, saveNeedOffer,
 } from '../lib/budgetApi';
 import { Bolt } from './CurrentcyCard';
 import './BudgetCard.css';
@@ -157,7 +157,15 @@ export default function BudgetCard() {
     await removeBudgetItem(id).catch(() => load());
   };
 
-  const row = (i: BudgetItem, normalized: boolean) => {
+  const row = (i: BudgetItem, normalized: boolean) => (
+    i.bucket === 'need' && !i.post_id ? (
+      <div key={i.id} className="budg__needwrap">
+        {rowLine(i, normalized)}
+        <NeedOffer item={i} onSaved={(patch) => setItems((cur) => (cur ?? []).map((x) => x.id === i.id ? { ...x, ...patch } : x))} />
+      </div>
+    ) : rowLine(i, normalized)
+  );
+  const rowLine = (i: BudgetItem, normalized: boolean) => {
     const noNumber = i.bucket === 'gift' || ((cents(i) ?? 0) === 0 && i.bucket === 'need');
     return (
       <div className="budg__row" key={i.id}>
@@ -340,5 +348,55 @@ export default function BudgetCard() {
         </button>
       </div>
     </section>
+  );
+}
+
+/** WHAT YOU CAN OFFER FOR A NEED + THE SHARE WITH LICHEN'S MATCHER (founder
+ *  2026-11-16: "you list what you want/need and what you can pay for it (or
+ *  trade for it)… Gifts flow to need. Giving earns no claim on receiving.").
+ *  Off by default — a budget stays private until its owner shares a line. */
+function NeedOffer({ item, onSaved }: { item: BudgetItem; onSaved: (p: Partial<BudgetItem>) => void }) {
+  const [amount, setAmount] = useState(item.offer_cents != null ? String(item.offer_cents / 100) : '');
+  const [trade, setTrade] = useState(item.offer_trade ?? '');
+  const [err, setErr] = useState('');
+  const save = async (patch: Partial<BudgetItem>) => {
+    setErr('');
+    onSaved(patch);
+    try { await saveNeedOffer(item.id, patch); } catch (e) { setErr((e as Error).message); }
+  };
+  const kind = item.offer_kind ?? null;
+  return (
+    <div className="budg__offer">
+      <div className="budg__offer-row">
+        <span className="budg__offer-q">What can you offer for it?</span>
+        {(['pay', 'trade', 'none'] as const).map((k) => (
+          <button key={k} type="button" className={'budg__chip' + (kind === k ? ' is-on' : '')}
+            onClick={() => void save({ offer_kind: kind === k ? null : k })}>
+            {k === 'pay' ? 'Pay some' : k === 'trade' ? 'A trade' : "I can't right now"}
+          </button>
+        ))}
+      </div>
+      {kind === 'pay' && (
+        <input className="budg__offer-in" inputMode="decimal" placeholder="$ you can put toward it"
+          value={amount} onChange={(e) => setAmount(numericAmount(e.target.value))}
+          onBlur={() => void save({ offer_cents: amount ? Math.round(parseFloat(amount) * 100) : null })} />
+      )}
+      {kind === 'trade' && (
+        <input className="budg__offer-in" placeholder="What you could trade — e.g. two hours of yard work" maxLength={200}
+          value={trade} onChange={(e) => setTrade(e.target.value)}
+          onBlur={() => void save({ offer_trade: trade.trim() || null })} />
+      )}
+      <label className="budg__share">
+        <input type="checkbox" checked={!!item.matchable} onChange={(e) => void save({ matchable: e.target.checked })} />
+        <span>
+          Let Lichen match gifts to this need
+          <small>Only Lichen&rsquo;s stewards see it, never other members. Gifts go where the need is greatest; giving earns no claim on receiving, and nothing is promised.</small>
+        </span>
+      </label>
+      {item.gift_offered_post_id && (
+        <Link className="budg__giftnote link-cue" to={`/posts/${item.gift_offered_post_id}`}>A gift may meet this need — take a look ›</Link>
+      )}
+      {err && <p className="budg__err">{err}</p>}
+    </div>
   );
 }

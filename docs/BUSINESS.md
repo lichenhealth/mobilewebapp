@@ -351,6 +351,17 @@ to build. Rough estimates only, not quotes:
   stay Google Workspace seats (~$7–14/user/mo); Lichen never mints
   addresses itself.
 
+## The gift economy — doctrine (founder 2026-11-16, PENDING TAX COUNSEL)
+
+**Gifts flow to need. Giving earns no claim on receiving.**
+
+- **Why not a blockchain:** the founder's read (to confirm with counsel) is that trading inside Lichen — "apples for reiki," in Current-cy or not — is generally taxable barter, so a dollar-pegged chain buys nothing on taxes. A *true* gift (nothing expected back) generally isn't the receiver's income; that is the only real way around it, and it only holds if nothing comes back *because of* the giving.
+- **Everything is recorded, whatever its manner:** gift, trade or dollars, with the value it carried — a private record of each person's part in rebalancing, never a balance owed and never shown to others (the no-counts doctrine holds). Long-term, Lichen tracks two numbers: what a thing was exchanged for today, and its true value in a fully reciprocal, inclusive economy (land, animals, plants, elements). Who sets "true value" is an open design conversation.
+- **Asking:** you list a need and what you can offer for it (pay some, a trade, or nothing right now). The matcher decides whether you pay or trade as offered, or whether it reaches you as a gift — by NEED, never by past giving. The founder's own example: she gifts therapy, but as someone living on tech-career money and investments, clean food doesn't come to her as a gift; she buys it like anyone who can.
+- **Beings and land are the exception that proves the rule.** For a person, giving earns no claim. For land, plants, animals and elements, value TAKEN without return IS the need. **The huachuma example:** a guide pays *x* for the cactus and charges participants *y* for the ceremony; the value of the huachuma's flesh, acting on the body to create the healing, is documented. The guides may donate to a huachuma foundation for advocacy and protection directly — and a donation to Lichen Health "for those in need" can run through the algorithm, which may find that huachuma has given the most and received the least in the reciprocal economy, and send it to restoration. This widens where donations go: the wells can serve beings, not only people. (Stewarded members already exist as ledger parties; a restoration well is not built yet.)
+- **Honesty for decks and copy:** never promise that giving earns gifts; never promise tax treatment. Say "gifts flow to need."
+- **Built 2026-11-16 (slice 1, moves no money):** a private value record on the wallet; needs carry "what I can offer for it" and an opt-in share with the matcher (stewards only); the routing desk matches entrusted gifts to shared needs and a steward offers each one. Not built: the true-value layer, the beings/restoration well, algorithmic (unattended) routing.
+
 ## Subsidy policy — state as of 2026-09-01
 
 Live at lichen.health/subsidy-policy. **Eva (accountant, Eva 990 &
