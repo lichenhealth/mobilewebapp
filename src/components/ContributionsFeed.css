@@ -73,5 +73,5 @@
 
 /* The circle rule's tab, hugging the AI circle's right edge (2026-11-14). */
 .cfeed__aiwrap { position: relative; display: inline-flex; flex-shrink: 0; }
-.cfeed__aidoor { position: absolute; top: 7px; left: calc(50% + 14px); }
+.cfeed__aiwrap .cfeed__aidoor { position: absolute; top: 7px; left: calc(50% + 14px); margin-left: 0; }
 .cfeed__area.is-ai-on .cfeed__area-circle { border-color: var(--peach); background: var(--peach-tint); color: var(--peach-deep); }

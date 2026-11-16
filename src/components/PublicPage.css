@@ -345,10 +345,16 @@
 /* The signed-in nav lives BELOW the feed's icon row (founder 2026-08-14:
    icons above, toggles below, everywhere) — tighter than the hero variant. */
 .ppage__nav--below {
-  padding: var(--s-2) var(--s-2) var(--s-3);
+  /* Air between the icon row and the tabs, and the gray rule ABOVE the tabs
+     rather than under them (founder 2026-11-16) — the first section below
+     sheds its own top rule so there's exactly one line. */
+  margin-top: var(--s-4);
+  border-top: 1px solid var(--bone-edge-soft);
+  padding: var(--s-4) var(--s-2) var(--s-3);
   justify-content: flex-start;   /* Home hugs the left (founder 2026-08-15) */
   max-width: none; margin-inline: 0;
 }
+.cfeed:has(.ppage__nav--below) + .ppage__sec { border-top: none; }
 
 /* Pronouns under the name — quieter than the tagline. */
 .ppage__pronouns {

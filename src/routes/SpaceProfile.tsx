@@ -1489,6 +1489,11 @@ export default function SpaceProfile({ spaceId, forcePublic }: { spaceId?: strin
             {!backstage && !tab && !previewing && !forcePublic && (
               <>
                 {noticeBanners}
+                {/* On phones the relationship signals sit HERE, under the
+                    cover and above the presence line — riding the end of the
+                    icon row they scrolled off the right edge (founder
+                    2026-11-16). Desktop keeps them in the row. */}
+                {actionRow && <div className="sprof__signals-top">{actionRow}</div>}
                 {presenceLine}
                 {/* A PERSONAL question — your own email/phone — so it never
                     asks while you wear a space's hat (founder 2026-11-08,
