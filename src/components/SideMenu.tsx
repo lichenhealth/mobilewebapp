@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import { getIdentityTags } from '../lib/meansApi';
 import './SideMenu.css';
 import { buildStamp } from '../lib/autoUpdate';
+import { openInstallGuide } from './InstallPrompt';
 
 interface SideMenuProps {
   open: boolean;
@@ -474,6 +475,12 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
           {/* The build this page is running — so a screenshot always says
               which build it came from (founder 2026-09-13, after a stale
               months-old window kept resurrecting long-fixed bugs). */}
+          {/* Install on this device — phone or computer (founder 2026-11-16). */}
+          {!(window.matchMedia?.('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone) && (
+            <button className="side-menu__install" onClick={() => { onClose(); openInstallGuide(); }}>
+              Install Lichen on this device
+            </button>
+          )}
           {buildStamp() && <p className="side-menu__build">version: {buildStamp()}</p>}
         </nav>
       </aside>

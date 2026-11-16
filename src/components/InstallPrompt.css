@@ -88,3 +88,22 @@
   border-top: 1px solid var(--bone-edge-soft); padding-top: 12px; margin-bottom: 14px;
 }
 .install-sheet__acts { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Desktop + device picker (founder 2026-11-16: install on the computer too). */
+.install-sheet__card { position: relative; max-height: calc(100dvh - 20px); overflow-y: auto; }
+@media (min-width: 1024px) { .install-sheet { align-items: center; } }
+.install-sheet__x {
+  position: absolute; top: 12px; right: 12px; width: 30px; height: 30px;
+  border-radius: var(--r-full); color: var(--ink-muted);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.install-sheet__x:hover { color: var(--ink); background: var(--bone-warm); }
+.install-sheet__title { padding-right: 34px; }
+.install-sheet__picks { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.install-sheet__pick {
+  padding: 6px 12px; border-radius: var(--r-full); font-size: 12.5px;
+  border: 1px solid var(--bone-edge); background: #fff; color: var(--ink-soft); white-space: nowrap;
+}
+.install-sheet__pick.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+.install-sheet__oneclick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px; color: var(--ink-muted); }
+.install-sheet__note { font-size: 12px; color: var(--ink-muted); }
