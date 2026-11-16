@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase, storedSession } from '../lib/supabase';
 import { syncAssistantConsent } from '../lib/assistantConsentApi';
+import { resyncPush } from '../lib/webPush';
 
 type AuthState = {
   session: Session | null;
@@ -113,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // any device. Fire-and-forget: a failed sync keeps the last known state.
   useEffect(() => {
     if (userId) void syncAssistantConsent(userId);
+    if (userId) void resyncPush(userId);
   }, [userId]);
 
   useEffect(() => {
