@@ -245,6 +245,8 @@
 .side-menu__header > svg { color: var(--ink); flex-shrink: 0; }
 
 .side-menu__build { margin: var(--s-2) var(--s-4); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; color: var(--ink-faint); }
+.side-menu__install { display: block; margin: var(--s-3) var(--s-4) 0; padding: 0; background: none; border: 0; font-size: 12px; color: var(--peach-deep); text-decoration: underline; text-decoration-color: var(--peach); text-underline-offset: 3px; cursor: pointer; text-align: left; }
+.side-menu__install:hover { color: var(--ink); }
 
 /* ===== Desktop docked rail (>=1024px) ==================================
    These OVERRIDE the drawer base rules above at equal specificity, so they
