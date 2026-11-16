@@ -465,3 +465,9 @@
   margin-top: var(--s-3);
 }
 .sprof__room-add .input { flex: 1 1 220px; min-width: 0; }
+
+/* Signals under the cover on phones; at the row's end on desktop (founder 2026-11-16). */
+.sprof__signals-top { display: flex; justify-content: center; margin-top: var(--s-3); }
+.sprof__signals-top .mprof__actions--signals { margin: 0; flex-wrap: wrap; justify-content: center; }
+@media (min-width: 1024px) { .sprof__signals-top { display: none; } }
+@media (max-width: 1023px) { .cfeed__signals { display: none; } }
