@@ -124,3 +124,29 @@ export async function disablePush(me: string): Promise<void> {
     console.warn('disablePush:', (e as Error).message);
   }
 }
+
+/** SELF-HEAL on every sign-in (founder 2026-11-16: reminders only in-app, no
+ *  phone alert and no home-screen "1" — Lichen held ZERO device sign-ups while
+ *  the phone believed it had one). A device the person already allowed must
+ *  stay registered: send-push prunes an endpoint Apple/Google answer 404/410
+ *  for, and the browser can quietly renew its subscription, so the row and the
+ *  device drift apart while Profile's switch still reads "on". When permission
+ *  is ALREADY granted (no prompt ever shown here) and the app can do push,
+ *  re-subscribe if needed and upsert the row. Best-effort, silent. */
+export async function resyncPush(me: string): Promise<void> {
+  try {
+    if (!pushSupported() || Notification.permission !== 'granted') return;
+    if (isIosSafari() && !isStandalone()) return;
+    const reg = await ready();
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    await supabase.from('push_subscriptions').upsert(subRow(sub, me), { onConflict: 'endpoint' });
+  } catch (e) {
+    console.warn('resyncPush:', (e as Error).message);
+  }
+}
