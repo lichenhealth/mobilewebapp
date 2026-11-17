@@ -246,8 +246,8 @@ export const LIFE_TOOLS = [
     // maps?"). Mapbox — the engine Lichen's own Maps runs on — with live
     // traffic, from their saved home (or any address they name).
     name: 'drive_time',
-    description: 'How long it takes to DRIVE somewhere right now, with current traffic (and the distance). to = the destination address (find it first — their calendar entry, their emails, the business site — never guess one). from = an address they named; leave it empty to start from their saved home address on Lichen. Returns minutes, miles, the arrival time if they left now, and a button that opens the route in Google Maps. When they ask "when should I leave" for an appointment, give the drive time plus a little buffer for parking.',
-    input_schema: { type: 'object', properties: { to: { type: 'string' }, from: { type: 'string' } }, required: ['to'] },
+    description: 'How long it takes to get somewhere right now — like asking Google Maps. Driving uses current traffic. to / from can each be ANY street address (on Lichen or not), "home" (their saved home), or the NAME of a place on Lichen: an organization/community/group/place, one of their events, one of their contact cards, or one of their own goods & services locations — those resolve to the address Lichen holds. If a business address is unknown, find it first (their calendar entry, emails, the business site) — never guess one. from empty = their saved home. mode: driving (default), walking or cycling. Returns minutes, miles, the arrival time if they left now, and a button that opens the route in Google Maps. When they ask "when should I leave" for an appointment, give the drive time plus a little buffer for parking.',
+    input_schema: { type: 'object', properties: { to: { type: 'string' }, from: { type: 'string' }, mode: { type: 'string', enum: ['driving', 'walking', 'cycling'] } }, required: ['to'] },
   },
 ];
 
@@ -1011,29 +1011,67 @@ export async function runLifeTool(
       const f = (await r.json())?.features?.[0];
       return f ? { at: f.center as [number, number], label: String(f.place_name ?? q) } : null;
     };
-    let from: { at: [number, number]; label: string } | null = null;
-    if (fromTxt) from = await geocode(fromTxt);
-    else if (homeRow.home_lat != null && homeRow.home_lng != null) from = { at: [Number(homeRow.home_lng), Number(homeRow.home_lat)], label: homeRow.home_location || 'home' };
-    else if (homeRow.home_location) from = await geocode(String(homeRow.home_location));
-    if (!from) return { ok: false, error: 'There is no home address saved on Lichen and no starting address was given — ask where they are leaving from (or they can save a home address in Profile → Location).' };
-    const to = await geocode(toTxt, from.at);
+    type Pt = { at: [number, number]; label: string; via?: string };
+    const home = async (): Promise<Pt | null> => {
+      if (homeRow.home_lat != null && homeRow.home_lng != null) return { at: [Number(homeRow.home_lng), Number(homeRow.home_lat)], label: homeRow.home_location || 'home', via: 'their home' };
+      if (homeRow.home_location) { const g = await geocode(String(homeRow.home_location)); return g && { ...g, via: 'their home' }; }
+      return null;
+    };
+    // A PLACE ON LICHEN BY NAME (founder 2026-11-17: "how long is it to get
+    // there from any place on the platform or off"): a space, one of their
+    // events, a contact card, their own goods & services locations — the
+    // address Lichen holds. Exactly one match, never a guess.
+    const lichenPlace = async (q: string, near?: [number, number]): Promise<Pt | null> => {
+      const t = enc(q.replace(/[%*,()]/g, ' ').trim());
+      if (!t) return null;
+      const one = <T,>(rows: unknown): T | null => (Array.isArray(rows) && rows.length === 1 ? rows[0] as T : null);
+      const sp = one<{ name: string; lat: number | null; lng: number | null; location: string | null }>(await (await sb(`spaces?name=ilike.${t}&status=neq.offline&select=name,lat,lng,location&limit=2`)).json());
+      if (sp) {
+        if (sp.lat != null && sp.lng != null) return { at: [Number(sp.lng), Number(sp.lat)], label: sp.location || sp.name, via: sp.name };
+        if (sp.location) { const g = await geocode(sp.location, near); if (g) return { ...g, via: sp.name }; }
+      }
+      const pl = one<{ label: string; location: string | null; lat: number | null; lng: number | null }>(await (await sb(`profile_locations?profile_id=eq.${me}&label=ilike.${t}&select=label,location,lat,lng&limit=2`)).json());
+      if (pl) {
+        if (pl.lat != null && pl.lng != null) return { at: [Number(pl.lng), Number(pl.lat)], label: pl.location || pl.label, via: pl.label };
+        if (pl.location) { const g = await geocode(pl.location, near); if (g) return { ...g, via: pl.label }; }
+      }
+      const ct = one<{ name: string; address: string | null }>(await (await sb(`contacts?owner_id=eq.${me}&name=ilike.${t}&address=not.is.null&select=name,address&limit=2`)).json());
+      if (ct?.address) { const g = await geocode(ct.address, near); if (g) return { ...g, via: ct.name }; }
+      const att = await (await sb(`event_attendees?profile_id=eq.${me}&select=event_id&limit=300`)).json();
+      const ids = (Array.isArray(att) ? att : []).map((a: { event_id: string }) => a.event_id);
+      const evq = `events?title=ilike.${t}&location=not.is.null&start_date=gte.${today()}&select=title,location&order=start_date.asc&limit=1`;
+      const ev = (await (await sb(`${evq}&creator_id=eq.${me}`)).json())?.[0]
+        ?? (ids.length ? (await (await sb(`${evq}&id=in.(${ids.slice(0, 200).join(',')})`)).json())?.[0] : null);
+      if (ev?.location && !/^https?:/i.test(ev.location)) { const g = await geocode(ev.location, near); if (g) return { ...g, via: ev.title }; }
+      return null;
+    };
+    const resolve = async (q: string, near?: [number, number]): Promise<Pt | null> => {
+      if (/^(home|my home|my house)$/i.test(q)) return home();
+      return (await lichenPlace(q, near)) ?? (await geocode(q, near));
+    };
+    const from: Pt | null = fromTxt ? await resolve(fromTxt) : await home();
+    if (!from) return { ok: false, error: fromTxt ? `Couldn't find "${fromTxt}" — check the address.` : 'There is no home address saved on Lichen and no starting address was given — ask where they are leaving from (or they can save a home address in Profile → Location).' };
+    const to = await resolve(toTxt, from.at);
     if (!to) return { ok: false, error: `Couldn't find "${toTxt}" on the map — check the address.` };
-    const r = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${from.at[0]},${from.at[1]};${to.at[0]},${to.at[1]}?overview=false&access_token=${tok}`);
+    const mode = ['walking', 'cycling'].includes(String(input.mode)) ? String(input.mode) : 'driving';
+    const profile = mode === 'driving' ? 'driving-traffic' : mode;
+    const r = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${from.at[0]},${from.at[1]};${to.at[0]},${to.at[1]}?overview=false&access_token=${tok}`);
     const route = r.ok ? (await r.json())?.routes?.[0] : null;
     if (!route) return { ok: false, error: 'The route lookup did not answer just now — try again in a moment.' };
     const mins = Math.round(Number(route.duration) / 60);
     const miles = Math.round((Number(route.distance) / 1609.34) * 10) / 10;
     const arrive = new Date(Date.now() + Number(route.duration) * 1000)
       .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz });
-    const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${enc(from.at[1] + ',' + from.at[0])}&destination=${enc(to.label)}&travelmode=driving`;
+    const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${enc(from.at[1] + ',' + from.at[0])}&destination=${enc(to.at[1] + ',' + to.at[0])}&travelmode=${mode === 'cycling' ? 'bicycling' : mode}`;
     return {
       ok: true,
-      from: fromTxt ? from.label : 'their home address on Lichen',
-      to: to.label,
-      drive_minutes_now: mins,
+      from: from.via ? `${from.via} (${from.label})` : from.label,
+      to: to.via ? `${to.via} (${to.label})` : to.label,
+      mode,
+      minutes_now: mins,
       miles,
       arrive_if_leaving_now: arrive,
-      note: 'Live traffic right now; it can change by the time they leave. An "Open in Google Maps" button rides under your reply — mention it, never paste the link.',
+      note: (mode === 'driving' ? 'Live traffic right now; it can change by the time they leave.' : `A ${mode} estimate.`) + ' An "Open in Google Maps" button rides under your reply — mention it, never paste the link.',
       map_link: gmaps,
     };
   }
