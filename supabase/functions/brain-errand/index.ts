@@ -123,7 +123,12 @@ Deno.serve(async (req) => {
     if (!errand || !['open', 'flagged'].includes(errand.status) || new Date(errand.expires_at) < new Date()) return json({ ok: true, skipped: 'no-errand' });
     const trig = (await rows<{ sender_id: string; body: string | null; via_brain: boolean }>(
       await svc(`chat_messages?id=eq.${messageId}&chat_id=eq.${errand.chat_id}&select=sender_id,body,via_brain`)))[0];
-    if (!trig || trig.via_brain || trig.sender_id !== errand.recipient_id || !trig.body?.trim()) return json({ ok: true, skipped: 'not-for-brain' });
+    if (!trig || trig.via_brain || !trig.body?.trim()) return json({ ok: true, skipped: 'not-for-brain' });
+    // The OWNER may speak to their Brain here (founder 2026-11-17) — an
+    // instruction, not the recipient's words; the trigger only forwards
+    // owner messages that address the Brain.
+    const fromOwner = trig.sender_id === errand.owner_id;
+    if (!fromOwner && trig.sender_id !== errand.recipient_id) return json({ ok: true, skipped: 'not-for-brain' });
 
     const people = await rows<{ id: string; full_name: string | null; first_name: string | null; assistant_readable: boolean | null }>(
       await svc(`profiles?id=in.(${errand.owner_id},${errand.recipient_id})&select=id,full_name,first_name,assistant_readable`));
@@ -142,7 +147,7 @@ Deno.serve(async (req) => {
       return json({ ok: true, skipped: 'consent-off' });
     }
     // The recipient doesn't let assistants read their words — don't.
-    if (them?.assistant_readable === false) {
+    if (!fromOwner && them?.assistant_readable === false) {
       await patch({ status: 'flagged', last_note: `${themFirst} keeps assistants out of their messages` });
       await notify(errand.owner_id, `${themFirst} replied about your calendar`, `${themFirst} keeps assistants out of their messages, so your Brain didn't read it — it's waiting for you.`, link, errand.recipient_id);
       return json({ ok: true, skipped: 'not-readable' });
@@ -166,7 +171,7 @@ Deno.serve(async (req) => {
     const history = await rows<{ sender_id: string; body: string | null; via_brain: boolean; created_at: string }>(
       await svc(`chat_messages?chat_id=eq.${errand.chat_id}&created_at=gte.${encodeURIComponent(new Date(Date.now() - 8 * 86400_000).toISOString())}&select=sender_id,body,via_brain,created_at&order=created_at.desc&limit=24`));
     const convo = history.reverse().filter((m) => m.body?.trim()).map((m) => {
-      const who = m.via_brain ? `${ownerFirst}'s Brain (you)` : m.sender_id === errand.owner_id ? `${ownerFirst} (in person)` : themFirst;
+      const who = m.via_brain ? `${ownerFirst}'s Brain (you)` : m.sender_id === errand.owner_id ? (fromOwner && m.body === trig.body ? `${ownerFirst} (in person, to you)` : `${ownerFirst} (in person)`) : themFirst;
       return `${who}: ${m.body!.trim().slice(0, 1500)}`;
     }).join('\n\n');
 
@@ -180,7 +185,7 @@ YOUR ONE JOB: help ${themFirst} subscribe to ${ownerFirst}'s shared Lichen calen
 - Google refreshes subscribed calendars on its own schedule, often every 12–24 hours — new events can take that long to appear. That's normal, not broken.
 - They will see ${seesLine(share.detail)}. Events ${ownerFirst} marked private never appear; to-dos and the care plan aren't included.
 - If Google says it can't fetch the URL, ask them to make sure they pasted the whole link with nothing added, and try again; if it still fails, flag ${ownerFirst}.
-RULES: Reply in 1–4 short sentences, warm and plain. Never invent features, links or other people's details. If the message is really for ${ownerFirst} personally (anything beyond setting up the calendar), say briefly that you'll make sure ${ownerFirst} sees it, and call flag_owner. If you can't solve a setup problem in a reply or two, or something seems wrong with the link, call flag_owner with a one-line reason and tell ${themFirst} you've let ${ownerFirst} know. When ${themFirst} says it's working (or they're all set), call mark_done and say a short goodbye.`;
+WHEN ${ownerFirst.toUpperCase()} SPEAKS TO YOU in the chat (marked "(in person, to you)"), it's an instruction from the person you work for: do it within your one job, speaking to ${themFirst} — e.g. ask ${themFirst} where they'd like the calendar (Google, Apple, or their Lichen calendar) and point to the one-tap buttons on the card that rides under your message. You can't press anything on ${themFirst}'s side; their tap (or their own Lichen assistant, if they ask it) finishes it.\nRULES: Reply in 1–4 short sentences, warm and plain. Never invent features, links or other people's details. If the message is really for ${ownerFirst} personally (anything beyond setting up the calendar), say briefly that you'll make sure ${ownerFirst} sees it, and call flag_owner. If you can't solve a setup problem in a reply or two, or something seems wrong with the link, call flag_owner with a one-line reason and tell ${themFirst} you've let ${ownerFirst} know. When ${themFirst} says it's working (or they're all set), call mark_done and say a short goodbye.`;
 
     const tools = [
       { name: 'flag_owner', description: `Let ${ownerFirst} know they're needed: a setup problem you can't solve, something wrong with the link, or a message that's really for ${ownerFirst}.`,
@@ -192,7 +197,7 @@ RULES: Reply in 1–4 short sentences, warm and plain. Never invent features, li
       method: 'POST',
       headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({ model: MODEL, max_tokens: 1200, system, tools,
-        messages: [{ role: 'user', content: `The conversation so far:\n\n${convo}\n\n${themFirst} just wrote the last message. Reply as ${ownerFirst}'s Brain.` }] }),
+        messages: [{ role: 'user', content: `The conversation so far:\n\n${convo}\n\n${fromOwner ? `${ownerFirst} just asked you (their Brain) something in this chat. Do it, writing to ${themFirst}.` : `${themFirst} just wrote the last message.`} Reply as ${ownerFirst}'s Brain.` }] }),
     });
     const out = res.ok ? await res.json().catch(() => null) : null;
     const blocks = (out?.content ?? []) as { type: string; text?: string; name?: string; input?: Record<string, string> }[];
@@ -205,7 +210,8 @@ RULES: Reply in 1–4 short sentences, warm and plain. Never invent features, li
       return json({ ok: false, error: 'model' }, 502);
     }
     if (!reply) reply = done ? `Wonderful — you're all set. I'll let ${ownerFirst} know.` : `I've let ${ownerFirst} know — they'll pick this up with you.`;
-    await postAsBrain(errand.chat_id, errand.owner_id, reply.slice(0, 2000));
+    await postAsBrain(errand.chat_id, errand.owner_id, reply.slice(0, 2000),
+      fromOwner ? [{ type: 'calfeed', url: FEED_BASE + share.token, name: ownerFirst }] : undefined);
     if (done) {
       await patch({ status: 'done', replies: errand.replies + 1, last_note: String(done.input?.summary ?? 'All set').slice(0, 300) });
       await notify(errand.owner_id, `${themFirst} has your calendar ✓`, `Your Brain helped ${themFirst} set it up. ${String(done.input?.summary ?? '').slice(0, 200)}`.trim(), link, errand.recipient_id);

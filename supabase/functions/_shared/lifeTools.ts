@@ -239,11 +239,21 @@ export const LIFE_TOOLS = [
       required: ['op'],
     },
   },
+  {
+    // DRIVE TIME, WITHOUT OPENING A MAP (founder 2026-11-17: "is there a way
+    // for claude to use google maps, or the maps we use to put in the address
+    // and tell me current drive time without me needing to open google
+    // maps?"). Mapbox — the engine Lichen's own Maps runs on — with live
+    // traffic, from their saved home (or any address they name).
+    name: 'drive_time',
+    description: 'How long it takes to DRIVE somewhere right now, with current traffic (and the distance). to = the destination address (find it first — their calendar entry, their emails, the business site — never guess one). from = an address they named; leave it empty to start from their saved home address on Lichen. Returns minutes, miles, the arrival time if they left now, and a button that opens the route in Google Maps. When they ask "when should I leave" for an appointment, give the drive time plus a little buffer for parking.',
+    input_schema: { type: 'object', properties: { to: { type: 'string' }, from: { type: 'string' } }, required: ['to'] },
+  },
 ];
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
+  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', drive_time: 'maps', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -985,6 +995,47 @@ export async function runLifeTool(
       ? 'These ride along as Copy buttons under your reply: ' + (out.copies as { label: string }[]).map((c) => c.label).join(', ') + '. Say they are there; do not paste long URLs. Speak the guest list in plain words.'
       : 'No Copy buttons ride along this time — do not promise any.';
     return out;
+  }
+
+  if (name === 'drive_time') {
+    const tok = Deno.env.get('MAPBOX_TOKEN') || 'pk.eyJ1IjoibGljaGVuaGVhbHRoIiwiYSI6ImNtcmNmcmZndjAzaXMyem9rcWk3MXE2dzgifQ.sV8h6aqBw8HeCTTfBOVblQ';
+    const toTxt = String(input.to ?? '').trim();
+    if (!toTxt) return { ok: false, error: 'Find the destination address first (their calendar entry, emails or the business website).' };
+    const fromTxt = String(input.from ?? '').trim();
+    const homeRow = (await (await sb(`profiles?id=eq.${me}&select=home_location,home_lat,home_lng,timezone`)).json())?.[0] ?? {};
+    const tz: string = homeRow.timezone || 'America/Denver';
+    const geocode = async (q: string, near?: [number, number]): Promise<{ at: [number, number]; label: string } | null> => {
+      const prox = near ? `&proximity=${near[0]},${near[1]}` : '';
+      const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${enc(q)}.json?limit=1&types=address,poi,place,postcode${prox}&access_token=${tok}`);
+      if (!r.ok) return null;
+      const f = (await r.json())?.features?.[0];
+      return f ? { at: f.center as [number, number], label: String(f.place_name ?? q) } : null;
+    };
+    let from: { at: [number, number]; label: string } | null = null;
+    if (fromTxt) from = await geocode(fromTxt);
+    else if (homeRow.home_lat != null && homeRow.home_lng != null) from = { at: [Number(homeRow.home_lng), Number(homeRow.home_lat)], label: homeRow.home_location || 'home' };
+    else if (homeRow.home_location) from = await geocode(String(homeRow.home_location));
+    if (!from) return { ok: false, error: 'There is no home address saved on Lichen and no starting address was given — ask where they are leaving from (or they can save a home address in Profile → Location).' };
+    const to = await geocode(toTxt, from.at);
+    if (!to) return { ok: false, error: `Couldn't find "${toTxt}" on the map — check the address.` };
+    const r = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${from.at[0]},${from.at[1]};${to.at[0]},${to.at[1]}?overview=false&access_token=${tok}`);
+    const route = r.ok ? (await r.json())?.routes?.[0] : null;
+    if (!route) return { ok: false, error: 'The route lookup did not answer just now — try again in a moment.' };
+    const mins = Math.round(Number(route.duration) / 60);
+    const miles = Math.round((Number(route.distance) / 1609.34) * 10) / 10;
+    const arrive = new Date(Date.now() + Number(route.duration) * 1000)
+      .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz });
+    const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${enc(from.at[1] + ',' + from.at[0])}&destination=${enc(to.label)}&travelmode=driving`;
+    return {
+      ok: true,
+      from: fromTxt ? from.label : 'their home address on Lichen',
+      to: to.label,
+      drive_minutes_now: mins,
+      miles,
+      arrive_if_leaving_now: arrive,
+      note: 'Live traffic right now; it can change by the time they leave. An "Open in Google Maps" button rides under your reply — mention it, never paste the link.',
+      map_link: gmaps,
+    };
   }
 
   if (name === 'set_clinical_home') {

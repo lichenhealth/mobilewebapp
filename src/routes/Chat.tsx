@@ -62,11 +62,34 @@ export default function Chat() {
   const asSpace = actor.type === 'space' ? actor.id : undefined;
   const spaceName = actor.type === 'space' ? actor.name : '';
 
+  // AN EMAIL OPENS BESIDE THE LIST TOO (founder 2026-11-17: "if I want to
+  // see an email; have email selected as the filter on the left on
+  // desktop"): ?mail=<account>:<thread> opens that thread in the pane, the
+  // Email lens lit — the same shape a chat click-through takes.
+  const [mailOpen, setMailOpen] = useState<string | undefined>(
+    () => new URLSearchParams(window.location.search).get('mail') || undefined,
+  );
+  function openMail(key: string) {
+    if (window.matchMedia('(min-width: 1024px)').matches) {
+      setMailOpen(key); setSelectedId(undefined);
+      const url = new URL(window.location.href);
+      url.searchParams.set('mail', key); url.searchParams.delete('open');
+      window.history.replaceState(null, '', url);
+    } else {
+      navigate(`/mail?thread=${encodeURIComponent(key)}`);
+    }
+  }
+  function closeMail() {
+    setMailOpen(undefined);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('mail');
+    window.history.replaceState(null, '', url);
+  }
   function openChat(id: string) {
     if (window.matchMedia('(min-width: 1024px)').matches) {
-      setSelectedId(id);
+      setSelectedId(id); setMailOpen(undefined);
       const url = new URL(window.location.href);
-      url.searchParams.set('open', id);
+      url.searchParams.set('open', id); url.searchParams.delete('mail');
       window.history.replaceState(null, '', url);
     } else {
       navigate(`/chat/${id}`);
@@ -102,7 +125,15 @@ export default function Chat() {
   // and chat bubble, then just chat, then just phone, then just mail… by
   // default the all is selected and when you select one of the filters, it
   // de-selects the all"): [] = All. Multi-select; picking all three is All.
-  const [chanPick, setChan] = useState<Medium[]>([]);
+  // A CLICK-THROUGH PICKS ITS LENS (founder 2026-11-17: "when I click thru
+  // to a chat from, say the brain… have it smart select to chats but bring
+  // up the chat in question"): arriving with a chat open lights Chat;
+  // arriving with an email open lights Email. Arrival only — a click on a
+  // row inside the inbox never changes the lens the member chose.
+  const [chanPick, setChan] = useState<Medium[]>(() => {
+    const q = new URLSearchParams(window.location.search);
+    return q.get('mail') ? ['mail'] : q.get('open') ? ['chat'] : [];
+  });
   // CHAT, NESTED UNDER INBOX (founder 2026-11-14: "chat arrow should open
   // chat as we used to have it...its just nested under inbox now"): the lit
   // Chat lens's › tab opens /chat?only=chat — the classic chat-only view,
@@ -194,14 +225,14 @@ export default function Chat() {
   // closing the pane stays closed.
   const autoOpened = useRef(false);
   useEffect(() => {
-    if (autoOpened.current || selectedId || loading || !actingReady) return;
+    if (autoOpened.current || selectedId || mailOpen || loading || !actingReady) return;
     if (!window.matchMedia('(min-width: 1024px)').matches) return;
     const first = items.find((it) => it.chat)?.chat;
     if (!first) return;
     autoOpened.current = true;
     openChat(first.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, selectedId, loading, actingReady]);
+  }, [items, selectedId, mailOpen, loading, actingReady]);
 
   return (
     <div className="chat">
@@ -364,7 +395,8 @@ export default function Chat() {
           />
         ) : it.mail ? (
           <MailRow key={it.key} m={it.mail} highlight={query}
-            onClick={() => navigate(`/mail?thread=${encodeURIComponent(it.mail!.account_id + ':' + it.mail!.thread_id)}`)} />
+            active={mailOpen === it.mail.account_id + ':' + it.mail.thread_id}
+            onClick={() => openMail(it.mail!.account_id + ':' + it.mail!.thread_id)} />
         ) : null)}
         {actingReady && !loading && items.length === 0 && chan.length > 0 && (
           <div className="chat__empty">
@@ -430,6 +462,16 @@ export default function Chat() {
       {/* Desktop split-view only (Chat.css hides/shows via the 1024px grid;
           not rendered at all on mobile since selectedId only ever gets set
           from openChat's desktop branch). */}
+      {mailOpen && !selectedId && (
+        <div className="chat__thread-pane chat__mail-pane">
+          <div className="chat__mail-panehead">
+            <span><Icon name="mail" size={14} /> Email</span>
+            <button type="button" className="chat__mail-close" onClick={closeMail} aria-label="Close this email">×</button>
+          </div>
+          <iframe key={mailOpen} className="chat__mail-frame" title="Email thread"
+            src={`/mail?thread=${encodeURIComponent(mailOpen)}&embed=1`} />
+        </div>
+      )}
       {selectedId && (
         <div className="chat__thread-pane">
           <ChatConversation
@@ -452,13 +494,26 @@ const MEDIA: Medium[] = ['chat', 'text', 'mail'];
 const MEDIUM_LABEL: Record<Medium, string> = { chat: 'Chat', text: 'Texts', mail: 'Email' };
 const MEDIUM_ICON: Record<Medium, 'chat' | 'phone' | 'mail'> = { chat: 'chat', text: 'phone', mail: 'mail' };
 
+/** WHICH MEDIUM, READ AT A GLANCE (founder 2026-11-17: "let's have the mail,
+ *  chat, text icons be bigger, and maybe show up as a circle on the profile
+ *  pic, not to the right - I want a better visual ability to scan what's an
+ *  email, text or chat"): a ringed disc riding the avatar's lower-right. */
+function MediumBadge({ m }: { m: Medium }) {
+  return (
+    <span className={'conv-row__mbadge conv-row__mbadge--' + m} aria-label={MEDIUM_LABEL[m]} title={MEDIUM_LABEL[m]}>
+      <Icon name={MEDIUM_ICON[m]} size={13} />
+    </span>
+  );
+}
+
 /** An email thread in the Inbox, read live from the member's own Gmail. */
-function MailRow({ m, highlight, onClick }: { m: ThreadSummary; highlight?: string; onClick: () => void }) {
+function MailRow({ m, highlight, onClick, active = false }: { m: ThreadSummary; highlight?: string; onClick: () => void; active?: boolean }) {
   const name = mailSender(m.from) || m.from;
   return (
-    <button className={'conv-row' + (m.unread ? ' has-unread' : '')} onClick={onClick}>
+    <button className={'conv-row' + (m.unread ? ' has-unread' : '') + (active ? ' is-active' : '')} onClick={onClick}>
       <div className="conv-row__avatar-stack">
         <Avatar id={m.from} name={name} size={48} />
+        <MediumBadge m="mail" />
       </div>
       <div className="conv-row__body">
         <div className="conv-row__top">
@@ -467,7 +522,6 @@ function MailRow({ m, highlight, onClick }: { m: ThreadSummary; highlight?: stri
             <span className="conv-row__muted"> · {m.account}</span>
           </span>
           <span className="conv-row__time">
-            <span className="conv-row__medium" aria-label="Email"><Icon name="mail" size={12} /></span>
             {m.date ? formatRelative(new Date(m.date).toISOString()) : ''}
           </span>
         </div>
@@ -506,6 +560,7 @@ function ConversationRow({ chat, me, highlight, unread = 0, active = false, onCl
     <button className={'conv-row' + (unread > 0 ? ' has-unread' : '') + (active ? ' is-active' : '')} onClick={onClick}>
       <div className="conv-row__avatar-stack">
         <GroupAvatar chat={chat} me={me} />
+        {medium && <MediumBadge m="chat" />}
       </div>
       <div className="conv-row__body">
         <div className="conv-row__top">
@@ -515,7 +570,6 @@ function ConversationRow({ chat, me, highlight, unread = 0, active = false, onCl
             {party && !iAmVisitor && !inSpaceInbox && <span className="conv-row__muted"> · via {party.name}</span>}
           </span>
           <span className="conv-row__time">
-            {medium && <span className="conv-row__medium" aria-label="Lichen chat"><Icon name="chat" size={12} /></span>}
             {last ? formatRelative(last.created_at) : ''}
           </span>
         </div>

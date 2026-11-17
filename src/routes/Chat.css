@@ -476,3 +476,25 @@ img.conv-row__group-bub { object-fit: cover; }
 /* Breathing room before the divider (founder 2026-11-14): the Email lens,
    the Organizations tab and row times ran flush into the thread pane. */
 @media (min-width: 1024px) { .chat__list-pane { padding-right: var(--s-5); } }
+
+/* WHICH MEDIUM, AT A GLANCE (founder 2026-11-17) — a ringed disc on the
+   avatar's lower-right: chat speaks peach, email speaks ink on white. */
+.conv-row__mbadge {
+  position: absolute; right: -4px; bottom: -3px; z-index: 2;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--bone); box-shadow: 0 0 0 1px var(--bone-edge);
+}
+.conv-row__mbadge--chat { background: var(--peach-tint); color: var(--peach-deep); box-shadow: 0 0 0 1px var(--peach); }
+.conv-row__mbadge--mail { background: #fff; color: var(--ink-soft); }
+.conv-row__mbadge--text { background: var(--green-tint, #e6efe4); color: var(--green-deep, #3f6b4a); box-shadow: 0 0 0 1px var(--green, #6f9a72); }
+
+/* An email in the inbox pane (founder 2026-11-17). */
+.chat__mail-panehead {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px var(--s-4); border-bottom: 1px solid var(--bone-edge);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted);
+}
+.chat__mail-panehead span { display: inline-flex; align-items: center; gap: 6px; }
+.chat__mail-close { border: 0; background: transparent; font-size: 22px; line-height: 1; color: var(--ink-muted); cursor: pointer; }
+.chat__mail-frame { flex: 1; width: 100%; border: 0; min-height: 0; background: var(--bone); }

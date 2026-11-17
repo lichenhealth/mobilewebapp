@@ -1515,6 +1515,16 @@ export default function AssistantFeed() {
                       </button>
                     </div>
                   ))}
+                {/* A ROUTE (founder 2026-11-17): drive_time's map button —
+                    the only outside link a reply carries, built server-side
+                    to Google Maps, never model-composed. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'map_link' && /^https:\/\/www\.google\.com\/maps\//.test(a.url) ? [a] : []))
+                  .map((a) => (
+                    <div className="afeed__pubrow" key={`${p.id}:map:${a.url}`}>
+                      <a className="afeed__pubbtn" href={a.url} target="_blank" rel="noreferrer">{a.label} ↗</a>
+                    </div>
+                  ))}
                 {/* A DRAFTED POST (founder 2026-10-15: "draft, post and edit
                     posts for me"): the assistant wrote it into their drafts;
                     this button opens it in the composer, where THEIR tap on

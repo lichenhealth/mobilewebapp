@@ -259,6 +259,45 @@ export default function AssistantBrief() {
   const [state, setState] = useState<'thinking' | 'ready' | 'quietly-unavailable' | 'capped'>(
     cached ? 'ready' : 'thinking');
   const [refreshTick, setRefreshTick] = useState(0);
+  // THE SUMMARY FOLDS ON DESKTOP (founder 2026-11-17: "let's have the left
+  // summary be a smaller bubble that you can expand, either with a carrot or
+  // clicking in the copy, so that the left and right drop downs on desktop are
+  // the same size and the conversations you can re-open are not below the
+  // fold"): at ≥1024 the summary bubble is clamped to the ask box's height;
+  // the caret or a tap on the words opens it whole. Phones unchanged.
+  const askRef = useRef<HTMLDivElement>(null);
+  const runMetaRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [wideSplit, setWideSplit] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const on = () => setWideSplit(mq.matches);
+    on(); mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const [sumOpen, setSumOpen] = useState(false);
+  const [askH, setAskH] = useState(0);
+  useEffect(() => {
+    const el = askRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setAskH(el.offsetHeight));
+    ro.observe(el); setAskH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
+  const [sumOverflows, setSumOverflows] = useState(false);
+  const sumClamped = wideSplit && !sumOpen && askH > 0;
+  useEffect(() => {
+    if (!sumClamped) return;
+    const el = cardRef.current;
+    if (!el) return;
+    const measure = () => setSumOverflows(el.scrollHeight > el.clientHeight + 2);
+    measure();
+    const mo = new MutationObserver(measure);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => mo.disconnect();
+  }, [sumClamped, askH]);
+  // A new briefing starts folded again.
+  useEffect(() => { setSumOpen(false); }, [section, refreshTick]);
 
   const meta = memberId ? FRAMES.member
     : spaceParam ? FRAMES.space
@@ -1274,13 +1313,22 @@ export default function AssistantBrief() {
           beside the name now, so the bubble runs the full column. */}
       <div className="abrief__split">
       <div className="abrief__run">
-        <div className="abrief__run-meta">
+        <div className="abrief__run-meta" ref={runMetaRef}>
           <span className="abrief__run-ava" aria-hidden><Icon name="brain" size={15} /></span>
           <span className="abrief__run-name">Claude</span>
           <span className="abrief__run-role">· AI Assistant</span>
         </div>
         <div className="abrief__run-row">
-      <div className="abrief__card">
+      <div
+        ref={cardRef}
+        className={'abrief__card' + (sumClamped ? ' is-clamped' : '') + (sumClamped && sumOverflows ? ' is-folded' : '')}
+        style={sumClamped ? { maxHeight: Math.max(110, askH - (runMetaRef.current?.offsetHeight ?? 26) - 6) } : undefined}
+        onClick={(e) => {
+          if (!sumClamped || !sumOverflows) return;
+          if ((e.target as HTMLElement).closest('a,button')) return;
+          setSumOpen(true);
+        }}
+      >
         {!doorOn && (
           <p className="abrief__text">
             The assistant is <strong>off</strong> for this part of your Lichen life — nothing
@@ -1304,6 +1352,18 @@ export default function AssistantBrief() {
         {doorOn && state === 'quietly-unavailable' && (
           <p className="abrief__text">The briefing isn&rsquo;t available right now — your bell and queues hold everything in the meantime.</p>
         )}
+      {wideSplit && (sumOverflows || sumOpen) && (
+        <button
+          type="button"
+          className={'abrief__sumfold' + (sumOpen ? ' is-open' : '')}
+          onClick={() => setSumOpen((v) => !v)}
+          aria-expanded={sumOpen}
+          aria-label={sumOpen ? 'Fold the summary' : 'Open the whole summary'}
+          data-tip={sumOpen ? 'Fold it back' : 'Read it all'}
+        >
+          <Icon name="chevron-right" size={16} />
+        </button>
+      )}
       </div>
         </div>
       </div>
@@ -1325,7 +1385,7 @@ export default function AssistantBrief() {
           feels like a reply to the summary right now, when in fact i might
           not want to address anything in the summary at all"): its own
           section under a hairline, its own heading, a neutral placeholder. */}
-      <div className="abrief__ask">
+      <div className="abrief__ask" ref={askRef}>
       <p className="abrief__convos-h">Ask Claude anything</p>
       <AssistantComposer
         key={params.get('ask') ?? 'blank'}

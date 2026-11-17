@@ -143,3 +143,29 @@
   .abrief__split .abrief__run { margin-bottom: 0; }
   .abrief__split .abrief__ask { margin-top: 0; padding-top: 0; border-top: none; position: sticky; top: calc(var(--top-h) + var(--s-4)); }
 }
+
+/* THE SUMMARY FOLDS ON DESKTOP (founder 2026-11-17) — clamped to the ask
+   box's height (set inline from a ResizeObserver), a soft fade at the foot,
+   and a caret that opens it whole; a tap on the words opens it too. */
+.abrief__card { position: relative; }
+.abrief__card.is-clamped { overflow: hidden; }
+.abrief__card.is-folded { cursor: pointer; }
+.abrief__card.is-folded::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0), #fff 78%);
+  border-radius: 0 0 16px 6px; pointer-events: none;
+}
+.abrief__card.is-folded .abrief__updated { display: none; }
+.abrief__card .abrief__sumfold {
+  position: absolute; right: 10px; bottom: 8px; z-index: 1;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--peach); background: #fff; color: var(--peach-deep);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.abrief__sumfold svg { transform: rotate(90deg); transition: transform 0.15s; }
+.abrief__card .abrief__sumfold.is-open { position: static; float: right; margin-top: 6px; }
+.abrief__sumfold.is-open svg { transform: rotate(-90deg); }
+.abrief__sumfold:hover { background: var(--peach-tint); }
+@media (min-width: 1024px) {
+  .abrief__split .abrief__ask { min-height: 160px; }
+}
