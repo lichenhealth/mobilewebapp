@@ -248,12 +248,14 @@
 .mapv__route-sum { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
 .mapv__route-sum strong { color: var(--peach-deep); }
 .mapv__route-x { border: 0; background: transparent; font-size: 24px; line-height: 1; color: var(--ink-muted); cursor: pointer; }
-.mapv__route-go { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.mapv__route-start, .mapv__route-alt {
+.mapv__route-go { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.mapv__route-golbl { width: 100%; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); }
+.mapv__route-app {
   font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 999px; text-decoration: none; cursor: pointer; white-space: nowrap;
+  background: #fff; color: var(--peach-deep); border: 1px solid var(--peach);
 }
-.mapv__route-start { background: var(--peach); color: #fff; border: 1px solid var(--peach); }
-.mapv__route-alt { background: #fff; color: var(--peach-deep); border: 1px solid var(--peach); }
+.mapv__route-app.is-on { background: var(--peach-tint); }
+.mapv__route-app:disabled { opacity: .5; cursor: default; }
 .mapv__route-steps { margin: 12px 0 0; padding-left: 20px; font-size: 14px; color: var(--ink); }
 .mapv__route-steps li { padding: 5px 0; border-bottom: 1px solid var(--bone-edge); display: flex; justify-content: space-between; gap: 12px; }
 .mapv__route-steps li:last-child { border-bottom: 0; }
