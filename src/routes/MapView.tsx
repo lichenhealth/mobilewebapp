@@ -518,6 +518,18 @@ function RouteCard({ mapRef, spec, toLabel, fromLabel, onClose }: {
   const [o, d] = valid ? pts : [[0, 0], [0, 0]];
   const google = `https://www.google.com/maps/dir/?api=1&origin=${o[1]},${o[0]}&destination=${d[1]},${d[0]}&travelmode=driving&dir_action=navigate`;
   const apple = `https://maps.apple.com/?saddr=${o[1]},${o[0]}&daddr=${d[1]},${d[0]}&dirflg=d`;
+  // THE SMARTER START (founder 2026-11-17: "we can do it on lichen, but also,
+  // if smarter we can have people open in google maps or apple maps"): the
+  // device's own navigator leads — Apple Maps on iPhone/iPad/Mac, Google Maps
+  // elsewhere — and whichever one they last tapped leads from then on.
+  const navApps = (() => {
+    const g = { key: 'google', name: 'Google Maps', href: google };
+    const a = { key: 'apple', name: 'Apple Maps', href: apple };
+    let pref: string | null = null;
+    try { pref = localStorage.getItem('lichen.navApp'); } catch { /* none */ }
+    const apple1st = pref ? pref === 'apple' : /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+    return apple1st ? [a, g] : [g, a];
+  })();
   const dist = (m: number) => (m < 160 ? `${Math.round(m * 3.281 / 10) * 10} ft` : `${(m / 1609.34).toFixed(1)} mi`);
   return (
     <div className="mapv__route">
@@ -532,8 +544,12 @@ function RouteCard({ mapRef, spec, toLabel, fromLabel, onClose }: {
       </div>
       {valid && (
         <div className="mapv__route-go">
-          <a className="mapv__route-start" href={google} target="_blank" rel="noreferrer">Start in Google Maps ↗</a>
-          <a className="mapv__route-alt" href={apple} target="_blank" rel="noreferrer">Apple Maps ↗</a>
+          {navApps.map((a, i) => (
+            <a key={a.key} className={i === 0 ? 'mapv__route-start' : 'mapv__route-alt'} href={a.href} target="_blank" rel="noreferrer"
+              onClick={() => { try { localStorage.setItem('lichen.navApp', a.key); } catch { /* per-device nicety */ } }}>
+              {i === 0 ? `Start in ${a.name}` : a.name} ↗
+            </a>
+          ))}
           {info && info.steps.length > 0 && (
             <button type="button" className="mapv__route-alt" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
               {open ? 'Hide' : 'Show'} {info.steps.length} turns
