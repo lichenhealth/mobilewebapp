@@ -261,3 +261,82 @@
 .mapv__route-steps li:last-child { border-bottom: 0; }
 .mapv__route-dist { color: var(--ink-muted); font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
 .mapv__route-fine { margin: 10px 0 0; font-size: 11px; color: var(--ink-faint); }
+
+/* ── NAVIGATION, BUILT INTO MAPS (founder 2026-11-17) ── */
+.mapv__popup-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mapv__popup-acts .mapv__popup-open { margin-top: 0; }
+.mapv__popup-dir {
+  font: inherit; font-size: 12px; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  background: var(--peach-tint); color: var(--peach-deep); border: 1px solid var(--peach);
+}
+/* A searched address not on Lichen: the + teardrop */
+.mapv__pin.mapv__pin--drop { background: #fff; border-color: var(--peach); }
+.mapv__pin.mapv__pin--drop .mapv__pin-glyph { color: var(--peach-deep); }
+
+/* The Directions box: From · stops · To, ⇅ to reverse */
+.mapv__dir {
+  position: relative; z-index: 6;
+  background: var(--bone); border-bottom: 1px solid var(--bone-edge);
+  padding: var(--s-2) var(--s-4) var(--s-3);
+}
+.mapv__dir-head { display: flex; justify-content: space-between; align-items: center; }
+.mapv__dir-title { margin: 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); }
+.mapv__dir-body { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.mapv__dir-rows { flex: 1; min-width: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.mapv__dir-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  background: var(--bone-warm); border: 1px solid var(--bone-edge); border-radius: 12px;
+}
+.mapv__dir-row.is-active { border-color: var(--peach); }
+.mapv__dir-role { flex-shrink: 0; width: 46px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
+.mapv__dir-row input { flex: 1; min-width: 0; border: 0; background: transparent; font-size: 14px; color: var(--ink); }
+.mapv__dir-row input:focus, .mapv__dir-row input:focus-visible { outline: none; box-shadow: none; }
+.mapv__dir-row input.is-here { color: var(--peach-deep); }
+.mapv__dir-x { display: inline-flex; padding: 3px; border: 0; background: transparent; color: var(--ink-faint); cursor: pointer; border-radius: 999px; }
+.mapv__dir-x:hover { color: var(--ink); }
+.mapv__dir-swap {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 999px; cursor: pointer;
+  background: #fff; border: 1px solid var(--bone-edge); color: var(--ink); font-size: 16px; line-height: 1;
+}
+.mapv__dir-swap:hover { border-color: var(--peach); color: var(--peach-deep); }
+.mapv__dir-sugg { margin-top: 6px; }
+.mapv__dir-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.mapv__dir-add { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer; background: transparent; border: 1px dashed var(--peach); color: var(--peach-deep); }
+.mapv__dir-foot .mapv__route-start { margin-left: auto; }
+.mapv__dir-err { margin: 8px 0 0; font-size: 12px; color: var(--red-deep, #a34a3a); }
+
+/* Drive · Walk · Bike */
+.mapv__route-modes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.mapv__dir-foot .mapv__route-modes { margin-top: 0; }
+.mapv__mode {
+  font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  background: #fff; color: var(--ink-soft); border: 1px solid var(--bone-edge);
+}
+.mapv__mode.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+.mapv__route-edit { font: inherit; font-size: 13px; padding: 5px 4px; background: transparent; border: 0; color: var(--peach-deep); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.mapv__route-start {
+  font: inherit; font-size: 14px; font-weight: 600; padding: 8px 18px; border-radius: 999px; cursor: pointer;
+  background: var(--peach); color: #fff; border: 1px solid var(--peach);
+}
+.mapv__route-start:disabled { opacity: .55; cursor: default; }
+.mapv__route-turns { display: block; margin-top: 10px; padding: 0; font: inherit; font-size: 13px; background: transparent; border: 0; color: var(--peach-deep); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Live navigation */
+.mapv__route--nav { max-height: 60%; }
+.mapv__nav-next { padding: 10px 12px; margin: -2px -4px 6px; border-radius: 12px; background: var(--peach-tint); }
+.mapv__nav-turn { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.mapv__nav-in { margin: 2px 0 0; font-family: var(--font-mono); font-size: 13px; color: var(--peach-deep); }
+.mapv__nav-note { margin: 6px 0 0; font-size: 12px; color: var(--ink-soft); }
+.mapv__nav-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.mapv__route-end { margin-left: auto; }
+.mapv__me {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #3b82f6; border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(59,130,246,.22);
+}
+.mapv__stopdot {
+  min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff; border: 2px solid var(--peach); color: var(--peach-deep);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+}
+.mapv__stopdot.is-start { min-width: 14px; height: 14px; padding: 0; background: var(--peach); border-color: #fff; box-shadow: 0 0 0 2px var(--peach); }

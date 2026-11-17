@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { navPref, outsideOrder, rememberNavApp } from '../lib/navApp';
+import { loadMyHome } from '../lib/locationApi';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -66,6 +67,85 @@ const KIND_LAYER: Record<SpaceKind, LayerKey> = {
   place: 'places', organization: 'orgs', community: 'communities', group: 'groups',
 };
 
+// ── NAVIGATION, BUILT INTO MAPS (founder 2026-11-17: "let's build navigation
+// into maps more seamlessly" + "a prompt for getting directions… load it as
+// the start address and let you type the destination, or reverse the order"
+// + "you also can 'add stop' as you would in google") ─────────────────────
+export interface NavPoint { lng: number; lat: number; label: string; addr?: string; here?: boolean }
+export type NavMode = 'driving' | 'walking' | 'cycling';
+const HERE: NavPoint = { lng: 0, lat: 0, label: 'Your location', here: true };
+const MAX_POINTS = 10;
+const enc = encodeURIComponent;
+
+/** Metres between two [lng, lat] points. */
+function metres(a: [number, number], b: [number, number]): number {
+  const R = 6371000, r = Math.PI / 180;
+  const dLat = (b[1] - a[1]) * r, dLng = (b[0] - a[0]) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+/** Metres from a point to the nearest segment of a line (flat-earth, fine at street scale). */
+function metresToLine(p: [number, number], line: [number, number][]): number {
+  if (line.length < 2) return Infinity;
+  const kx = 111320 * Math.cos(p[1] * Math.PI / 180), ky = 110540;
+  let best = Infinity;
+  for (let i = 1; i < line.length; i++) {
+    const ax = (line[i - 1][0] - p[0]) * kx, ay = (line[i - 1][1] - p[1]) * ky;
+    const bx = (line[i][0] - p[0]) * kx, by = (line[i][1] - p[1]) * ky;
+    const dx = bx - ax, dy = by - ay;
+    const t = dx || dy ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / (dx * dx + dy * dy))) : 0;
+    best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+  }
+  return best;
+}
+/** Where this device is right now — the browser's own prompt is the consent. */
+function getHere(timeout = 8000): Promise<[number, number] | null> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const t = window.setTimeout(() => resolve(null), timeout);
+    navigator.geolocation.getCurrentPosition(
+      (p) => { window.clearTimeout(t); resolve([p.coords.longitude, p.coords.latitude]); },
+      () => { window.clearTimeout(t); resolve(null); },
+      { enableHighAccuracy: true, timeout: timeout - 500, maximumAge: 60000 },
+    );
+  });
+}
+/** The one route address: /maps?route=<lng,lat;…>&names=a|b&addrs=a|b&here=1&mode=. */
+export function routeUrl(points: NavPoint[], mode: NavMode = 'driving'): string {
+  const clean = (t: string) => t.replace(/\|/g, ' ').slice(0, 90);
+  return `/maps?route=${points.map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';')}`
+    + `&names=${enc(points.map((p) => clean(p.label)).join('|'))}`
+    + `&addrs=${enc(points.map((p) => clean(p.addr ?? '')).join('|'))}`
+    + (points[0]?.here ? '&here=1' : '') + (mode !== 'driving' ? `&mode=${mode}` : '');
+}
+/** A Lichen place the From/To boxes can offer by name. */
+interface PlaceHit { key: string; label: string; sub: string; lng: number; lat: number; addr?: string }
+
+/** A pin's popup: its words, then its doors. */
+function makePopup(rows: { cls: string; text: string }[], actions: { label: string; onClick: () => void; cls?: string }[]) {
+  const el = document.createElement('div');
+  el.className = 'mapv__popup';
+  rows.filter((r) => r.text).forEach((r) => {
+    const p = document.createElement('p');
+    p.className = r.cls;
+    p.textContent = r.text;
+    el.appendChild(p);
+  });
+  if (actions.length) {
+    const row = document.createElement('div');
+    row.className = 'mapv__popup-acts';
+    actions.forEach((a) => {
+      const btn = document.createElement('button');
+      btn.className = a.cls ?? 'mapv__popup-open';
+      btn.textContent = a.label;
+      btn.addEventListener('click', a.onClick);
+      row.appendChild(btn);
+    });
+    el.appendChild(row);
+  }
+  return new mapboxgl.Popup({ offset: 26, closeButton: false, maxWidth: '280px' }).setDOMContent(el);
+}
+
 export default function MapView() {
   const navigate = useNavigate();
   // ?space= / ?member= / ?event= — arrive pointed AT something (founder
@@ -103,7 +183,17 @@ export default function MapView() {
   const [peoplePins, setPeoplePins] = useState<MappableMember[]>([]);
   const [bizPins, setBizPins] = useState<BizLocationPin[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetPrefill, setSheetPrefill] = useState<{ text: string; geo: GeoPoint } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  // THE DIRECTIONS BOX (founder 2026-11-17): From · stops · To, reversible.
+  const [dirInit, setDirInit] = useState<(NavPoint | null)[] | null>(null);
+  const openDirections = useCallback((init: (NavPoint | null)[]) => {
+    setSearchOpen(false); setSheetOpen(false); setDirInit(init);
+  }, []);
+  const dirRef = useRef(openDirections);
+  dirRef.current = openDirections;
+  const [, setParams] = useSearchParams();
+  const tempPinRef = useRef<mapboxgl.Marker | null>(null);
 
   const reloadSpaces = useCallback(async () => {
     setSpacePins(await loadMappableSpaces());
@@ -191,25 +281,11 @@ export default function MapView() {
     if (!map) return;
     markersRef.current.forEach((m) => m.remove());
     const next = new Map<string, mapboxgl.Marker>();
-
-    const makePopup = (rows: { cls: string; text: string }[], action?: { label: string; onClick: () => void }) => {
-      const el = document.createElement('div');
-      el.className = 'mapv__popup';
-      rows.filter((r) => r.text).forEach((r) => {
-        const p = document.createElement('p');
-        p.className = r.cls;
-        p.textContent = r.text;
-        el.appendChild(p);
-      });
-      if (action) {
-        const btn = document.createElement('button');
-        btn.className = 'mapv__popup-open';
-        btn.textContent = action.label;
-        btn.addEventListener('click', action.onClick);
-        el.appendChild(btn);
-      }
-      return new mapboxgl.Popup({ offset: 26, closeButton: false, maxWidth: '260px' }).setDOMContent(el);
-    };
+    // Every pin offers a way there (founder 2026-11-17).
+    const dirAction = (dest: NavPoint) => ({
+      label: 'Directions', cls: 'mapv__popup-dir',
+      onClick: () => dirRef.current([HERE, dest]),
+    });
 
     /** A pin that says WHAT it is (founder 2026-08-15). The teardrop is
      *  rotated 45°, so the glyph rides in a counter-rotated child to stay
@@ -237,7 +313,10 @@ export default function MapView() {
             { cls: 'mapv__popup-when', text: whenLabel(post) },
             { cls: 'mapv__popup-loc', text: typeof post.details?.location === 'string' ? post.details.location : '' },
           ],
-          { label: 'Open event', onClick: () => navigate(`/events/${post.id}`) },
+          [
+            { label: 'Open event', onClick: () => navigate(`/events/${post.id}`) },
+            dirAction({ lng, lat, label: post.title || 'Event', addr: typeof post.details?.location === 'string' ? post.details.location : '' }),
+          ],
         ))
         .addTo(map);
       next.set(`evt:${post.id}`, marker);
@@ -256,7 +335,10 @@ export default function MapView() {
             { cls: 'mapv__popup-when', text: typeof d.sleeps === 'number' ? `${kind} · sleeps ${d.sleeps}` : kind },
             { cls: 'mapv__popup-loc', text: routeLine || (typeof d.location === 'string' ? d.location : '') },
           ],
-          { label: 'Open the offer', onClick: () => navigate(`/posts/${post.id}`) },
+          [
+            { label: 'Open the offer', onClick: () => navigate(`/posts/${post.id}`) },
+            dirAction({ lng, lat, label: post.title || 'Travel', addr: typeof d.location === 'string' ? d.location : '' }),
+          ],
         ))
         .addTo(map);
       next.set(`trv:${post.id}`, marker);
@@ -272,7 +354,10 @@ export default function MapView() {
             { cls: 'mapv__popup-when', text: KIND_LABEL[s.kind] },
             { cls: 'mapv__popup-loc', text: s.location ?? '' },
           ],
-          { label: 'View profile', onClick: () => navigate(`/spaces/${s.id}`) },
+          [
+            { label: 'View profile', onClick: () => navigate(`/spaces/${s.id}`) },
+            dirAction({ lng: s.lng!, lat: s.lat!, label: s.name, addr: s.location ?? '' }),
+          ],
         ))
         .addTo(map);
       next.set(`spc:${s.id}`, marker);
@@ -290,7 +375,9 @@ export default function MapView() {
             { cls: 'mapv__popup-when', text: m.level !== 'exact' ? 'Member · approximate' : 'Member' },
             { cls: 'mapv__popup-loc', text: (m.level !== 'exact' ? areaLabel(m.place) : m.place) ?? '' },
           ],
-          { label: 'View profile', onClick: () => navigate(`/members/${m.id}`) },
+          m.level === 'exact'
+            ? [{ label: 'View profile', onClick: () => navigate(`/members/${m.id}`) }, dirAction({ lng: m.lng, lat: m.lat, label: name, addr: m.place ?? '' })]
+            : [{ label: 'View profile', onClick: () => navigate(`/members/${m.id}`) }],
         ))
         .addTo(map);
       next.set(`usr:${m.id}`, marker);
@@ -308,7 +395,10 @@ export default function MapView() {
             { cls: 'mapv__popup-when', text: b.owner_name ? `Goods & services · ${b.owner_name}` : 'Goods & services' },
             { cls: 'mapv__popup-loc', text: b.location },
           ],
-          { label: 'View member', onClick: () => navigate(`/members/${b.profile_id}`) },
+          [
+            { label: 'View member', onClick: () => navigate(`/members/${b.profile_id}`) },
+            dirAction({ lng: b.lng, lat: b.lat, label: b.label || b.location, addr: b.location }),
+          ],
         ))
         .addTo(map);
       next.set(`biz:${b.id}`, marker);
@@ -365,6 +455,43 @@ export default function MapView() {
     }
   }, [focusSpace, focusMember, focusEvent, spacePins, peoplePins, bizPins, eventPins, flyTo]);
 
+  /** A searched address that isn't on Lichen gets a + teardrop (founder
+   *  2026-11-17: "nothing happens… Do the map pin teardrop with a '+' button
+   *  and you can either get directions or add place"). */
+  const dropPin = useCallback((g: GeoSuggestion) => {
+    const map = mapRef.current;
+    if (!map) return;
+    tempPinRef.current?.remove();
+    const el = document.createElement('button');
+    el.className = 'mapv__pin mapv__pin--drop';
+    el.setAttribute('aria-label', g.label);
+    const glyph = document.createElement('span');
+    glyph.className = 'mapv__pin-glyph';
+    glyph.innerHTML = iconSvgMarkup('plus', 15);
+    el.appendChild(glyph);
+    const point: NavPoint = { lng: g.lng, lat: g.lat, label: g.label, addr: g.label };
+    const popup = makePopup(
+      [{ cls: 'mapv__popup-title', text: g.label }, { cls: 'mapv__popup-when', text: 'Not on Lichen yet' }],
+      [
+        { label: 'Directions to here', cls: 'mapv__popup-dir', onClick: () => { popup.remove(); dirRef.current([HERE, point]); } },
+        { label: 'Start from here', cls: 'mapv__popup-dir', onClick: () => { popup.remove(); dirRef.current([point, null]); } },
+        { label: 'Add as a place', onClick: () => { popup.remove(); setSheetPrefill({ text: g.label, geo: { lat: g.lat, lng: g.lng } }); setSearchOpen(false); setDirInit(null); setSheetOpen(true); } },
+      ],
+    );
+    tempPinRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat([g.lng, g.lat]).setPopup(popup).addTo(map);
+    map.flyTo({ center: [g.lng, g.lat], zoom: 14, duration: 900 });
+    window.setTimeout(() => { if (!popup.isOpen()) tempPinRef.current?.togglePopup(); }, 950);
+  }, []);
+  useEffect(() => () => { tempPinRef.current?.remove(); }, []);
+
+  /** Lichen places the From/To boxes know by name. */
+  const places = useMemo<PlaceHit[]>(() => [
+    ...spacePins.filter((x) => x.lat != null && x.lng != null).map((x) => ({ key: 'spc:' + x.id, label: x.name, sub: KIND_LABEL[x.kind], lng: x.lng!, lat: x.lat!, addr: x.location ?? '' })),
+    ...bizPins.map((b) => ({ key: 'biz:' + b.id, label: b.label || b.location, sub: b.owner_name ? `Goods & services · ${b.owner_name}` : 'Goods & services', lng: b.lng, lat: b.lat, addr: b.location })),
+    ...eventPins.map(({ post, lat, lng }) => ({ key: 'evt:' + post.id, label: post.title || 'Event', sub: whenLabel(post) || 'Event', lng, lat, addr: typeof post.details?.location === 'string' ? post.details.location : '' })),
+    ...peoplePins.filter((m) => m.level === 'exact' && m.lat != null && m.lng != null).map((m) => ({ key: 'usr:' + m.id, label: m.full_name ?? 'Member', sub: 'Member', lng: m.lng!, lat: m.lat!, addr: m.place ?? '' })),
+  ], [spacePins, bizPins, eventPins, peoplePins]);
+
   const totalPins = eventPins.length + travelPins.length + spacePins.length + peoplePins.length + bizPins.length;
 
   return (
@@ -384,20 +511,30 @@ export default function MapView() {
           >
             <Icon name="search" size={16} />
           </button>
+          <button
+            className={'mapv__bar-btn' + (dirInit ? ' is-on' : '')}
+            onClick={() => (dirInit ? setDirInit(null) : openDirections([HERE, null]))}
+            aria-label="Directions" data-tip="Directions"
+          >
+            <Icon name="car" size={16} />
+          </button>
           <div className="mapv__add-wrap">
             <button
               className={'mapv__bar-btn' + (sheetOpen ? ' is-on' : '')}
-              onClick={() => { setSheetOpen((o) => !o); setSearchOpen(false); }}
+              onClick={() => { setSheetPrefill(null); setSheetOpen((o) => !o); setSearchOpen(false); setDirInit(null); }}
               aria-label="Add a place" data-tip="Add a place"
             >
               <Icon name="plus" size={16} />
             </button>
             {sheetOpen && (
               <AddPlaceSheet
+                key={sheetPrefill?.text ?? 'blank'}
                 me={me}
-                onClose={() => setSheetOpen(false)}
+                prefill={sheetPrefill}
+                onClose={() => { setSheetOpen(false); setSheetPrefill(null); }}
                 onSaved={async (geo) => {
                   await reloadSpaces();
+                  tempPinRef.current?.remove(); tempPinRef.current = null;
                   if (geo) flyTo(geo.lng, geo.lat, 13);
                 }}
               />
@@ -445,13 +582,38 @@ export default function MapView() {
           spaces={spacePins}
           people={peoplePins}
           onFly={flyTo}
+          onPlace={dropPin}
           onClose={() => setSearchOpen(false)}
+        />
+      )}
+
+      {dirInit && (
+        <DirPanel
+          key={JSON.stringify(dirInit)}
+          init={dirInit}
+          places={places}
+          mode0={(mapParams.get('mode') as NavMode) || 'driving'}
+          onGo={(pts, mode) => { setDirInit(null); tempPinRef.current?.remove(); tempPinRef.current = null; navigate(routeUrl(pts, mode)); }}
+          onClose={() => setDirInit(null)}
         />
       )}
 
       <div className="mapv__frame">
         <div ref={mapEl} className="mapv__map" />
-        {mapParams.get('route') && <RouteCard mapRef={mapRef} spec={mapParams.get('route')!} toLabel={mapParams.get('to') ?? ''} fromLabel={mapParams.get('from') ?? ''} started={mapParams.get('start') === 'lichen'} onClose={() => navigate('/maps', { replace: true })} />}
+        {mapParams.get('route') && (
+          <RouteCard
+            mapRef={mapRef}
+            spec={mapParams.get('route')!}
+            names={mapParams.get('names')?.split('|') ?? [mapParams.get('from') ?? '', mapParams.get('to') ?? '']}
+            addrs={mapParams.get('addrs')?.split('|') ?? []}
+            here={mapParams.get('here') === '1' || /your (location|home)|where you are/i.test(mapParams.get('from') ?? '') && mapParams.get('from') !== 'your home'}
+            mode={(mapParams.get('mode') as NavMode) || 'driving'}
+            started={mapParams.get('start') === 'lichen'}
+            onMode={(m) => setParams((cur) => { const n = new URLSearchParams(cur); if (m === 'driving') n.delete('mode'); else n.set('mode', m); return n; }, { replace: true })}
+            onEdit={openDirections}
+            onClose={() => navigate('/maps', { replace: true })}
+          />
+        )}
         {ready && totalPins === 0 && !mapParams.get('route') && (
           <div className="mapv__empty">
             <Icon name="maps" size={20} />
@@ -469,116 +631,498 @@ export default function MapView() {
  *  directions to the facial?"). /maps?route=<lng,lat;lng,lat>&to=&from=
  *  draws the live-traffic route and lists every turn; Start hands the same
  *  route to the phone's own navigator for voice guidance. */
-type RouteStep = { text: string; dist: number };
-function RouteCard({ mapRef, spec, toLabel, fromLabel, started, onClose }: {
-  mapRef: React.MutableRefObject<mapboxgl.Map | null>; spec: string; toLabel: string; fromLabel: string;
+type RouteStep = { text: string; dist: number; dur: number; at: [number, number]; arrive: boolean };
+type RouteInfo = { mins: number; miles: number; steps: RouteStep[]; geom: [number, number][]; traffic: boolean };
+const MODES: { key: NavMode; label: string }[] = [
+  { key: 'driving', label: 'Drive' }, { key: 'walking', label: 'Walk' }, { key: 'cycling', label: 'Bike' },
+];
+const dist = (m: number) => (m < 160 ? `${Math.round(m * 3.281 / 10) * 10} ft` : `${(m / 1609.34).toFixed(1)} mi`);
+const fmtMins = (mins: number) => (mins >= 60 ? `${Math.floor(mins / 60)} hr${mins % 60 ? ` ${mins % 60} min` : ''}` : `${Math.max(1, mins)} min`);
+
+async function fetchRoute(coords: [number, number][], mode: NavMode): Promise<{ route: { duration: number; distance: number; geometry: { coordinates: [number, number][] }; legs: { steps: { maneuver: { instruction?: string; location: [number, number]; type?: string }; distance: number; duration: number }[] }[] }; traffic: boolean } | null> {
+  // Live traffic only takes three points (Mapbox's limit) — a longer trip
+  // rides plain driving times and says so.
+  const first = mode === 'walking' ? 'walking' : mode === 'cycling' ? 'cycling' : coords.length <= 3 ? 'driving-traffic' : 'driving';
+  // A dropped connection or a busy server gets one more try a beat later
+  // (founder 2026-11-17: "have default protocols to do the necessary pings").
+  const tryOne = async (profile: string) => {
+    const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords.map((c) => c.join(',')).join(';')}`
+      + `?steps=true&geometries=geojson&overview=full&radiuses=${coords.map(() => 'unlimited').join(';')}&access_token=${MAPBOX_TOKEN}`;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch(url);
+        if (r.ok) return (await r.json())?.routes?.[0] ?? null;
+        if (r.status < 500 && r.status !== 429) return null;   // a real "no route"
+      } catch { /* network — try once more */ }
+      if (attempt === 0) await new Promise((res) => window.setTimeout(res, 1200));
+    }
+    return null;
+  };
+  const a = await tryOne(first);
+  if (a) return { route: a, traffic: first === 'driving-traffic' };
+  if (first === 'driving-traffic') { const b = await tryOne('driving'); if (b) return { route: b, traffic: false }; }
+  return null;
+}
+
+function RouteCard({ mapRef, spec, names, addrs, here, mode, started, onMode, onEdit, onClose }: {
+  mapRef: React.MutableRefObject<mapboxgl.Map | null>; spec: string; names: string[]; addrs: string[];
+  here: boolean; mode: NavMode;
   /** They already chose Lichen Maps (the brain's door) — skip the choice. */
-  started: boolean; onClose: () => void;
+  started: boolean;
+  onMode: (m: NavMode) => void;
+  onEdit: (pts: (NavPoint | null)[]) => void;
+  onClose: () => void;
 }) {
   const pts = spec.split(';').map((p) => p.split(',').map(Number)) as [number, number][];
-  const valid = pts.length === 2 && pts.every((p) => p.length === 2 && p.every((n) => Number.isFinite(n)));
-  const [info, setInfo] = useState<{ mins: number; miles: number; steps: RouteStep[] } | null>(null);
+  const valid = pts.length >= 2 && pts.length <= MAX_POINTS && pts.every((p) => p.length === 2 && p.every((n) => Number.isFinite(n)));
+  const last = pts.length - 1;
+  const nameAt = (i: number) => (names[i] || '').trim() || (i === 0 ? 'Start' : i === last ? 'your destination' : `Stop ${i}`);
+  const [info, setInfo] = useState<RouteInfo | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
   const [open, setOpen] = useState(false);
+  // ── live navigation (Go mode) ──
+  const [nav, setNav] = useState(false);
+  const [cur, setCur] = useState(0);
+  const [toNext, setToNext] = useState<number | null>(null);
+  const [muted, setMuted] = useState(false);
+  const [note, setNote] = useState('');
+  const [arrived, setArrived] = useState(false);
+  const stepsRef = useRef<RouteStep[]>([]);
+  const geomRef = useRef<[number, number][]>([]);
+  const curRef = useRef(0);
+  const legsRef = useRef(0);
+  const offRef = useRef(0);
+  const reroutingRef = useRef(false);
+  const spokenRef = useRef<Set<number>>(new Set());
+  const mutedRef = useRef(false);
+  const watchRef = useRef<number | null>(null);
+  const wakeRef = useRef<{ release: () => Promise<void> } | null>(null);
+  const meRef = useRef<mapboxgl.Marker | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  mutedRef.current = muted;
+
+  const speak = (text: string) => {
+    if (mutedRef.current || typeof window === 'undefined' || !('speechSynthesis' in window) || !text) return;
+    try { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); } catch { /* voice is a nicety */ }
+  };
+
+  /** Draw a route on the map, retrying until the map's style is ready. */
+  const draw = (geom: [number, number][], stops: [number, number][], fit: boolean) => {
+    let tries = 0;
+    const attempt = () => {
+      const map = mapRef.current;
+      if (!(map && map.isStyleLoaded())) { if (++tries < 60) window.setTimeout(attempt, 250); return; }
+      try {
+        const data = { type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: geom } };
+        const src = map.getSource('lichen-route') as mapboxgl.GeoJSONSource | undefined;
+        if (src) src.setData(data);
+        else {
+          map.addSource('lichen-route', { type: 'geojson', data });
+          map.addLayer({ id: 'lichen-route', type: 'line', source: 'lichen-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#E07B4F', 'line-width': 5, 'line-opacity': 0.9 } });
+        }
+        markersRef.current.forEach((m) => m.remove());
+        markersRef.current = stops.map((p, i) => {
+          const el = document.createElement('div');
+          el.className = 'mapv__stopdot' + (i === 0 ? ' is-start' : '');
+          el.textContent = i === 0 ? '' : i === stops.length - 1 ? '' : String(i);
+          return new mapboxgl.Marker(i === 0 ? { element: el } : (i === stops.length - 1 ? { color: '#E07B4F' } : { element: el })).setLngLat(p).addTo(map);
+        });
+        if (fit) {
+          const b = new mapboxgl.LngLatBounds();
+          for (const c of geom) b.extend(c);
+          map.fitBounds(b, { padding: { top: 60, bottom: 260, left: 40, right: 40 }, duration: 800 });
+        }
+      } catch { if (++tries < 60) window.setTimeout(attempt, 250); }
+    };
+    attempt();
+  };
+
+  const apply = (res: NonNullable<Awaited<ReturnType<typeof fetchRoute>>>, stops: [number, number][], fit: boolean) => {
+    const steps: RouteStep[] = res.route.legs.flatMap((l) => l.steps.map((st) => ({
+      text: st.maneuver.instruction ?? '', dist: st.distance, dur: st.duration, at: st.maneuver.location, arrive: st.maneuver.type === 'arrive',
+    })));
+    stepsRef.current = steps;
+    geomRef.current = res.route.geometry.coordinates;
+    setInfo({ mins: Math.round(res.route.duration / 60), miles: Math.round((res.route.distance / 1609.34) * 10) / 10, steps, geom: res.route.geometry.coordinates, traffic: res.traffic });
+    draw(res.route.geometry.coordinates, stops, fit);
+  };
+
   useEffect(() => {
     if (!valid) { setErr('That route link is incomplete.'); return; }
     let live = true;
-    const markers: mapboxgl.Marker[] = [];
+    setInfo(null); setErr(null);
     void (async () => {
       try {
-        const r = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${pts[0].join(',')};${pts[1].join(',')}?steps=true&geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`);
-        const route = r.ok ? (await r.json())?.routes?.[0] : null;
-        if (!live) return;
-        if (!route) { setErr('The route didn’t load — try again in a moment.'); return; }
-        const steps: RouteStep[] = (route.legs?.[0]?.steps ?? []).map((st: { maneuver?: { instruction?: string }; distance: number }) => ({ text: st.maneuver?.instruction ?? '', dist: st.distance }));
-        setInfo({ mins: Math.round(route.duration / 60), miles: Math.round((route.distance / 1609.34) * 10) / 10, steps });
-        const draw = () => {
-          const map = mapRef.current;
-          if (!map || !live) return;
-          const data = { type: 'Feature' as const, properties: {}, geometry: route.geometry };
-          const src = map.getSource('lichen-route') as mapboxgl.GeoJSONSource | undefined;
-          if (src) src.setData(data);
-          else {
-            map.addSource('lichen-route', { type: 'geojson', data });
-            map.addLayer({ id: 'lichen-route', type: 'line', source: 'lichen-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#E07B4F', 'line-width': 5, 'line-opacity': 0.9 } });
-          }
-          for (const p of pts) markers.push(new mapboxgl.Marker({ color: '#E07B4F' }).setLngLat(p).addTo(map));
-          const b = new mapboxgl.LngLatBounds();
-          for (const c of route.geometry.coordinates as [number, number][]) b.extend(c);
-          map.fitBounds(b, { padding: { top: 60, bottom: 220, left: 40, right: 40 }, duration: 800 });
-        };
-        // The map may not exist yet, or its style may still be loading — and
-        // a 'load' that already fired never fires again. Try until it takes.
-        let tries = 0;
-        const attempt = () => {
+        // A route that starts from "your location" was pinned when it was
+        // asked for — maybe an hour ago in the brain. Ask the device again
+        // and start from where they actually are now.
+        let use = pts;
+        if (here) {
+          const now = await getHere(5000);
           if (!live) return;
-          const map = mapRef.current;
-          if (map && map.isStyleLoaded()) { try { draw(); return; } catch { /* style mid-swap */ } }
-          if (++tries < 60) window.setTimeout(attempt, 250);
-        };
-        attempt();
-      } catch { if (live) setErr('The route didn’t load — try again in a moment.'); }
+          if (now && metres(now, pts[0]) > 250) use = [now, ...pts.slice(1)];
+        }
+        const res = await fetchRoute(use, mode);
+        if (!live) return;
+        if (!res) { setErr('The route didn’t load — check your connection and try again.'); return; }
+        apply(res, use, true);
+      } catch { if (live) setErr('The route didn’t load — check your connection and try again.'); }
     })();
-    return () => {
-      live = false;
-      markers.forEach((m) => m.remove());
-      const map = mapRef.current;
-      if (map?.getLayer('lichen-route')) map.removeLayer('lichen-route');
-      if (map?.getSource('lichen-route')) map.removeSource('lichen-route');
-    };
+    return () => { live = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spec]);
-  const [o, d] = valid ? pts : [[0, 0], [0, 0]];
-  const google = `https://www.google.com/maps/dir/?api=1&origin=${o[1]},${o[0]}&destination=${d[1]},${d[0]}&travelmode=driving&dir_action=navigate`;
-  const apple = `https://maps.apple.com/?saddr=${o[1]},${o[0]}&daddr=${d[1]},${d[0]}&dirflg=d`;
-  // THREE CHOICES, NEVER ASSUMED (founder 2026-11-17: "give someone the
-  // chance to pick lichen, apple or google - with lichen first and apple next
-  // if on an iphone, and google next if on an android...but let's not assume.
-  // I use google maps, for example, on Apple"): Lichen's own turns lead, then
-  // the member's remembered pick, else a device guess that reads the BROWSER
-  // too — Chrome anywhere (CriOS on iOS) reads as a Google person.
-  const pref = navPref();
+  }, [spec, mode, retry]);
+
+  // Clear the line and pins when the card goes.
+  useEffect(() => () => {
+    stopNav();
+    markersRef.current.forEach((m) => m.remove());
+    const map = mapRef.current;
+    if (map?.getLayer('lichen-route')) map.removeLayer('lichen-route');
+    if (map?.getSource('lichen-route')) map.removeSource('lichen-route');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function stopNav() {
+    if (watchRef.current != null) { navigator.geolocation?.clearWatch(watchRef.current); watchRef.current = null; }
+    void wakeRef.current?.release().catch(() => {}); wakeRef.current = null;
+    meRef.current?.remove(); meRef.current = null;
+    try { window.speechSynthesis?.cancel(); } catch { /* */ }
+  }
+
+  async function reroute(from: [number, number]) {
+    if (reroutingRef.current) return;
+    reroutingRef.current = true;
+    setNote('Finding a new way…');
+    const remaining = pts.slice(1 + legsRef.current);
+    const res = await fetchRoute([from, ...remaining], mode).catch(() => null);
+    reroutingRef.current = false;
+    offRef.current = 0;
+    if (!res) { setNote('Couldn’t find a new way just now — keep going, trying again soon.'); return; }
+    curRef.current = 0; setCur(0); spokenRef.current = new Set();
+    apply(res, [from, ...remaining], false);
+    setNote('New route ✓');
+    speak(stepsRef.current[1]?.text ?? '');
+  }
+
+  function onPos(p: GeolocationPosition) {
+    const here: [number, number] = [p.coords.longitude, p.coords.latitude];
+    const map = mapRef.current;
+    if (map) {
+      if (!meRef.current) {
+        const el = document.createElement('div');
+        el.className = 'mapv__me';
+        meRef.current = new mapboxgl.Marker({ element: el }).setLngLat(here).addTo(map);
+      } else meRef.current.setLngLat(here);
+      const moving = (p.coords.speed ?? 0) > 1.5 && p.coords.heading != null && !Number.isNaN(p.coords.heading);
+      map.easeTo({ center: here, zoom: Math.max(map.getZoom(), 15.5), bearing: moving ? p.coords.heading! : map.getBearing(), duration: 700 });
+    }
+    const steps = stepsRef.current;
+    if (!steps.length) return;
+    setNote((n) => (n.startsWith('Can’t see') ? '' : n));
+    const thr = mode === 'driving' ? 30 : 15;
+    // Pass every maneuver we're at (or have skipped past): a stop's arrival
+    // and the next leg's departure share one spot, so one reading can clear
+    // several steps (the simulated drive got stuck at "in 0 ft").
+    let c = curRef.current;
+    let moved = false;
+    for (let guard = 0; guard < 6; guard++) {
+      let jump = -1;
+      for (let j = c + 1; j <= Math.min(c + 4, steps.length - 1); j++) {
+        if (metres(here, steps[j].at) < thr) jump = j;
+      }
+      if (jump < 0) break;
+      for (let j = c + 1; j <= jump; j++) {
+        if (steps[j].arrive && j < steps.length - 1) {
+          legsRef.current += 1;
+          speak(`You've reached ${nameAt(legsRef.current)}.`);
+        }
+      }
+      c = jump; moved = true;
+    }
+    if (moved) { curRef.current = c; setCur(c); }
+    if (c >= steps.length - 1) {
+      setArrived(true); setNote(''); setToNext(null);
+      speak(`You've arrived at ${nameAt(last)}.`);
+      stopNav();
+      return;
+    }
+    const next = steps[c + 1];
+    const d = metres(here, next.at);
+    setToNext(d);
+    const near = mode === 'driving' ? 160 : 60;
+    if (d < near && !spokenRef.current.has(c + 1)) { spokenRef.current.add(c + 1); speak(next.text); }
+    else if (moved && d > 500) speak(`Continue for ${dist(d)}, then ${next.text.charAt(0).toLowerCase()}${next.text.slice(1)}`);
+    // Off the line for three readings in a row → a fresh route from here.
+    const off = metresToLine(here, geomRef.current) > (mode === 'driving' ? 70 : 40);
+    offRef.current = off ? offRef.current + 1 : 0;
+    if (offRef.current >= 3) void reroute(here);
+  }
+
+  async function startNav() {
+    if (!info) return;
+    if (!navigator.geolocation) { setNote('This device can’t share where it is.'); return; }
+    setNav(true); setArrived(false); setOpen(false); setNote('');
+    curRef.current = 0; setCur(0); legsRef.current = 0; offRef.current = 0; spokenRef.current = new Set();
+    try { wakeRef.current = await (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock?.request('screen') ?? null; } catch { /* the screen may dim */ }
+    speak(`Starting. ${info.steps[0]?.text ?? ''}`);
+    watchRef.current = navigator.geolocation.watchPosition(onPos, (e) => {
+      // Only a refusal is worth saying; a slow fix just waits for the next one.
+      if (e.code === 1) setNote('Can’t see where you are — allow location for Lichen in your browser settings.');
+    }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });
+  }
+  function endNav() {
+    stopNav();
+    setNav(false); setArrived(false); setToNext(null); setNote('');
+    if (info) draw(info.geom, pts, true);
+    const map = mapRef.current;
+    map?.easeTo({ bearing: 0, pitch: 0, duration: 500 });
+  }
+
+  // Outside apps: real addresses when we have them, "your location" left
+  // for the app to fill (founder 2026-11-17), coordinates as the fallback.
+  const arg = (i: number) => { const a = (addrs[i] || '').trim(); return a && /\d/.test(a) ? a : `${pts[i][1]},${pts[i][0]}`; };
+  const mids = pts.slice(1, -1).map((_, k) => k + 1);
+  const gm = mode === 'walking' ? 'walking' : mode === 'cycling' ? 'bicycling' : 'driving';
+  const google = valid ? `https://www.google.com/maps/dir/?api=1${here ? '' : `&origin=${enc(arg(0))}`}&destination=${enc(arg(last))}`
+    + (mids.length ? `&waypoints=${enc(mids.map(arg).join('|'))}` : '') + `&travelmode=${gm}&dir_action=navigate` : '';
+  const apple = !valid ? '' : mids.length
+    ? `https://maps.apple.com/directions?${here ? '' : `source=${enc(arg(0))}&`}destination=${enc(arg(last))}${mids.map((i) => `&waypoint=${enc(arg(i))}`).join('')}&mode=${mode === 'walking' ? 'walking' : mode === 'cycling' ? 'cycling' : 'driving'}`
+    : `https://maps.apple.com/?${here ? '' : `saddr=${enc(arg(0))}&`}daddr=${enc(arg(last))}&dirflg=${mode === 'walking' ? 'w' : 'd'}`;
   const outside = outsideOrder().map((k) => (k === 'apple'
     ? { key: 'apple' as const, name: 'Apple Maps', href: apple }
     : { key: 'google' as const, name: 'Google Maps', href: google }));
-  const remember = rememberNavApp;
+  const pref = navPref();
   useEffect(() => { if (started || pref === 'lichen') setOpen(true); }, [pref, started]);
-  const dist = (m: number) => (m < 160 ? `${Math.round(m * 3.281 / 10) * 10} ft` : `${(m / 1609.34).toFixed(1)} mi`);
+  const editPoints = (): NavPoint[] => pts.map((p, i) => (i === 0 && here
+    ? HERE
+    : { lng: p[0], lat: p[1], label: nameAt(i), addr: addrs[i] || undefined }));
+
+  if (nav && info) {
+    const steps = info.steps;
+    const next = steps[cur + 1];
+    const leftMins = Math.round(steps.slice(cur + 1).reduce((a, s) => a + s.dur, 0) / 60);
+    const leftMi = steps.slice(cur + 1).reduce((a, s) => a + s.dist, 0) / 1609.34;
+    return (
+      <div className="mapv__route mapv__route--nav">
+        <div className="mapv__nav-next">
+          <p className="mapv__nav-turn">{arrived ? `You've arrived at ${nameAt(last)}` : next?.text || 'Head to the route'}</p>
+          {!arrived && toNext != null && <p className="mapv__nav-in">in {dist(toNext)}</p>}
+        </div>
+        {!arrived && <p className="mapv__route-sum"><strong>{fmtMins(leftMins)}</strong> · {leftMi.toFixed(1)} mi left · to {nameAt(last)}</p>}
+        {note && <p className="mapv__nav-note">{note}</p>}
+        <div className="mapv__nav-acts">
+          <button type="button" className="mapv__route-app" onClick={() => setMuted((m) => !m)}>{muted ? 'Unmute' : 'Mute voice'}</button>
+          <button type="button" className={'mapv__route-app' + (open ? ' is-on' : '')} onClick={() => setOpen((v) => !v)}>Turns</button>
+          <button type="button" className="mapv__route-app mapv__route-end" onClick={endNav}>{arrived ? 'Done' : 'End'}</button>
+        </div>
+        {open && (
+          <ol className="mapv__route-steps">
+            {steps.slice(cur + 1).map((st, i) => <li key={i}><span>{st.text}</span>{st.dist > 0 && <span className="mapv__route-dist">{dist(st.dist)}</span>}</li>)}
+          </ol>
+        )}
+        <p className="mapv__route-fine">Keep Lichen open on screen — a phone browser pauses navigation when it locks or you switch apps. For spoken turns with the screen off, use Apple Maps or Google Maps.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mapv__route">
       <div className="mapv__route-head">
         <div>
-          <p className="mapv__route-to">To {toLabel || 'your destination'}</p>
-          {info && <p className="mapv__route-sum"><strong>{info.mins >= 60 ? `${Math.floor(info.mins / 60)} hr${info.mins % 60 ? ` ${info.mins % 60} min` : ''}` : `${info.mins} min`}</strong> · {info.miles} mi · live traffic{fromLabel ? ` · from ${fromLabel === 'their home' ? 'your home' : fromLabel}` : ''}</p>}
+          <p className="mapv__route-to">To {nameAt(last)}{mids.length ? ` · ${mids.length} stop${mids.length > 1 ? 's' : ''}` : ''}</p>
+          {info && <p className="mapv__route-sum"><strong>{fmtMins(info.mins)}</strong> · {info.miles} mi{info.traffic ? ' · live traffic' : ''} · from {here ? 'where you are' : nameAt(0) === 'their home' ? 'your home' : nameAt(0)}</p>}
           {!info && !err && <p className="mapv__route-sum">Finding the way…</p>}
-          {err && <p className="mapv__route-sum">{err}</p>}
+          {err && <p className="mapv__route-sum">{err}{valid && <> <button className="mapv__route-edit" onClick={() => setRetry((n) => n + 1)}>Try again</button></>}</p>}
         </div>
         <button type="button" className="mapv__route-x" onClick={onClose} aria-label="Close the route">×</button>
       </div>
+      {valid && (
+        <div className="mapv__route-modes">
+          {MODES.map((m) => (
+            <button key={m.key} type="button" className={'mapv__mode' + (mode === m.key ? ' is-on' : '')} aria-pressed={mode === m.key} onClick={() => onMode(m.key)}>{m.label}</button>
+          ))}
+          <button type="button" className="mapv__route-edit" onClick={() => onEdit(editPoints())}>Edit stops</button>
+        </div>
+      )}
+      {valid && started && (
+        <div className="mapv__route-go">
+          <button type="button" className="mapv__route-start" disabled={!info} onClick={() => { rememberNavApp('lichen'); void startNav(); }}>Start</button>
+        </div>
+      )}
       {valid && !started && (
         <div className="mapv__route-go" role="group" aria-label="Start in">
           <span className="mapv__route-golbl">Start in:</span>
-          <button type="button" className={`mapv__route-app${open ? ' is-on' : ''}`} aria-pressed={open}
-            disabled={!info || info.steps.length === 0}
-            onClick={() => { remember('lichen'); setOpen((v) => !v); }}>
+          <button type="button" className="mapv__route-app mapv__route-app--lichen" disabled={!info}
+            onClick={() => { rememberNavApp('lichen'); void startNav(); }}>
             Lichen Maps
           </button>
           {outside.map((x) => (
-            <a key={x.key} className="mapv__route-app" href={x.href} target="_blank" rel="noreferrer"
-              onClick={() => remember(x.key)}>
+            <a key={x.key} className="mapv__route-app" href={x.href} target="_blank" rel="noreferrer" onClick={() => rememberNavApp(x.key)}>
               {x.name} ↗
             </a>
           ))}
         </div>
       )}
+      {info && info.steps.length > 0 && (
+        <button type="button" className="mapv__route-turns" onClick={() => setOpen((v) => !v)}>{open ? 'Hide' : 'See all'} {info.steps.length} turns</button>
+      )}
       {open && info && (
         <ol className="mapv__route-steps">
-          {info.steps.map((st, i) => (
-            <li key={i}><span>{st.text}</span>{st.dist > 0 && <span className="mapv__route-dist">{dist(st.dist)}</span>}</li>
-          ))}
+          {info.steps.map((st, i) => <li key={i}><span>{st.text}</span>{st.dist > 0 && <span className="mapv__route-dist">{dist(st.dist)}</span>}</li>)}
         </ol>
       )}
-      {started ? (!info && !err ? null : <p className="mapv__route-fine">Every turn, right here in Lichen Maps.</p>) : <p className="mapv__route-fine">Lichen Maps lists every turn right here. Apple Maps and Google Maps take the same route with spoken turn-by-turn. Whichever you pick, Lichen remembers it on this device.</p>}
+      <p className="mapv__route-fine">
+        Lichen Maps follows you and speaks each turn while Lichen stays open. Apple Maps and Google Maps take the same route{mids.length ? ', stops included' : ''} with turn-by-turn that keeps going with the screen off.
+        {mids.length > 1 && mode === 'driving' ? ' Live traffic covers trips with one stop; this one uses normal driving times.' : ''}
+      </p>
+    </div>
+  );
+}
+
+/** THE DIRECTIONS BOX (founder 2026-11-17): From · stops · To. Any row takes
+ *  your location, Home, a Lichen place by name, or any address; ⇅ reverses
+ *  the order and + Add stop slips a stop in before the destination. */
+function DirPanel({ init, places, mode0, onGo, onClose }: {
+  init: (NavPoint | null)[];
+  places: PlaceHit[];
+  mode0: NavMode;
+  onGo: (pts: NavPoint[], mode: NavMode) => void;
+  onClose: () => void;
+}) {
+  const start = init.length >= 2 ? init : [HERE, null];
+  const [rows, setRows] = useState<(NavPoint | null)[]>(start);
+  const [texts, setTexts] = useState<string[]>(start.map((r) => r?.label ?? ''));
+  const [active, setActive] = useState<number>(() => { const i = start.findIndex((r) => !r); return i; });
+  const [geo, setGeo] = useState<GeoSuggestion[]>([]);
+  const [home, setHome] = useState<NavPoint | null>(null);
+  const [mode, setMode] = useState<NavMode>(mode0);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const debounce = useRef<number | null>(null);
+
+  useEffect(() => {
+    void loadMyHome().then((h) => { if (h.geo) setHome({ lng: h.geo.lng, lat: h.geo.lat, label: 'Home', addr: h.location }); });
+  }, []);
+  useEffect(() => { if (active >= 0) inputs.current[active]?.focus(); }, [active, rows.length]);
+  const q = active >= 0 ? (texts[active] ?? '').trim() : '';
+  useEffect(() => {
+    if (debounce.current) window.clearTimeout(debounce.current);
+    if (q.length < 3 || (active >= 0 && rows[active])) { setGeo([]); return; }
+    debounce.current = window.setTimeout(() => { void geocodeSuggest(q).then(setGeo); }, 300);
+    return () => { if (debounce.current) window.clearTimeout(debounce.current); };
+  }, [q, active, rows]);
+
+  const needle = q.toLowerCase();
+  const sugg: { key: string; label: string; sub: string; pick: NavPoint }[] = [];
+  if (active >= 0 && !rows[active]) {
+    if (!needle || /^(you|my|cur|here|loc)/.test(needle)) sugg.push({ key: 'here', label: 'Your location', sub: 'Where this device is', pick: HERE });
+    if (home && (!needle || 'home'.startsWith(needle))) sugg.push({ key: 'home', label: 'Home', sub: home.addr || 'Your saved home', pick: home });
+    if (needle.length >= 2) {
+      for (const p of places) {
+        if (sugg.length > 8) break;
+        if (p.label.toLowerCase().includes(needle)) sugg.push({ key: p.key, label: p.label, sub: p.sub, pick: { lng: p.lng, lat: p.lat, label: p.label, addr: p.addr } });
+      }
+    }
+    geo.forEach((g, i) => sugg.push({ key: 'g' + i, label: g.label, sub: 'Address', pick: { lng: g.lng, lat: g.lat, label: g.label, addr: g.label } }));
+  }
+
+  const pick = (i: number, p: NavPoint) => {
+    const r = rows.slice(); r[i] = p; setRows(r);
+    const t = texts.slice(); t[i] = p.label; setTexts(t);
+    setErr(''); setGeo([]);
+    const nextEmpty = r.findIndex((x) => !x);
+    setActive(nextEmpty);
+  };
+  const edit = (i: number, v: string) => {
+    const r = rows.slice(); r[i] = null; setRows(r);
+    const t = texts.slice(); t[i] = v; setTexts(t);
+    setActive(i);
+  };
+  const swap = () => { setRows((r) => r.slice().reverse()); setTexts((t) => t.slice().reverse()); setActive(-1); };
+  const addStop = () => {
+    if (rows.length >= MAX_POINTS) return;
+    const at = rows.length - 1;
+    setRows((r) => [...r.slice(0, at), null, ...r.slice(at)]);
+    setTexts((t) => [...t.slice(0, at), '', ...t.slice(at)]);
+    setActive(at);
+  };
+  const remove = (i: number) => {
+    if (rows.length <= 2) { edit(i, ''); return; }
+    setRows((r) => r.filter((_, k) => k !== i));
+    setTexts((t) => t.filter((_, k) => k !== i));
+    setActive(-1);
+  };
+
+  async function go() {
+    if (rows.some((r) => !r)) { setErr('Pick a place for every row — start, stops and destination.'); setActive(rows.findIndex((r) => !r)); return; }
+    let pts = rows as NavPoint[];
+    if (pts.some((p) => p.here)) {
+      setBusy(true);
+      const at = await getHere();
+      setBusy(false);
+      if (!at) { setErr('Lichen can’t see where you are — allow location for Lichen, or type a starting address.'); return; }
+      pts = pts.map((p) => (p.here ? { ...p, lng: at[0], lat: at[1] } : p));
+    }
+    onGo(pts, mode);
+  }
+
+  const role = (i: number) => (i === 0 ? 'From' : i === rows.length - 1 ? 'To' : `Stop ${i}`);
+  return (
+    <div className="mapv__dir">
+      <div className="mapv__dir-head">
+        <p className="mapv__dir-title">Directions</p>
+        <button type="button" className="mapv__search-x" onClick={onClose} aria-label="Close directions"><Icon name="close" size={14} /></button>
+      </div>
+      <div className="mapv__dir-body">
+        <ol className="mapv__dir-rows">
+          {rows.map((r, i) => (
+            <li key={i} className={'mapv__dir-row' + (active === i ? ' is-active' : '')}>
+              <span className="mapv__dir-role">{role(i)}</span>
+              <input
+                ref={(el) => { inputs.current[i] = el; }}
+                value={texts[i] ?? ''}
+                placeholder={i === 0 ? 'Starting point' : i === rows.length - 1 ? 'Where to?' : 'Add a stop'}
+                onFocus={() => setActive(i)}
+                onChange={(e) => edit(i, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') onClose();
+                  if (e.key === 'Enter') { e.preventDefault(); if (!rows[i] && sugg[0]) pick(i, sugg[0].pick); else void go(); }
+                }}
+                className={r?.here ? 'is-here' : ''}
+                autoComplete="off"
+              />
+              {(i > 0 && i < rows.length - 1) || (r && rows.length > 2) ? (
+                <button type="button" className="mapv__dir-x" onClick={() => remove(i)} aria-label={`Remove ${role(i)}`}><Icon name="close" size={12} /></button>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+        <button type="button" className="mapv__dir-swap" onClick={swap} aria-label="Reverse the order" data-tip="Reverse">⇅</button>
+      </div>
+      {sugg.length > 0 && (
+        <ul className="mapv__search-list mapv__dir-sugg">
+          {sugg.map((sg) => (
+            <li key={sg.key}>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(active, sg.pick)}>
+                <Icon name={sg.key === 'here' ? 'location' : sg.key === 'home' ? 'home' : sg.key.startsWith('g') ? 'globe' : 'location'} size={14} />
+                <span>{sg.label}</span><em>{sg.sub}</em>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mapv__dir-foot">
+        {rows.length < MAX_POINTS && <button type="button" className="mapv__dir-add" onClick={addStop}>+ Add stop</button>}
+        <div className="mapv__route-modes">
+          {MODES.map((m) => (
+            <button key={m.key} type="button" className={'mapv__mode' + (mode === m.key ? ' is-on' : '')} aria-pressed={mode === m.key} onClick={() => setMode(m.key)}>{m.label}</button>
+          ))}
+        </div>
+        <button type="button" className="mapv__route-start" disabled={busy} onClick={() => void go()}>{busy ? 'Finding you…' : 'Get directions'}</button>
+      </div>
+      {err && <p className="mapv__dir-err">{err}</p>}
     </div>
   );
 }
@@ -586,11 +1130,13 @@ function RouteCard({ mapRef, spec, toLabel, fromLabel, started, onClose }: {
 /** Search v1 — finds what's mappable: pins by name, anywhere via geocoding.
  *  This overlay is where the two full search modes mount later (freeform
  *  smart queries + the Advanced Search criteria panel — CLAUDE.md thread #4). */
-function MapSearch({ events, spaces, people, onFly, onClose }: {
+function MapSearch({ events, spaces, people, onFly, onPlace, onClose }: {
   events: EventPin[];
   spaces: MappableSpace[];
   people: MappableMember[];
   onFly: (lng: number, lat: number, zoom?: number, markerKey?: string) => void;
+  /** An address not on Lichen — drops the + pin. */
+  onPlace: (g: GeoSuggestion) => void;
   onClose: () => void;
 }) {
   const navigate = useNavigate();
@@ -695,7 +1241,7 @@ function MapSearch({ events, spaces, people, onFly, onClose }: {
           ))}
           {geoRows.map((g, i) => (
             <li key={'g' + i}>
-              <button onClick={() => { onFly(g.lng, g.lat, 12); onClose(); }}>
+              <button onClick={() => { onPlace(g); onClose(); }}>
                 <Icon name="globe" size={14} /> <span>Go to {g.label}</span>
               </button>
             </li>
@@ -711,19 +1257,21 @@ function MapSearch({ events, spaces, people, onFly, onClose }: {
 
 /** Add-a-Place sheet: give any space you administer a real address (picked
  *  suggestions pin it), or create a new place/organization right here. */
-function AddPlaceSheet({ me, onClose, onSaved }: {
+function AddPlaceSheet({ me, prefill, onClose, onSaved }: {
   me: string;
+  /** An address searched on the map (founder 2026-11-17: the + pin's "Add as a place"). */
+  prefill?: { text: string; geo: GeoPoint } | null;
   onClose: () => void;
   onSaved: (geo: GeoPoint | null) => void;
 }) {
   type View = 'list' | 'edit' | 'create';
   const navigate = useNavigate();
-  const [view, setView] = useState<View>('list');
+  const [view, setView] = useState<View>(prefill ? 'create' : 'list');
   const [mine, setMine] = useState<MappableSpace[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState<MappableSpace | null>(null);
-  const [locText, setLocText] = useState('');
-  const [locGeo, setLocGeo] = useState<GeoPoint | null>(null);
+  const [locText, setLocText] = useState(prefill?.text ?? '');
+  const [locGeo, setLocGeo] = useState<GeoPoint | null>(prefill?.geo ?? null);
   const [newName, setNewName] = useState('');
   const [newKind, setNewKind] = useState<SpaceKind>('place');
   const [busy, setBusy] = useState(false);
@@ -741,8 +1289,9 @@ function AddPlaceSheet({ me, onClose, onSaved }: {
 
   function startEdit(s: MappableSpace) {
     setEditing(s);
-    setLocText(s.location ?? '');
-    setLocGeo(s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null);
+    // A searched address rides into whichever place you pick for it.
+    setLocText(prefill?.text ?? s.location ?? '');
+    setLocGeo(prefill?.geo ?? (s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng } : null));
     setView('edit');
   }
 
@@ -807,7 +1356,7 @@ function AddPlaceSheet({ me, onClose, onSaved }: {
                 <Icon name="chevron-right" size={14} />
               </button>
             ))}
-            <button className="mapv__sheet-new" onClick={() => { setLocText(''); setLocGeo(null); setView('create'); }}>
+            <button className="mapv__sheet-new" onClick={() => { setLocText(prefill?.text ?? ''); setLocGeo(prefill?.geo ?? null); setView('create'); }}>
               <Icon name="plus" size={14} /> New place
             </button>
           </>
