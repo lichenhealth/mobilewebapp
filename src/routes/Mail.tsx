@@ -60,6 +60,19 @@ export default function Mail() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const openKey = params.get('thread'); // "<accountId>:<threadId>"
+  // A DOOR INTO ONE EMAIL LANDS IN THE INBOX ON DESKTOP (founder
+  // 2026-11-17): arriving with a thread (from the brain, a draft card), the
+  // Inbox opens it beside the list with the Email lens lit. Only on arrival
+  // — opening a thread from Mail's own list stays here.
+  const arrivedKey = useRef(openKey);
+  useEffect(() => {
+    const k = arrivedKey.current;
+    arrivedKey.current = null;
+    if (!k || params.get('embed') === '1') return;
+    if (!window.matchMedia('(min-width: 1024px)').matches) return;
+    navigate(`/chat?mail=${encodeURIComponent(k)}`, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [openAcct, openThread] = openKey ? openKey.split(':') : [null, null];
 
   useEffect(() => { void mailEnabled(user?.id).then(setAllowed); }, [user?.id]);
