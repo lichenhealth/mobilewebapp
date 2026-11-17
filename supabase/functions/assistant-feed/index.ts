@@ -523,6 +523,7 @@ const READ_INTAKE_DRAFT_TOOL = {
 };
 
 // Reply shapes that send a member off to do by hand what a tool could do.
+const ROUTE_ASK_RE = /\b(directions?|navigat\w*|drive time|driving time|how (long|far)\b[^?]*\b(to|from|get|drive|take)|route to|take me (to|there)|get me (to|there))\b/i;
 const DEFLECT_RE = /\b(manually|by hand)\b|\b(tap|press|hit|use) (the )?(\+|plus\b)|\bwhere you(?:'d|’d| would| can) (create|make|set|add|fill)|\b(head|go) (over )?to [^.\n]{0,40}\b(and|to) (create|fill|make|set up|add)\b|\byou(?:'ll|’ll| will) (need|have) to (create|make|set|add|fill)|(?:^|\n)\s*(?:\d+[.)]|step \d+:?)\s*(?:open|go|tap|click|select|navigate|choose|head)\b|\b(?:open|go to|navigate to|head to) (?:your |the )?[^.\n]{0,30}\b(?:settings|tab|menu|screen|page)\b[^.\n]{0,40}\b(?:and|then) (?:tap|click|select|choose|turn|toggle|press)\b/i;
 
 const POST_TOOLS = [
@@ -3466,6 +3467,7 @@ Deno.serve(async (req) => {
   let outputTokens = 0;
   let round = 0;
   let deflectRetried = false;
+  let routeRetried = false;
   let parityFiled = false;
   const anyToolsArmed = !spaceRoom && (canEdit || canCalendar || canCourses || canPosts || canLife || canSpaceEdit);
   // They ASKED to do it themselves — pointing at the screen is then the answer.
@@ -3561,6 +3563,18 @@ Deno.serve(async (req) => {
       // gets ONE re-think naming the rule — and if it still deflects, the gap
       // files itself into dev_reports so the builder session sees it.
       const text = (data?.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n');
+      // THE ROUTE GUARD (founder 2026-11-17, "looks like its not loading the
+      // maps buttons for me"): a directions / drive-time ask answered without
+      // a fresh drive_time call means the numbers were guessed from an earlier
+      // route in the conversation (it even gave an arrival time already past)
+      // and no buttons ride along. One forced re-run that calls the tool.
+      if (canLife && !routeRetried && !mapLinks.length && ROUTE_ASK_RE.test(String(trigger.body ?? ''))) {
+        routeRetried = true;
+        console.error('route-retry', JSON.stringify({ feed_post_id, thread }));
+        messages.push({ role: 'assistant', content: data.content });
+        messages.push({ role: 'user', content: '[System check, not the member:] They asked for directions or travel time. Never answer that from memory or an earlier route — call drive_time now for exactly what they asked (their words for the place; "home" when no start is given), then write the reply from its result. Its buttons ride under your reply. No mention of this check.' });
+        continue;
+      }
       if (anyToolsArmed && DEFLECT_RE.test(text) && !deflectRetried && !askedForManual) {
         deflectRetried = true;
         console.error('parity-deflect-retry', JSON.stringify({ feed_post_id, thread }));
