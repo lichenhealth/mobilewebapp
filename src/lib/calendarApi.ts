@@ -789,7 +789,11 @@ export async function sendFeedShareChat(share: FeedShare, text: string): Promise
   if (!user) throw new Error('Sign in first');
   const { ensureDirectChat } = await import('./chatApi');
   const chatId = await ensureDirectChat(share.recipient_profile_id);
-  const { error } = await supabase.from('chat_messages').insert({ chat_id: chatId, sender_id: user.id, body: text });
+  const { data: me } = await supabase.from('profiles').select('first_name,full_name').eq('id', user.id).maybeSingle();
+  const first = ((me as { first_name?: string | null; full_name?: string | null } | null)?.first_name
+    || ((me as { full_name?: string | null } | null)?.full_name ?? '').split(' ')[0] || '').trim() || undefined;
+  const { error } = await supabase.from('chat_messages').insert({ chat_id: chatId, sender_id: user.id, body: text,
+    attachments: [{ type: 'calfeed', url: calendarFeedUrl(share.token), name: first }] });
   if (error) throw error;
   await markFeedShareSent(share.id, 'chat');
   return chatId;
@@ -797,16 +801,16 @@ export async function sendFeedShareChat(share: FeedShare, text: string): Promise
 /** «FIRST»'S BRAIN SENDS IT (founder 2026-11-15): the brain-errand fn posts
  *  the link + instructions into your DM as YOUR BRAIN (via_brain), then keeps
  *  helping them set it up and bells you if they need you. Returns the chat id. */
-export async function sendFeedShareByBrain(shareId: string, text?: string): Promise<{ chatId: string; custom: boolean }> {
+export async function sendFeedShareByBrain(shareId: string, text?: string): Promise<{ chatId: string; custom: boolean; already: boolean }> {
   const { data, error } = await supabase.functions.invoke('brain-errand', { body: { mode: 'send', share_id: shareId, text: text ?? '' } });
   if (error) {
     const ctx = (error as { context?: Response }).context;
     const msg = ctx ? ((await ctx.json().catch(() => null)) as { error?: string } | null)?.error : null;
     throw new Error(msg || 'Your Brain couldn\'t send it — try again.');
   }
-  const d = data as { error?: string; chat_id?: string; custom?: boolean } | null;
+  const d = data as { error?: string; chat_id?: string; custom?: boolean; already?: boolean } | null;
   if (d?.error) throw new Error(d.error);
-  return { chatId: d?.chat_id ?? '', custom: !!d?.custom };
+  return { chatId: d?.chat_id ?? '', custom: !!d?.custom, already: !!d?.already };
 }
 /** Does the live brain-errand take an EDITED message? An older deploy answers
  *  "Unknown mode" — then the card shows the Brain's message read-only rather
@@ -834,4 +838,13 @@ export async function sendFeedShareEmail(shareId: string, note?: string): Promis
 export function feedShareSmsHref(phone: string, text: string): string {
   const digits = phone.replace(/[^\d+]/g, '');
   return `sms:${digits}?&body=${encodeURIComponent(text)}`;
+}
+
+/** The latest Brain errand for a share — what the card shows after "Let my
+ *  Brain send it" (and on any later visit): sent, waiting, needs you, all set. */
+export type ShareErrand = { status: 'open' | 'flagged' | 'done' | 'closed'; created_at: string; chat_id: string; last_note: string | null };
+export async function loadShareErrand(shareId: string): Promise<ShareErrand | null> {
+  const { data } = await supabase.from('brain_errands').select('status,created_at,chat_id,last_note')
+    .eq('share_id', shareId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  return (data as ShareErrand | null) ?? null;
 }

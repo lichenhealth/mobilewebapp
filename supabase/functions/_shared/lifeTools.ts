@@ -148,6 +148,11 @@ export const LIFE_TOOLS = [
     },
   },
   {
+    name: 'calendars_shared_with_me',
+    description: 'Calendars OTHER members have shared with this member (each a private link made for them). action=list (default) names whose calendars they hold and attaches one-tap add buttons under your reply — Add to Google Calendar (opens Google\'s own "Add calendar?" screen, one more tap there), Add to Apple Calendar (iPhone/Mac subscribe sheet), Add to my Lichen calendar. action=add_to_lichen with owner (a name from the list) adds that calendar straight into their Lichen calendar now — DO it when they ask, then say it\'s in. You cannot press Google\'s or Apple\'s confirm for them — that one tap is theirs, on their own account\'s screen; never send them hunting through settings or pasting URLs.',
+    input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['list', 'add_to_lichen'] }, owner: { type: 'string' } } },
+  },
+  {
     name: 'set_clinical_home',
     description: 'For licensed providers: name the HIPAA tool where their CLINICAL conversations and records live (SimplePractice, Spruce, Hushmail…), with an optional client-portal link and a short note for clients. Members see "For anything clinical, X uses …" on their profile and care team. Lichen is not a HIPAA platform yet — it points there and never holds clinical records. service empty clears it. A url only if they typed it in this conversation.',
     input_schema: { type: 'object', properties: { service: { type: 'string' }, url: { type: 'string' }, note: { type: 'string' } }, required: ['service'] },
@@ -233,7 +238,7 @@ export const LIFE_TOOLS = [
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
+  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -787,6 +792,37 @@ export async function runLifeTool(
       sees: `${name} will see ${seen(detail)} — the events on their Lichen calendar plus ones they're going to or invited to. Events they marked "Nothing" never show, "Only that I'm busy" events show as Busy, and to-dos and the care plan are never included. It updates on Google's schedule (often every 12–24 hours).`,
       note: `${prior ? 'Reused their existing link. ' : ''}A card under your reply holds the message — nothing is sent until they tap ${ways || 'Copy'}.`,
     };
+  }
+
+  if (name === 'calendars_shared_with_me') {
+    // ONE TAP, OR NONE (founder 2026-11-17: "can't we just have his assistant
+    // do it for him?"). Reads shares made FOR this member (service read — the
+    // table's RLS is owner-only), never anyone else's.
+    const arr = <T,>(x: unknown) => (Array.isArray(x) ? x : []) as T[];
+    type In = { token: string; detail: string; owner_id: string };
+    const rows = arr<In>(await (await sb(`calendar_feed_shares?recipient_profile_id=eq.${me}&revoked_at=is.null&select=token,detail,owner_id&order=created_at.desc&limit=20`)).json());
+    if (!rows.length) return { ok: true, shared_with_you: [], note: 'Nobody has shared a Lichen calendar with them yet.' };
+    const owners = arr<{ id: string; full_name: string | null; first_name: string | null }>(await (await sb(`profiles?id=in.(${[...new Set(rows.map((r) => r.owner_id))].join(',')})&select=id,full_name,first_name`)).json());
+    const BASE = 'https://mjqnaevertyzgjlpwynr.supabase.co/functions/v1/calendar-feed?t=';
+    const list = rows.map((r) => {
+      const o = owners.find((x) => x.id === r.owner_id);
+      return { full: o?.full_name ?? 'A member', first: (o?.first_name || (o?.full_name ?? '').split(' ')[0] || 'A member').trim(), url: BASE + r.token, detail: r.detail };
+    });
+    const norm = (x: string) => x.trim().toLowerCase();
+    const want = String(input.owner ?? '').trim();
+    const pick = want ? list.filter((x) => norm(x.full) === norm(want) || norm(x.first) === norm(want)) : list;
+    if (want && pick.length !== 1) return { ok: false, error: pick.length ? `Several match "${want}" — ask which: ${pick.map((p) => p.full).join(', ')}.` : `No calendar from "${want}". Shared with them: ${list.map((l) => l.full).join(', ')}.` };
+    const feeds = pick.map((x) => ({ type: 'calfeed', url: x.url, name: x.first }));
+    if (input.action === 'add_to_lichen') {
+      const x = pick[0];
+      if (!want && list.length > 1) return { ok: false, error: `Whose? ${list.map((l) => l.full).join(', ')}.` };
+      const have = arr<{ id: string }>(await (await sb(`external_calendars?profile_id=eq.${me}&url=eq.${encodeURIComponent(x.url)}&select=id`)).json());
+      if (!have.length) await sb('external_calendars', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ profile_id: me, name: `${x.first}'s calendar`, url: x.url }) });
+      return { ok: true, feeds, change: have.length ? `${x.full}'s calendar was already in their Lichen calendar` : `added ${x.full}'s calendar to their Lichen calendar — it fills in the next time they open Calendar`,
+        doors: [{ path: '/calendar', label: 'Open your calendar →' }] };
+    }
+    return { ok: true, shared_with_you: list.map((x) => ({ from: x.full, sees: x.detail === 'busy' ? 'only when they are busy' : 'their events with details' })), feeds,
+      note: 'One-tap add buttons (Google, Apple, Lichen) are attached under your reply.' };
   }
 
   if (name === 'my_event') {

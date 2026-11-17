@@ -1,5 +1,5 @@
 import { isHeic } from '../lib/heic';
-import { Fragment, useEffect, useMemo, useRef, useState, RefObject, ChangeEvent } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, RefObject, ChangeEvent } from 'react';
 import { Icon } from './Icon';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -8,7 +8,7 @@ import {
   KIND_LABEL, MESSAGE_COLS, REACTION_EMOJI,
   colorFor, monogramFor, formatTime, dayLabel, chatTitle, otherMember,
   uploadChatMedia, signChatMedia, loadReactions, toggleReaction,
-  markChatRead, visitorIdOfKey, helpPartyOrder, CLAUDE_PROFILE_ID, LICHEN_HEALTH_PROFILE_ID, type PartySpace,
+  markChatRead, visitorIdOfKey, helpPartyOrder, CLAUDE_PROFILE_ID, LICHEN_HEALTH_PROFILE_ID, isRefAttachment, type PartySpace,
 } from '../lib/chatApi';
 import { EmojiPicker } from './EmojiPicker';
 import { renderBold } from '../lib/inlineBold';
@@ -17,6 +17,7 @@ import type { FeedPost } from '../lib/postsApi';
 import Avatar from './Avatar';
 import { postOpenPath } from '../lib/feedMapping';
 import DocRefCard from './ChatDocCard';
+import CalFeedCard from './CalFeedCard';
 import { useConfirm } from './ConfirmDialog';
 import { createChatDoc, DOC_KIND_LABEL, type ChatDocKind } from '../lib/chatDocsApi';
 import '../routes/ChatThread.css';
@@ -144,6 +145,10 @@ export default function ChatConversation({
   const [amSpaceAdmin, setAmSpaceAdmin] = useState(false);
   const confirmDialog = useConfirm();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const targetParam = params.get('m');
+  const [anchor, setAnchor] = useState<{ id: string | null; unread: boolean }>({ id: null, unread: false });
+  const positioned = useRef(false);
+  const userMoved = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Initial load: chat, members, messages, reactions
@@ -153,7 +158,7 @@ export default function ChatConversation({
       setLoading(true);
       const [cRes, mRes, msgRes] = await Promise.all([
         supabase.from('chats').select('id, kind, title, space_id, patient_id, direct_key, topic, assistant_enabled, party:spaces!chats_party_space_id_fkey(id, name, avatar_url), room_space:spaces!chats_space_id_fkey(id, name, avatar_url)').eq('id', chatId).maybeSingle(),
-        supabase.from('chat_members').select('profile_id, profiles(full_name, avatar_url)').eq('chat_id', chatId),
+        supabase.from('chat_members').select('profile_id, last_read_at, profiles(full_name, avatar_url)').eq('chat_id', chatId),
         supabase.from('chat_messages').select(MESSAGE_COLS).eq('chat_id', chatId).order('created_at', { ascending: true }),
       ]);
       if (!active) return;
@@ -181,7 +186,20 @@ export default function ChatConversation({
         };
       }
       setMembers(map);
-      setMessages(((msgRes.data as MessageRow[] | null) ?? []));
+      const loaded = ((msgRes.data as MessageRow[] | null) ?? []);
+      // WHERE TO OPEN (founder 2026-11-17: "when it clicks thru to his chat,
+      // it goes to the top, so it should scroll to the unread message that the
+      // notification is indicating"): a ?m=<message> from a bell wins, else
+      // the first message from someone else after MY read cursor (read BEFORE
+      // markChatRead bumps it below), else the newest words.
+      const mine = ((mRes.data as { profile_id: string; last_read_at: string | null }[] | null) ?? []).find((r) => r.profile_id === me);
+      const readAt = mine?.last_read_at ? new Date(mine.last_read_at).getTime() : null;
+      const fromLink = targetParam && loaded.some((m) => m.id === targetParam) ? targetParam : null;
+      const firstUnread = readAt == null ? null
+        : loaded.find((m) => m.sender_id !== me && new Date(m.created_at).getTime() > readAt)?.id ?? null;
+      setAnchor({ id: fromLink ?? firstUnread, unread: !fromLink && !!firstUnread });
+      positioned.current = false; userMoved.current = false;
+      setMessages(loaded);
       // "Delete for me" is a personal curtain — load this room's hides.
       const { data: hid } = await supabase.from('hidden_messages')
         .select('message_id').eq('chat_id', chatId);
@@ -273,7 +291,7 @@ export default function ChatConversation({
     for (const m of messages) for (const a of m.attachments ?? []) {
       // A docref carries a chat_docs id and a postref a post id, not a
       // storage path — never sign those.
-      if (a.type !== 'docref' && a.type !== 'postref' && !mediaUrls[a.url]) need.add(a.url);
+      if (!isRefAttachment(a) && !mediaUrls[a.url]) need.add(a.url);
     }
     if (need.size === 0) return;
     let active = true;
@@ -281,11 +299,45 @@ export default function ChatConversation({
     return () => { active = false; };
   }, [messages, mediaUrls]);
 
-  // Auto-scroll to bottom on new messages
+  // OPEN WHERE THE NEWS IS, THEN FOLLOW ONLY WHEN WATCHING. The first
+  // placement lands on the anchor (a bell's message, or the first unread) or
+  // the foot, and re-applies while photos/cards load and push the height —
+  // until the reader scrolls themselves. After that a new message follows
+  // only when the reader is already near the foot or it's their own.
+  const placeNow = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const bubble = anchor.id ? el.querySelector<HTMLElement>(`[data-msg-id="${anchor.id}"]`) : null;
+    const t = (anchor.unread && el.querySelector<HTMLElement>('.thread__new')) || bubble;
+    if (t) {
+      const lead = 8;
+      el.scrollTop = Math.max(0, t.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - lead);
+    } else el.scrollTop = el.scrollHeight;
+  };
+  useLayoutEffect(() => {
+    if (loading || positioned.current || !scrollRef.current) return;
+    positioned.current = true;
+    placeNow();
+    const el = scrollRef.current;
+    const stop = () => { userMoved.current = true; };
+    el.addEventListener('wheel', stop, { passive: true });
+    el.addEventListener('touchstart', stop, { passive: true });
+    el.addEventListener('keydown', stop);
+    const ro = new ResizeObserver(() => { if (!userMoved.current) placeNow(); });
+    Array.from(el.children).forEach((c) => ro.observe(c));
+    const done = window.setTimeout(() => ro.disconnect(), 4000);
+    return () => { ro.disconnect(); window.clearTimeout(done); el.removeEventListener('wheel', stop); el.removeEventListener('touchstart', stop); el.removeEventListener('keydown', stop); };
+  }, [loading, anchor]); // eslint-disable-line react-hooks/exhaustive-deps
+  const lastCount = useRef(0);
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length]);
+    const prev = lastCount.current;
+    lastCount.current = messages.length;
+    if (!el || !positioned.current || messages.length <= prev || prev === 0) return;
+    const newest = messages[messages.length - 1];
+    const nearFoot = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+    if (nearFoot || newest?.sender_id === me) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+  }, [messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // THREAD FILTERS (founder 2026-11-15: "just like they are in a text thread
   // on iphone where you can go to pictures, links, etc"): one conversation,
@@ -495,7 +547,11 @@ export default function ChatConversation({
               {day !== prevDay && (
                 <div className="thread__day">{dayLabel(run.messages[0].created_at)}</div>
               )}
+              {anchor.unread && run.messages[0].id === anchor.id && (
+                <div className="thread__new" role="separator"><span>New</span></div>
+              )}
               <MessageRun
+                targetId={anchor.id}
                 run={run}
                 me={me}
                 helpMemberId={chat.helpMemberId}
@@ -896,8 +952,9 @@ function groupRuns(msgs: MessageRow[]): Run[] {
 
 function MessageRun({
   run, me, members, messagesById, reactionsByMessage, mediaUrls, menuFor, setMenuFor, onReply, onReact, helpMemberId,
-  pickerFor, setPickerFor, onCopy, onShare, onSave, onDeleteMine, onHideForMe, onDeleteForGroup, canModerate,
+  pickerFor, setPickerFor, onCopy, onShare, onSave, onDeleteMine, onHideForMe, onDeleteForGroup, canModerate, targetId,
 }: {
+  targetId?: string | null;
   run: Run;
   me: string;
   /** Set in a help room: the person being helped (from the room's key). */
@@ -964,7 +1021,7 @@ function MessageRun({
           const quoted = m.reply_to ? messagesById[m.reply_to] : undefined;
           const rx = reactionsByMessage[m.id] ?? [];
           return (
-            <div key={m.id} className={'bubble-wrap' + (isMe ? ' bubble-wrap--me' : '')}>
+            <div key={m.id} data-msg-id={m.id} className={'bubble-wrap' + (isMe ? ' bubble-wrap--me' : '') + (m.id === targetId ? ' is-target' : '')}>
               <div className={'bubble' + (isMe ? ' bubble--me' : '') + (brain ? ' bubble--brain' : '')}>
                 {m.reply_to && (
                   <div className="bubble__reply">
@@ -985,9 +1042,12 @@ function MessageRun({
                 {(m.attachments ?? []).filter((a) => a.type === 'postref').map((a, k) => (
                   <PostRefCard key={`post${k}`} postId={a.url} />
                 ))}
-                {(m.attachments ?? []).some((a) => a.type !== 'docref' && a.type !== 'postref') && (
+                {(m.attachments ?? []).filter((a) => a.type === 'calfeed').map((a, k) => (
+                  <CalFeedCard key={`cal${k}`} url={a.url} name={a.name} mine={m.sender_id === me} />
+                ))}
+                {(m.attachments ?? []).some((a) => !isRefAttachment(a)) && (
                   <div className="bubble__media">
-                    {(m.attachments ?? []).filter((a) => a.type !== 'docref' && a.type !== 'postref').map((a, k) => (
+                    {(m.attachments ?? []).filter((a) => !isRefAttachment(a)).map((a, k) => (
                       <MediaItem key={k} attachment={a} url={mediaUrls[a.url]} />
                     ))}
                   </div>

@@ -1,0 +1,9 @@
+.calfeed { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--bone-edge); border-radius: 12px; background: #fff; display: flex; flex-direction: column; gap: 8px; max-width: 340px; color: var(--ink); }
+.calfeed__head { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--peach-deep); }
+.calfeed__head strong { color: var(--ink); font-weight: 500; }
+.calfeed__btns { display: flex; flex-direction: column; gap: 6px; }
+.calfeed__btn { display: block; text-align: center; border: 1px solid var(--peach); background: var(--peach-tint); color: var(--peach-deep); border-radius: var(--r-full); padding: 8px 12px; font-size: 14px; text-decoration: none; cursor: pointer; font: inherit; }
+.calfeed__btn:disabled { opacity: .6; cursor: default; }
+.calfeed__btn--done { background: color-mix(in srgb, var(--green) 14%, #fff); border-color: var(--green); color: var(--green-deep); }
+.calfeed__fine { margin: 0; font-size: 12px; color: var(--ink-muted); text-wrap: pretty; overflow-wrap: anywhere; }
+.calfeed__copy { background: none; border: none; padding: 0; color: var(--peach-deep); font: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: var(--peach); }

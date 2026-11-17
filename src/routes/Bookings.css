@@ -209,3 +209,6 @@
 /* An outside guest's email / phone on the provider's rows. */
 .bkg__reach { display: block; font-size: 13px; color: var(--ink-soft); margin-top: 2px; overflow-wrap: anywhere; }
 .bkg__reach em { color: var(--ink-muted); font-style: normal; }
+
+/* A bell's booking (?b=) — lit when you land on it. */
+.bkg__row.is-called { border-color: var(--peach); box-shadow: 0 0 0 2px var(--peach-tint); }

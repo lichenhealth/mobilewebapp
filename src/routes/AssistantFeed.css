@@ -598,3 +598,4 @@
 .afeed__convo-del.is-armed { color: var(--red-deep); font-weight: 600; }
 /* While Delete asks, Rename steps aside so the title keeps its room. */
 .afeed__convo-titlerow:has(.afeed__convo-del.is-armed) .afeed__convo-rename:not(.afeed__convo-del) { display: none; }
+.afeed__entry { scroll-margin-top: calc(var(--top-h, 64px) + 12px); }

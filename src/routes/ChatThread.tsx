@@ -26,9 +26,12 @@ export default function ChatThread() {
         if (!live) return;
         const c = data as { kind?: string; patient_id?: string | null } | null;
         if (c?.kind === 'care_team') {
+          // A bell's ?m=<message> rides along so the room opens AT it.
+          const m = new URLSearchParams(window.location.search).get('m');
+          const mq = m ? `m=${encodeURIComponent(m)}` : '';
           setCareDest(c.patient_id && c.patient_id !== user.id
-            ? `/concierge/client/${c.patient_id}/chat`
-            : '/concierge/chat?room=1');
+            ? `/concierge/client/${c.patient_id}/chat${mq ? '?' + mq : ''}`
+            : `/concierge/chat?room=1${mq ? '&' + mq : ''}`);
         } else {
           setCareDest(null);
         }
@@ -59,7 +62,8 @@ export default function ChatThread() {
       if (careDest !== null) return;
       const from = params.get('from');
       const about = params.get('about');
-      navigate(`/chat?open=${id}${from ? `&from=${encodeURIComponent(from)}` : ''}${about ? `&about=${encodeURIComponent(about)}` : ''}`, { replace: true });
+      const m = params.get('m');
+      navigate(`/chat?open=${id}${from ? `&from=${encodeURIComponent(from)}` : ''}${about ? `&about=${encodeURIComponent(about)}` : ''}${m ? `&m=${encodeURIComponent(m)}` : ''}`, { replace: true });
     };
     go();
     mq.addEventListener('change', go);
