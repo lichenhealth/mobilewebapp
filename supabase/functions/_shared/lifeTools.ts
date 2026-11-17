@@ -148,6 +148,11 @@ export const LIFE_TOOLS = [
     },
   },
   {
+    name: 'remove_duplicate_messages',
+    description: 'In the member\'s direct chat with ONE person (by name — exactly one person they have a direct chat with), find messages THEY sent more than once with identical words (their own, or their Brain\'s on their behalf) and delete the later copies for everyone, keeping the first. Nothing unique is ever removed. Use it when they ask to clean up a doubled message ("Gabe got it twice"). Report how many copies went.',
+    input_schema: { type: 'object', properties: { person: { type: 'string' } }, required: ['person'] },
+  },
+  {
     name: 'calendars_shared_with_me',
     description: 'Calendars OTHER members have shared with this member (each a private link made for them). action=list (default) names whose calendars they hold and attaches one-tap add buttons under your reply — Add to Google Calendar (opens Google\'s own "Add calendar?" screen, one more tap there), Add to Apple Calendar (iPhone/Mac subscribe sheet), Add to my Lichen calendar. action=add_to_lichen with owner (a name from the list) adds that calendar straight into their Lichen calendar now — DO it when they ask, then say it\'s in. You cannot press Google\'s or Apple\'s confirm for them — that one tap is theirs, on their own account\'s screen; never send them hunting through settings or pasting URLs.',
     input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['list', 'add_to_lichen'] }, owner: { type: 'string' } } },
@@ -238,7 +243,7 @@ export const LIFE_TOOLS = [
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
+  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -792,6 +797,39 @@ export async function runLifeTool(
       sees: `${name} will see ${seen(detail)} — the events on their Lichen calendar plus ones they're going to or invited to. Events they marked "Nothing" never show, "Only that I'm busy" events show as Busy, and to-dos and the care plan are never included. It updates on Google's schedule (often every 12–24 hours).`,
       note: `${prior ? 'Reused their existing link. ' : ''}A card under your reply holds the message — nothing is sent until they tap ${ways || 'Copy'}.`,
     };
+  }
+
+  if (name === 'remove_duplicate_messages') {
+    // DOUBLES OUT, NOTHING ELSE (founder 2026-11-17: "can my brain do that for
+    // me?" — Gabe got the Brain's message twice). Only the member's own
+    // messages, only exact repeats, only the later copies; the first stands.
+    const arr = <T,>(x: unknown) => (Array.isArray(x) ? x : []) as T[];
+    const person = String(input.person ?? '').trim().toLowerCase();
+    if (!person) return { ok: false, error: 'Whose chat?' };
+    const mine = arr<{ chat_id: string }>(await (await sb(`chat_members?profile_id=eq.${me}&select=chat_id`)).json()).map((r) => r.chat_id);
+    if (!mine.length) return { ok: false, error: 'They have no chats yet.' };
+    const direct = arr<{ id: string }>(await (await sb(`chats?id=in.(${mine.join(',')})&kind=eq.direct&select=id`)).json()).map((c) => c.id);
+    if (!direct.length) return { ok: false, error: 'They have no direct chats.' };
+    const others = arr<{ chat_id: string; profile_id: string; profiles: { full_name: string | null; first_name: string | null } | null }>(
+      await (await sb(`chat_members?chat_id=in.(${direct.join(',')})&profile_id=neq.${me}&select=chat_id,profile_id,profiles(full_name,first_name)`)).json());
+    const hits = others.filter((o) => {
+      const full = (o.profiles?.full_name ?? '').toLowerCase(); const first = (o.profiles?.first_name || full.split(' ')[0] || '').toLowerCase();
+      return full === person || first === person;
+    });
+    const chats = [...new Set(hits.map((h) => h.chat_id))];
+    if (chats.length !== 1) return { ok: false, error: chats.length ? `More than one direct chat matches "${input.person}" — ask for the full name.` : `They have no direct chat with "${input.person}".` };
+    const msgs = arr<{ id: string; body: string | null; created_at: string }>(await (await sb(`chat_messages?chat_id=eq.${chats[0]}&sender_id=eq.${me}&select=id,body,created_at&order=created_at.asc&limit=1000`)).json());
+    const seen = new Set<string>(); const extra: string[] = [];
+    for (const m of msgs) {
+      const k = (m.body ?? '').trim();
+      if (!k) continue;
+      if (seen.has(k)) extra.push(m.id); else seen.add(k);
+    }
+    const who = hits[0].profiles?.full_name ?? String(input.person);
+    if (!extra.length) return { ok: true, change: `no repeated messages in their chat with ${who} — nothing removed` };
+    await sb(`chat_messages?id=in.(${extra.join(',')})&sender_id=eq.${me}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    return { ok: true, change: `removed ${extra.length} repeated ${extra.length === 1 ? 'copy' : 'copies'} from their chat with ${who} (for everyone); the first of each stays`,
+      doors: [{ path: `/chat/${chats[0]}`, label: `Open your chat with ${who.split(' ')[0]} →` }] };
   }
 
   if (name === 'calendars_shared_with_me') {
