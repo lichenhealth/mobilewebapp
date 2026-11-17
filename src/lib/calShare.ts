@@ -9,15 +9,24 @@ export function seesLine(detail: string): string {
     : 'the events on my Lichen calendar — titles, times, places and notes, including ones I\'m going to or invited to';
 }
 
+/** The short "you'll see" (founder 2026-11-17: the messages were "too clunky
+ *  and wordy"). The full detail lives on the card and in the Brain's replies. */
+export function seesShort(detail: string, whose = 'my'): string {
+  const own = whose === 'my';
+  return detail === 'busy'
+    ? `when ${own ? "I'm" : whose + ' is'} busy (no details)`
+    : `${own ? 'my' : whose + "'s"} events and their details`;
+}
+
+const GOOGLE_STEP = 'Google Calendar (on a computer): Other calendars + → From URL → paste the link.';
+
 export function shareMessage(ownerFirst: string, detail: string, url: string): string {
   return [
-    `Here's my Lichen calendar, so you can see it in your own calendar.`,
+    `Here's my Lichen calendar — add it to yours and you'll see ${seesShort(detail)}.`,
     ``,
     url,
     ``,
-    `To add it in Google Calendar: on a computer open calendar.google.com, then Other calendars (+) → From URL, paste the link, and Add calendar. (Apple: File → New Calendar Subscription. Outlook: Add calendar → Subscribe from web.)`,
-    ``,
-    `You'll see ${seesLine(detail)}. Anything I've marked private stays off it, my to-dos and care plan aren't included, and it updates on Google's schedule (often every 12–24 hours).`,
+    GOOGLE_STEP,
     ``,
     `— ${ownerFirst}`,
   ].join('\n');
@@ -26,17 +35,22 @@ export function shareMessage(ownerFirst: string, detail: string, url: string): s
 /** «FIRST»'S BRAIN SENDS IT — the ONE wording, shared by the card's preview and
  *  the brain-errand fn so what the member reads is exactly what goes out.
  *  The INTRO is fixed (every Brain message says what it is — the member can't
- *  edit it away); the BODY is the editable part. */
+ *  edit it away); the BODY is the editable part. Short on purpose: the Brain
+ *  walks them through anything more when they reply. */
 export function brainShareIntro(themFirst: string, ownerFirst: string): string {
-  return `Hi ${themFirst} — this is ${ownerFirst}'s Brain, the AI assistant ${ownerFirst} uses on Lichen, writing on ${ownerFirst}'s behalf.`;
+  return `Hi ${themFirst} — this is ${ownerFirst}'s Brain (the AI assistant ${ownerFirst} uses on Lichen).`;
 }
-export function brainShareBody(ownerFirst: string, detail: string, url: string): string {
-  // The share wording is the owner's first person; the Brain speaks ABOUT them.
-  const shared = shareMessage(ownerFirst, detail, url).replace(/\n\n— .*$/s, '')
-    .replace("Here's my Lichen calendar", `Here's ${ownerFirst}'s Lichen calendar`)
-    .replace(/Anything I've marked/, `Anything ${ownerFirst} has marked`)
-    .replace(/\bI'm\b/g, `${ownerFirst} is`)
-    .replace(/\bmy (to-dos|Lichen calendar)/g, `${ownerFirst}'s $1`);
-  return `${ownerFirst} asked me to share their calendar with you and help you get it set up.\n\n${shared}`
-    + `\n\nIf anything gets stuck, just reply here — I'll help, and I'll let ${ownerFirst} know if it needs them.`;
+export function brainShareBody(ownerFirst: string, detail: string, _url: string): string {
+  // ONE TAP, NOT A TUTORIAL (founder 2026-11-17: "can't we just have his
+  // assistant do it for him?"): the link + add buttons ride the message as a
+  // calendar card, so the words just say what it is.
+  return `Here's ${ownerFirst}'s Lichen calendar — tap a button below to add it to your Google, Apple or Lichen calendar, and you'll see ${seesShort(detail, ownerFirst)}.\n\nStuck? Reply here and I'll help.`;
+}
+
+/** One-tap adds: Google's own "Add this calendar?" screen (cid=) and Apple's
+ *  subscribe sheet (webcal:). The final confirm is the person's, on their
+ *  calendar's own screen — Lichen can't (and shouldn't) click it for them. */
+export function oneTapLinks(url: string): { google: string; apple: string } {
+  const webcal = url.replace(/^https?:/, 'webcal:');
+  return { google: `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`, apple: webcal };
 }

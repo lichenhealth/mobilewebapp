@@ -1,5 +1,5 @@
 import { useTopBackFor } from '../lib/topBack';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import PayDoors from '../components/PayDoors';
@@ -160,6 +160,20 @@ export default function Bookings() {
       }}>Pay {usdLabel(b.price_cents!)}</button>
     ) : null;
 
+  // A BELL LANDS ON ITS BOOKING (founder 2026-11-17: "scroll to the unread
+  // message that the notification is indicating… across all messages and
+  // notifications"): ?b=<booking> scrolls that row into view and lights it.
+  const calledId = new URLSearchParams(window.location.search).get('b');
+  const called = useRef(false);
+  const [calledMissing, setCalledMissing] = useState(false);
+  useEffect(() => {
+    if (!ready || !calledId || called.current) return;
+    called.current = true;
+    const el = document.querySelector<HTMLElement>(`[data-booking="${calledId}"]`);
+    if (el) requestAnimationFrame(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    else setCalledMissing(true);
+  }, [ready, calledId]);
+
   return (
     <div className="bkg">
       <header className="bkg__head">
@@ -169,6 +183,7 @@ export default function Bookings() {
 
       {error && <p className="bkg__error">{error}</p>}
       {!ready && <p className="bkg__muted">Loading…</p>}
+      {calledMissing && <p className="bkg__muted">That booking isn&rsquo;t on your list anymore — it may have been cancelled or already happened.</p>}
 
       {ready && open.length > 0 && (
         <section className="bkg__sec">
@@ -223,7 +238,7 @@ export default function Bookings() {
         <section className="bkg__sec">
           <h2 className="bkg__h2">Waiting on you</h2>
           {requests.map((b) => (
-            <div className="bkg__row" key={b.id}>
+            <div className={'bkg__row' + (b.id === calledId ? ' is-called' : '')} key={b.id} data-booking={b.id}>
               <div className="bkg__row-body">
                 <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
                 {reach(b)}
@@ -250,7 +265,7 @@ export default function Bookings() {
           {byDay(upcoming).map(([iso, rows]) => (<div key={iso}>
           <h3 className="bkg__dayhead">{dayHead(iso)}</h3>
           {rows.map((b) => (
-            <div className="bkg__row" key={b.id}>
+            <div className={'bkg__row' + (b.id === calledId ? ' is-called' : '')} key={b.id} data-booking={b.id}>
               <div className="bkg__row-body">
                 <span className="bkg__row-title">{who(b)} · {b.type?.title ?? 'Session'}</span>
                 {reach(b)}
@@ -284,7 +299,7 @@ export default function Bookings() {
           {byDay(mine).map(([iso, rows]) => (<div key={iso}>
           <h3 className="bkg__dayhead">{dayHead(iso)}</h3>
           {rows.map((b) => (
-            <div className="bkg__row" key={b.id}>
+            <div className={'bkg__row' + (b.id === calledId ? ' is-called' : '')} key={b.id} data-booking={b.id}>
               <div className="bkg__row-body">
                 <span className="bkg__row-title">
                   {b.type?.title ?? 'Session'} with {b.provider?.full_name ?? 'a member'}

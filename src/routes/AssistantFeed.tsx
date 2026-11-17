@@ -31,6 +31,7 @@ import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import KnockDraftCard from '../components/KnockDraftCard';
 import MailDraftCard from '../components/MailDraftCard';
 import GDriveImportCard from '../components/GDriveImportCard';
+import CalFeedCard from '../components/CalFeedCard';
 import CalShareCard from '../components/CalShareCard';
 import CalInviteCard from '../components/CalInviteCard';
 import './AssistantFeed.css';
@@ -441,7 +442,23 @@ export default function AssistantFeed() {
     // new entries while you watch still follow to the foot only when the
     // reader is near it or the newest words are their own send. ⚠ The
     // app's scroller is #root, not window.
-    if (first) end.scrollIntoView({ block: 'end' });
+    if (first) {
+      end.scrollIntoView({ block: 'end' });
+      // …BUT NEVER PAST THE START OF WHAT'S NEW (founder 2026-11-17: "it
+      // should scroll to the unread message that the notification is
+      // indicating"): if the first unseen reply's top was carried above the
+      // fold by the bottom landing, start there instead.
+      const c = { id: openConvo ?? thread, thread, entries: viewEntries };
+      if (personal && convoUnread(c) > 0) {
+        const cursorAt = cursors[thread] ?? 0;
+        const lastMine = Math.max(0, ...viewEntries.filter((e) => e.author === 'member').map((e) => +new Date(e.created_at)));
+        const floor = cursorAt > 0 ? Math.max(cursorAt, lastMine) : Math.max(lastMine, Date.now() - 7 * 86_400_000);
+        const firstNew = viewEntries.find((e) => e.author === 'claude' && !isSnagNote(e.body) && +new Date(e.created_at) > floor);
+        const el = firstNew ? document.querySelector<HTMLElement>(`[data-entry="${firstNew.id}"]`) : null;
+        const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--top-h')) || 64;
+        if (el && el.getBoundingClientRect().top < topH) el.scrollIntoView({ block: 'start' });
+      }
+    }
     else if (nearFoot || lastIsMine) end.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [loading, listMode, viewEntries, thread, openConvo]);
 
@@ -1369,6 +1386,7 @@ export default function AssistantFeed() {
                 + (peer ? ' afeed__entry--peer' : '')
                 + (handoff ? ' afeed__entry--handoff' : '')}
               key={p.id}
+              data-entry={p.id}
             >
               {/* In a space's build thread, your entries wear the SPACE's
                   logo with your face as the small peach-ringed dot — the
@@ -1544,6 +1562,11 @@ export default function AssistantFeed() {
                     <div className="afeed__pubrow" key={`${p.id}:calinv:${a.event_id}`}>
                       <CalInviteCard eventId={a.event_id} title={a.title} members={a.members} emails={a.emails} calendar={a.calendar} />
                     </div>
+                  ))}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'calfeed' ? [a] : []))
+                  .map((a, i) => (
+                    <div className="afeed__pubrow" key={`${p.id}:cfd:${i}`}><CalFeedCard url={a.url} name={a.name} /></div>
                   ))}
                 {p.author === 'claude' && (p.attachments ?? [])
                   .flatMap((a) => (a.type === 'cal_share' ? [a] : []))

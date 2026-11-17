@@ -32,7 +32,9 @@ export type MediaType = 'photo' | 'video' | 'audio';
  *  post card a chat-about message rides on, rendered at read time through
  *  RLS so a post that later closes shows an honest stub. Never send a docref
  *  or postref to media signing. */
-export interface Attachment { type: MediaType | 'docref' | 'postref'; url: string; kind?: 'doc' | 'poll' | 'sheet'; }
+export interface Attachment { type: MediaType | 'docref' | 'postref' | 'calfeed'; url: string; kind?: 'doc' | 'poll' | 'sheet'; /** calfeed: whose calendar */ name?: string; }
+/** A reference card (doc, post, shared calendar) — never signed as media. */
+export const isRefAttachment = (a: Attachment) => a.type === 'docref' || a.type === 'postref' || a.type === 'calfeed';
 
 export interface MemberInfo { profile_id: string; name: string; avatarUrl?: string | null; }
 export interface MessageRow {
@@ -236,6 +238,7 @@ export function messagePreview(msg: MessageRow): string {
       return first.kind === 'poll' ? '📊 Poll' : first.kind === 'sheet' ? '📋 Spreadsheet' : '📄 Doc';
     }
     if (first.type === 'postref') return '🔗 A post';
+    if (first.type === 'calfeed') return '📅 A shared calendar';
     const label = first.type === 'photo' ? 'Photo' : first.type === 'video' ? 'Video' : 'Audio';
     return `📎 ${label}${a.length > 1 ? ` +${a.length - 1}` : ''}`;
   }

@@ -45,8 +45,8 @@ async function notify(recipient: string, title: string, body: string, link: stri
   }) });
 }
 
-async function postAsBrain(chatId: string, ownerId: string, body: string) {
-  await svc('chat_messages', { method: 'POST', body: JSON.stringify({ chat_id: chatId, sender_id: ownerId, body, via_brain: true }) });
+async function postAsBrain(chatId: string, ownerId: string, body: string, attachments?: unknown[]) {
+  await svc('chat_messages', { method: 'POST', body: JSON.stringify({ chat_id: chatId, sender_id: ownerId, body, via_brain: true, ...(attachments ? { attachments } : {}) }) });
 }
 
 Deno.serve(async (req) => {
@@ -95,9 +95,19 @@ Deno.serve(async (req) => {
     const text = brainShareIntro(themFirst, ownerFirst) + '\n\n'
       + (edited || ((note ? note + '\n\n' : '') + brainShareBody(ownerFirst, share.detail, FEED_BASE + share.token)));
 
+    // A SECOND TAP IS NOT A SECOND MESSAGE (founder 2026-11-17: nothing
+    // seemed to happen, so she tapped again and Gabe got it twice). The same
+    // share sent by the Brain in the last 10 minutes answers with that send.
+    const recent = (await rows<{ chat_id: string; created_at: string }>(await svc(
+      `brain_errands?share_id=eq.${id}&owner_id=eq.${user.id}&status=in.(open,flagged)&created_at=gte.${encodeURIComponent(new Date(Date.now() - 10 * 60_000).toISOString())}&select=chat_id,created_at&order=created_at.desc&limit=1`)))[0];
+    if (recent) return json({ ok: true, chat_id: recent.chat_id, custom: !!edited, already: true, sent_at: recent.created_at });
+
     // One live errand per chat.
     await svc(`brain_errands?chat_id=eq.${chatId}&status=in.(open,flagged)`, { method: 'PATCH', body: JSON.stringify({ status: 'closed', updated_at: new Date().toISOString(), last_note: 'Replaced by a new errand' }) });
-    await postAsBrain(chatId, user.id, text);
+    // The link rides as a calendar CARD — one-tap Google / Apple / Lichen
+    // buttons on their side (founder 2026-11-17: "can't we just have his
+    // assistant do it for him?"), not a paste-this-URL tutorial.
+    await postAsBrain(chatId, user.id, text, [{ type: 'calfeed', url: FEED_BASE + share.token, name: ownerFirst }]);
     await svc('brain_errands', { method: 'POST', body: JSON.stringify({ owner_id: user.id, chat_id: chatId, recipient_id: share.recipient_profile_id, share_id: id }) });
     await svc(`calendar_feed_shares?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ channel: 'chat', sent_at: new Date().toISOString() }) });
     return json({ ok: true, chat_id: chatId, custom: !!edited });
@@ -162,6 +172,7 @@ Deno.serve(async (req) => {
 
     const system = `You are ${ownerFirst}'s Brain — the AI assistant ${ownerFirst} uses on Lichen — writing in ${ownerFirst}'s direct chat with ${themFirst}, ON ${ownerFirst.toUpperCase()}'S BEHALF. ${themFirst} knows they are talking with an AI; never pretend to be ${ownerFirst}.
 YOUR ONE JOB: help ${themFirst} subscribe to ${ownerFirst}'s shared Lichen calendar feed. Facts you may use:
+- Under your first message is a calendar card with ONE-TAP buttons: "Add to Google Calendar" (opens Google's own "Add calendar?" screen — one more tap there), "Add to Apple Calendar" (opens the iPhone/Mac subscribe sheet), and "Add to my Lichen calendar" (adds it inside Lichen right away). Point to those first; the manual steps below are the fallback.
 - The link (only ever repeat this exact one): ${FEED_BASE + share.token}
 - Google Calendar: it must be added on a COMPUTER (or a phone's web browser in desktop mode) at calendar.google.com → Other calendars "+" → From URL → paste → Add calendar. The Google Calendar phone app can't add a URL, but once added on the web the calendar shows up in the phone app too (it may need switching on under the app's Settings → that calendar → Sync).
 - Apple Calendar: File → New Calendar Subscription (Mac); on iPhone: Settings → Calendar → Accounts → Add Account → Other → Add Subscribed Calendar.

@@ -43,6 +43,7 @@ export type FeedAttachment =
   /** SHARE MY CALENDAR (2026-11-15): the brain made a private share row; the
    *  card's tap sends it by Lichen chat, text or email. */
   | { type: 'cal_share'; share_id: string }
+  | { type: 'calfeed'; url: string; name?: string }
   | { type: 'gdrive_import'; account_id: string; account: string; then_trash?: boolean; files: { id: string; name: string; mimeType: string; size?: string; modifiedTime?: string }[] }
   | { type: 'mail_reconnect'; accounts: string[] }
   /** An email the brain DRAFTED (founder 2026-11-15) — the card carries Send; the person's tap sends it. */

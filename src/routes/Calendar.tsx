@@ -140,6 +140,15 @@ export default function Calendar() {
   const [remDone, setRemDone] = useState<Map<string, { profileId: string; name: string | null }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<EventRow | null>(null);
+  // A BELL LANDS ON ITS EVENT (founder 2026-11-17): ?e=<event id> opens that
+  // event's sheet once it has loaded on the ?d= day the link carries.
+  const eParam = urlParams.get('e');
+  const eDone = useRef<string | null>(null);
+  useEffect(() => {
+    if (!eParam || eDone.current === eParam) return;
+    const hit = events.find((x) => x.id === eParam);
+    if (hit) { eDone.current = eParam; setSelected(hit); }
+  }, [eParam, events]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [searchPool, setSearchPool] = useState<EventRow[]>([]);
