@@ -381,7 +381,7 @@ export async function markThreadRead(thread: string): Promise<void> {
  *  asks the device; the browser's own permission prompt is the consent, a no
  *  or a slow answer (5s) just means the brain falls back to their home. The
  *  point rides this one message — nothing is stored anywhere else. */
-const ROUTE_ASK = /\b(directions?|navigat\w*|drive time|driving time|how (long|far)\b[^?]*\b(to|from|get|drive|take)|route to|take me (to|there)|get me (to|there))\b/i;
+const ROUTE_ASK = /\b(directions?|navigat\w*|drive time|driving time|travel time|commute|eta|traffic|how (long|far)\b[^?]*\b(to|from|get|drive|take|is|away)|how far|route to|take me (to|there)|get me (to|there)|get there|when (should|do|must) (i|we) (leave|head out|go)|leave (by|at) what time|what time (should|do) (i|we) leave)\b/i;
 async function hereForRouteAsk(body: string): Promise<[number, number] | null> {
   if (!ROUTE_ASK.test(body) || typeof navigator === 'undefined' || !navigator.geolocation) return null;
   return new Promise((resolve) => {

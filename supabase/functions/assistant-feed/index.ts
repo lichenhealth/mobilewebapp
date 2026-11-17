@@ -523,7 +523,8 @@ const READ_INTAKE_DRAFT_TOOL = {
 };
 
 // Reply shapes that send a member off to do by hand what a tool could do.
-const ROUTE_ASK_RE = /\b(directions?|navigat\w*|drive time|driving time|how (long|far)\b[^?]*\b(to|from|get|drive|take)|route to|take me (to|there)|get me (to|there))\b/i;
+const TRAVEL_CLAIM_RE = /\b\d+\s*(-|to)?\s*\d*\s*(min|mins|minutes|hr|hrs|hours?)\s+(drive|driving|away|walk|by car|in traffic|with traffic)\b|\b\d+(\.\d+)?\s*(mi|miles)\s+(away|from|to)\b|\b(leave|head out) by \d/i;
+const ROUTE_ASK_RE = /\b(directions?|navigat\w*|drive time|driving time|travel time|commute|eta|traffic|how (long|far)\b[^?]*\b(to|from|get|drive|take|is|away)|how far|route to|take me (to|there)|get me (to|there)|get there|when (should|do|must) (i|we) (leave|head out|go)|leave (by|at) what time|what time (should|do) (i|we) leave)\b/i;
 const DEFLECT_RE = /\b(manually|by hand)\b|\b(tap|press|hit|use) (the )?(\+|plus\b)|\bwhere you(?:'d|’d| would| can) (create|make|set|add|fill)|\b(head|go) (over )?to [^.\n]{0,40}\b(and|to) (create|fill|make|set up|add)\b|\byou(?:'ll|’ll| will) (need|have) to (create|make|set|add|fill)|(?:^|\n)\s*(?:\d+[.)]|step \d+:?)\s*(?:open|go|tap|click|select|navigate|choose|head)\b|\b(?:open|go to|navigate to|head to) (?:your |the )?[^.\n]{0,30}\b(?:settings|tab|menu|screen|page)\b[^.\n]{0,40}\b(?:and|then) (?:tap|click|select|choose|turn|toggle|press)\b/i;
 
 const POST_TOOLS = [
@@ -1486,6 +1487,7 @@ Deno.serve(async (req) => {
   // composed ONLY from the fixed APP_DOORS table, never model-written paths.
   const appDoors: { path: string; label: string }[] = [];
   const mapLinks: { url: string; label: string }[] = [];
+  let driveTimeCalled = false;
   // Post drafts minted this exchange — each becomes a Review-&-post button
   // under the reply (the page_edit Preview/Publish grammar for posts).
   const postDraftDoors: { id: string; title: string }[] = [];
@@ -1609,6 +1611,7 @@ Deno.serve(async (req) => {
         }
         delete lr.doors;
       }
+      if (name === 'drive_time') driveTimeCalled = true;
       if (name === 'drive_time' && lr.ok && typeof lr.map_link === 'string') {
         const md = typeof lr.map_door === 'string' ? lr.map_door : '';
         if (/^\/maps\?route=-?[0-9.]+,-?[0-9.]+;-?[0-9.]+,-?[0-9.]+(&[a-z]+=[^&\s]*)*$/.test(md) && !appDoors.some((d) => d.path === md)) appDoors.push({ path: md, label: 'Directions in Lichen Maps' });
@@ -3575,7 +3578,12 @@ Deno.serve(async (req) => {
       // a fresh drive_time call means the numbers were guessed from an earlier
       // route in the conversation (it even gave an arrival time already past)
       // and no buttons ride along. One forced re-run that calls the tool.
-      if (canLife && !routeRetried && !mapLinks.length && ROUTE_ASK_RE.test(String(trigger.body ?? ''))) {
+      // Two triggers, one check (founder 2026-11-17: "have default protocols
+      // to do the necessary pings"): the member ASKED a route question, or
+      // the draft reply STATES travel numbers (minutes away, miles, leave by)
+      // — either way, with no drive_time call this exchange the numbers were
+      // guessed. Re-run once with the tool.
+      if (canLife && !routeRetried && !driveTimeCalled && (ROUTE_ASK_RE.test(String(trigger.body ?? '')) || TRAVEL_CLAIM_RE.test(text))) {
         routeRetried = true;
         console.error('route-retry', JSON.stringify({ feed_post_id, thread }));
         messages.push({ role: 'assistant', content: data.content });

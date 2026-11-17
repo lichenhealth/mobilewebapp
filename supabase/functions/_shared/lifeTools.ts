@@ -1087,8 +1087,15 @@ export async function runLifeTool(
     const miles = Math.round((Number(route.distance) / 1609.34) * 10) / 10;
     const arrive = new Date(Date.now() + Number(route.duration) * 1000)
       .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz });
-    const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${enc(from.at[1] + ',' + from.at[0])}&destination=${enc(to.at[1] + ',' + to.at[0])}&travelmode=${mode === 'cycling' ? 'bicycling' : mode}`;
-    const amaps = `https://maps.apple.com/?saddr=${enc(from.at[1] + ',' + from.at[0])}&daddr=${enc(to.at[1] + ',' + to.at[0])}&dirflg=${mode === 'walking' ? 'w' : mode === 'cycling' ? 'b' : 'd'}`;
+    // Outside apps get a real ADDRESS when one is known (founder 2026-11-17:
+    // the boxes showed coordinates), and "your location" is left for the app
+    // itself to fill when the trip starts from where they stand.
+    const fromHere = from.via === 'where you are now';
+    const argOf = (pt: Pt) => (/\d/.test(pt.label) && !pt.label.includes(" — ") && !/^-?\d+\.\d+,/.test(pt.label) ? pt.label : `${pt.at[1]},${pt.at[0]}`);
+    const gmaps = `https://www.google.com/maps/dir/?api=1${fromHere ? '' : `&origin=${enc(argOf(from))}`}&destination=${enc(argOf(to))}&travelmode=${mode === 'cycling' ? 'bicycling' : mode}`;
+    const amaps = `https://maps.apple.com/?${fromHere ? '' : `saddr=${enc(argOf(from))}&`}daddr=${enc(argOf(to))}&dirflg=${mode === 'walking' ? 'w' : 'd'}`;
+    const clean = (t: string) => t.replace(/\|/g, ' ').slice(0, 80);
+    const fromName = fromHere ? 'Your location' : from.via === 'their home' ? 'Home' : (from.via || from.label);
     return {
       ok: true,
       from: from.via ? `${from.via} (${from.label})` : from.label,
@@ -1100,7 +1107,7 @@ export async function runLifeTool(
       note: (mode === 'driving' ? 'Live traffic right now; it can change by the time they leave.' : `A ${mode} estimate.`) + ' Three buttons ride under your reply — "Directions in Lichen Maps" (the route with every turn), then Apple Maps and Google Maps for spoken turn-by-turn (ordered by what they used last on that device) — mention them, never paste a link. When they ask you to navigate or take them there, those buttons ARE the navigation.',
       map_link: gmaps,
       apple_link: amaps,
-      map_door: `/maps?route=${from.at[0].toFixed(6)},${from.at[1].toFixed(6)};${to.at[0].toFixed(6)},${to.at[1].toFixed(6)}&to=${enc((to.via || to.label).slice(0, 80))}${from.via ? `&from=${enc((from.via === 'their home' ? 'your home' : from.via).slice(0, 60))}` : ''}&start=lichen`,
+      map_door: `/maps?route=${from.at[0].toFixed(6)},${from.at[1].toFixed(6)};${to.at[0].toFixed(6)},${to.at[1].toFixed(6)}&names=${enc(clean(fromName) + '|' + clean(to.via || to.label))}&addrs=${enc(clean(fromHere ? '' : from.label) + '|' + clean(to.label))}${fromHere ? '&here=1' : ''}${mode !== 'driving' ? `&mode=${mode}` : ''}&start=lichen`,
     };
   }
 

@@ -127,6 +127,15 @@ function ScrollToTop() {
   return null;
 }
 
+// A new Compose address is a new post: the same route element would
+// otherwise keep the last post's state — its guests, its guest-list chips
+// (founder 2026-11-17: "family shouldn't be auto added to a new invite
+// because they were on the last one").
+function ComposeFresh() {
+  const { search } = useLocation();
+  return <Compose key={search} />;
+}
+
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   // The full-screen chat thread hides the TopBar but keeps a ☰ of its own
@@ -448,7 +457,7 @@ export default function App() {
           <Route path="/invite"    element={<Invite />} />
           <Route path="/help"      element={<Help />} />
           <Route path="/membership" element={<Membership />} />
-          <Route path="/compose"   element={<Compose />} />
+          <Route path="/compose"   element={<ComposeFresh />} />
           <Route path="/search"    element={<SmartSearch />} />
           <Route path="/login"     element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
