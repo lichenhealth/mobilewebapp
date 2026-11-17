@@ -375,6 +375,25 @@ export async function markThreadRead(thread: string): Promise<void> {
  *  show your own message, so a dropped websocket made a safely-stored send
  *  vanish from the screen. The caller appends this row itself; the realtime
  *  handler's id-dedup makes the echo harmless when it does arrive. */
+/** WHERE AM I, FOR DIRECTIONS (founder 2026-11-17: "ping your current
+ *  location and give directions from that by default if you don't put a start
+ *  and finish location"). Only a message that asks for directions/drive time
+ *  asks the device; the browser's own permission prompt is the consent, a no
+ *  or a slow answer (5s) just means the brain falls back to their home. The
+ *  point rides this one message — nothing is stored anywhere else. */
+const ROUTE_ASK = /\b(directions?|navigat\w*|drive time|driving time|how (long|far)\b[^?]*\b(to|from|get|drive|take)|route to|take me (to|there)|get me (to|there))\b/i;
+async function hereForRouteAsk(body: string): Promise<[number, number] | null> {
+  if (!ROUTE_ASK.test(body) || typeof navigator === 'undefined' || !navigator.geolocation) return null;
+  return new Promise((resolve) => {
+    const done = window.setTimeout(() => resolve(null), 5000);
+    navigator.geolocation.getCurrentPosition(
+      (p) => { window.clearTimeout(done); resolve([Math.round(p.coords.latitude * 1e5) / 1e5, Math.round(p.coords.longitude * 1e5) / 1e5]); },
+      () => { window.clearTimeout(done); resolve(null); },
+      { enableHighAccuracy: false, timeout: 4500, maximumAge: 120000 },
+    );
+  });
+}
+
 export async function postToAssistantFeed(
   body: string, sourcePostId?: string, thread = 'general', images?: string[],
   /** The conversation to continue. Omit to START a fresh conversation (an
@@ -397,7 +416,9 @@ export async function postToAssistantFeed(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   const convo = convoId === undefined ? crypto.randomUUID() : convoId;
+  const here = await hereForRouteAsk(body);
   const atts = [
+    ...(here ? [{ type: 'here', lat: here[0], lng: here[1] } as const] : []),
     ...(images ?? []).map((url) => ({ type: 'photo', url } as const)),
     ...(briefCtx?.text.trim()
       ? [{ type: 'brief_ctx', section: briefCtx.section, text: briefCtx.text.slice(0, 2000) } as const]
