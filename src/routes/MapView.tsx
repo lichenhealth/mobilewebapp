@@ -316,7 +316,9 @@ export default function MapView() {
 
     markersRef.current = next;
 
-    if (next.size > 0) {
+    // A route on screen owns the camera — fitting every pin would zoom back
+    // out over it (founder 2026-11-17: the route "didn't actually populate").
+    if (next.size > 0 && !new URLSearchParams(window.location.search).get('route')) {
       const bounds = new mapboxgl.LngLatBounds();
       visibleEvents.forEach(({ lat, lng }) => bounds.extend([lng, lat]));
       visibleSpaces.forEach((s) => bounds.extend([s.lng!, s.lat!]));
@@ -449,7 +451,7 @@ export default function MapView() {
 
       <div className="mapv__frame">
         <div ref={mapEl} className="mapv__map" />
-        {mapParams.get('route') && <RouteCard mapRef={mapRef} spec={mapParams.get('route')!} toLabel={mapParams.get('to') ?? ''} fromLabel={mapParams.get('from') ?? ''} onClose={() => navigate('/maps', { replace: true })} />}
+        {mapParams.get('route') && <RouteCard mapRef={mapRef} spec={mapParams.get('route')!} toLabel={mapParams.get('to') ?? ''} fromLabel={mapParams.get('from') ?? ''} started={mapParams.get('start') === 'lichen'} onClose={() => navigate('/maps', { replace: true })} />}
         {ready && totalPins === 0 && !mapParams.get('route') && (
           <div className="mapv__empty">
             <Icon name="maps" size={20} />
@@ -468,8 +470,10 @@ export default function MapView() {
  *  draws the live-traffic route and lists every turn; Start hands the same
  *  route to the phone's own navigator for voice guidance. */
 type RouteStep = { text: string; dist: number };
-function RouteCard({ mapRef, spec, toLabel, fromLabel, onClose }: {
-  mapRef: React.MutableRefObject<mapboxgl.Map | null>; spec: string; toLabel: string; fromLabel: string; onClose: () => void;
+function RouteCard({ mapRef, spec, toLabel, fromLabel, started, onClose }: {
+  mapRef: React.MutableRefObject<mapboxgl.Map | null>; spec: string; toLabel: string; fromLabel: string;
+  /** They already chose Lichen Maps (the brain's door) — skip the choice. */
+  started: boolean; onClose: () => void;
 }) {
   const pts = spec.split(';').map((p) => p.split(',').map(Number)) as [number, number][];
   const valid = pts.length === 2 && pts.every((p) => p.length === 2 && p.every((n) => Number.isFinite(n)));
@@ -503,8 +507,16 @@ function RouteCard({ mapRef, spec, toLabel, fromLabel, onClose }: {
           for (const c of route.geometry.coordinates as [number, number][]) b.extend(c);
           map.fitBounds(b, { padding: { top: 60, bottom: 220, left: 40, right: 40 }, duration: 800 });
         };
-        const map = mapRef.current;
-        if (map?.isStyleLoaded()) draw(); else map?.once('load', draw);
+        // The map may not exist yet, or its style may still be loading — and
+        // a 'load' that already fired never fires again. Try until it takes.
+        let tries = 0;
+        const attempt = () => {
+          if (!live) return;
+          const map = mapRef.current;
+          if (map && map.isStyleLoaded()) { try { draw(); return; } catch { /* style mid-swap */ } }
+          if (++tries < 60) window.setTimeout(attempt, 250);
+        };
+        attempt();
       } catch { if (live) setErr('The route didn’t load — try again in a moment.'); }
     })();
     return () => {
@@ -530,7 +542,7 @@ function RouteCard({ mapRef, spec, toLabel, fromLabel, onClose }: {
     ? { key: 'apple' as const, name: 'Apple Maps', href: apple }
     : { key: 'google' as const, name: 'Google Maps', href: google }));
   const remember = rememberNavApp;
-  useEffect(() => { if (pref === 'lichen') setOpen(true); }, [pref]);
+  useEffect(() => { if (started || pref === 'lichen') setOpen(true); }, [pref, started]);
   const dist = (m: number) => (m < 160 ? `${Math.round(m * 3.281 / 10) * 10} ft` : `${(m / 1609.34).toFixed(1)} mi`);
   return (
     <div className="mapv__route">
@@ -543,7 +555,7 @@ function RouteCard({ mapRef, spec, toLabel, fromLabel, onClose }: {
         </div>
         <button type="button" className="mapv__route-x" onClick={onClose} aria-label="Close the route">×</button>
       </div>
-      {valid && (
+      {valid && !started && (
         <div className="mapv__route-go" role="group" aria-label="Start in">
           <span className="mapv__route-golbl">Start in:</span>
           <button type="button" className={`mapv__route-app${open ? ' is-on' : ''}`} aria-pressed={open}
@@ -566,7 +578,7 @@ function RouteCard({ mapRef, spec, toLabel, fromLabel, onClose }: {
           ))}
         </ol>
       )}
-      <p className="mapv__route-fine">Lichen Maps lists every turn right here. Apple Maps and Google Maps take the same route with spoken turn-by-turn. Whichever you pick, Lichen remembers it on this device.</p>
+      {started ? (!info && !err ? null : <p className="mapv__route-fine">Every turn, right here in Lichen Maps.</p>) : <p className="mapv__route-fine">Lichen Maps lists every turn right here. Apple Maps and Google Maps take the same route with spoken turn-by-turn. Whichever you pick, Lichen remembers it on this device.</p>}
     </div>
   );
 }

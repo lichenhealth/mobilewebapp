@@ -246,7 +246,7 @@ export const LIFE_TOOLS = [
     // maps?"). Mapbox — the engine Lichen's own Maps runs on — with live
     // traffic, from their saved home (or any address they name).
     name: 'drive_time',
-    description: 'How long it takes to get somewhere right now — like asking Google Maps. Driving uses current traffic. to / from can each be ANY street address (on Lichen or not), "home" (their saved home), or the NAME of a place on Lichen: an organization/community/group/place, one of their events, one of their contact cards, or one of their own goods & services locations — those resolve to the address Lichen holds. If a business address is unknown, find it first (their calendar entry, emails, the business site) — never guess one. from empty = their saved home. mode: driving (default), walking or cycling. Returns minutes, miles, the arrival time if they left now, and a button that opens the route in Google Maps. When they ask "when should I leave" for an appointment, give the drive time plus a little buffer for parking.',
+    description: 'How long it takes to get somewhere right now — like asking Google Maps. Driving uses current traffic. to / from can each be ANY street address (on Lichen or not), "home" (their saved home), or the NAME of a place on Lichen: an organization/community/group/place, one of their events, one of their contact cards, or one of their own goods & services locations — those resolve to the address Lichen holds. If a business address is unknown, find it first (their calendar entry, emails, the business site) — never guess one. mode: driving (default), walking or cycling. from empty = where their device is right now (when it shared its location with this message), else their saved home — say which in the answer. Returns minutes, miles, the arrival time if they left now, and buttons into Lichen Maps, Apple Maps and Google Maps. When they ask "when should I leave" for an appointment, give the drive time plus a little buffer for parking.',
     input_schema: { type: 'object', properties: { to: { type: 'string' }, from: { type: 'string' }, mode: { type: 'string', enum: ['driving', 'walking', 'cycling'] } }, required: ['to'] },
   },
 ];
@@ -287,6 +287,10 @@ async function findPost(sb: SbFn, me: string, title: string, sharedPostId: strin
 export async function runLifeTool(
   sb: SbFn, me: string, name: string, input: Record<string, unknown>,
   offSections: Set<string>, sharedPostId: string | null, memberText = '',
+  /** Where their device was when they sent the message (founder 2026-11-17:
+   *  "ping your current location and give directions from that by default").
+   *  Only ever their own phone/computer's answer, never stored. */
+  here: [number, number] | null = null,
 ): Promise<Out> {
   const sec = LIFE_TOOL_SECTION[name];
   const which = name === 'my_lists' ? String(input.which ?? '') : '';
@@ -1004,12 +1008,24 @@ export async function runLifeTool(
     const fromTxt = String(input.from ?? '').trim();
     const homeRow = (await (await sb(`profiles?id=eq.${me}&select=home_location,home_lat,home_lng,timezone`)).json())?.[0] ?? {};
     const tz: string = homeRow.timezone || 'America/Denver';
+    // NEAR FIRST (founder 2026-11-17: "Red Rocks Amphitheatre" geocoded to
+    // Red Rocks, Australia — proximity alone is only a hint): search a box
+    // ~2° around the starting point, and only then the whole world. When the
+    // hit doesn't carry their words (a venue resolved to its road), the label
+    // keeps their words first so the card says where they asked to go.
     const geocode = async (q: string, near?: [number, number]): Promise<{ at: [number, number]; label: string } | null> => {
+      const look = async (extra: string) => {
+        const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${enc(q)}.json?limit=1&types=address,poi,place,postcode${extra}&access_token=${tok}`);
+        return r.ok ? (await r.json())?.features?.[0] ?? null : null;
+      };
       const prox = near ? `&proximity=${near[0]},${near[1]}` : '';
-      const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${enc(q)}.json?limit=1&types=address,poi,place,postcode${prox}&access_token=${tok}`);
-      if (!r.ok) return null;
-      const f = (await r.json())?.features?.[0];
-      return f ? { at: f.center as [number, number], label: String(f.place_name ?? q) } : null;
+      const box = near ? `&bbox=${near[0] - 2},${Math.max(-89, near[1] - 2)},${near[0] + 2},${Math.min(89, near[1] + 2)}` : '';
+      const f = (near ? await look(box + prox) : null) ?? (await look(prox));
+      if (!f) return null;
+      const name = String(f.place_name ?? q);
+      const word = q.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+      const label = /\d/.test(q) || !word || name.toLowerCase().includes(word) ? name : `${q.trim()} — ${name}`;
+      return { at: f.center as [number, number], label };
     };
     type Pt = { at: [number, number]; label: string; via?: string };
     const home = async (): Promise<Pt | null> => {
@@ -1045,18 +1061,27 @@ export async function runLifeTool(
       if (ev?.location && !/^https?:/i.test(ev.location)) { const g = await geocode(ev.location, near); if (g) return { ...g, via: ev.title }; }
       return null;
     };
+    const hereMeant = (q: string) => /^(here|where i am|my (current )?location|current location|me|my phone)$/i.test(q.trim());
+    const hereOrNull = (): Pt | null => (here ? { at: here, label: 'where you are now', via: 'where you are now' } : null);
     const resolve = async (q: string, near?: [number, number]): Promise<Pt | null> => {
       if (/^(home|my home|my house)$/i.test(q)) return home();
+      if (hereMeant(q)) return hereOrNull();
       return (await lichenPlace(q, near)) ?? (await geocode(q, near));
     };
-    const from: Pt | null = fromTxt ? await resolve(fromTxt) : await home();
+    const from: Pt | null = fromTxt ? await resolve(fromTxt) : (hereOrNull() ?? await home());
+    if (!from && fromTxt && hereMeant(fromTxt)) return { ok: false, error: 'Their device did not share where it is with this message (location is off, or they said no). Ask where they are leaving from, or offer their saved home.' };
     if (!from) return { ok: false, error: fromTxt ? `Couldn't find "${fromTxt}" — check the address.` : 'There is no home address saved on Lichen and no starting address was given — ask where they are leaving from (or they can save a home address in Profile → Location).' };
     const to = await resolve(toTxt, from.at);
     if (!to) return { ok: false, error: `Couldn't find "${toTxt}" on the map — check the address.` };
     const mode = ['walking', 'cycling'].includes(String(input.mode)) ? String(input.mode) : 'driving';
     const profile = mode === 'driving' ? 'driving-traffic' : mode;
-    const r = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${from.at[0]},${from.at[1]};${to.at[0]},${to.at[1]}?overview=false&access_token=${tok}`);
-    const route = r.ok ? (await r.json())?.routes?.[0] : null;
+    // A place's pin can sit off any road (a park, a venue's centre) — let the
+    // router snap to the nearest road, and fall back to plain driving once.
+    const tryRoute = async (prof: string) => {
+      const r = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${prof}/${from.at[0]},${from.at[1]};${to.at[0]},${to.at[1]}?overview=false&radiuses=unlimited;unlimited&access_token=${tok}`);
+      return r.ok ? (await r.json())?.routes?.[0] ?? null : null;
+    };
+    const route = (await tryRoute(profile)) ?? (profile === 'driving-traffic' ? await tryRoute('driving') : null);
     if (!route) return { ok: false, error: 'The route lookup did not answer just now — try again in a moment.' };
     const mins = Math.round(Number(route.duration) / 60);
     const miles = Math.round((Number(route.distance) / 1609.34) * 10) / 10;
@@ -1075,7 +1100,7 @@ export async function runLifeTool(
       note: (mode === 'driving' ? 'Live traffic right now; it can change by the time they leave.' : `A ${mode} estimate.`) + ' Three buttons ride under your reply — "Directions in Lichen Maps" (the route with every turn), then Apple Maps and Google Maps for spoken turn-by-turn (ordered by what they used last on that device) — mention them, never paste a link. When they ask you to navigate or take them there, those buttons ARE the navigation.',
       map_link: gmaps,
       apple_link: amaps,
-      map_door: `/maps?route=${from.at[0].toFixed(6)},${from.at[1].toFixed(6)};${to.at[0].toFixed(6)},${to.at[1].toFixed(6)}&to=${enc((to.via || to.label).slice(0, 80))}${from.via ? `&from=${enc((from.via === 'their home' ? 'your home' : from.via).slice(0, 60))}` : ''}`,
+      map_door: `/maps?route=${from.at[0].toFixed(6)},${from.at[1].toFixed(6)};${to.at[0].toFixed(6)},${to.at[1].toFixed(6)}&to=${enc((to.via || to.label).slice(0, 80))}${from.via ? `&from=${enc((from.via === 'their home' ? 'your home' : from.via).slice(0, 60))}` : ''}&start=lichen`,
     };
   }
 
