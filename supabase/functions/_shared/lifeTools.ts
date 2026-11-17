@@ -1063,6 +1063,7 @@ export async function runLifeTool(
     const arrive = new Date(Date.now() + Number(route.duration) * 1000)
       .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz });
     const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${enc(from.at[1] + ',' + from.at[0])}&destination=${enc(to.at[1] + ',' + to.at[0])}&travelmode=${mode === 'cycling' ? 'bicycling' : mode}`;
+    const amaps = `https://maps.apple.com/?saddr=${enc(from.at[1] + ',' + from.at[0])}&daddr=${enc(to.at[1] + ',' + to.at[0])}&dirflg=${mode === 'walking' ? 'w' : mode === 'cycling' ? 'b' : 'd'}`;
     return {
       ok: true,
       from: from.via ? `${from.via} (${from.label})` : from.label,
@@ -1071,9 +1072,10 @@ export async function runLifeTool(
       minutes_now: mins,
       miles,
       arrive_if_leaving_now: arrive,
-      note: (mode === 'driving' ? 'Live traffic right now; it can change by the time they leave.' : `A ${mode} estimate.`) + ' Two buttons ride under your reply: "Directions in Lichen Maps" (the route drawn with every turn, and Start hands it to their phone for voice guidance) and "Open in Google Maps" — mention them, never paste a link. When they ask you to navigate or take them there, those buttons ARE the navigation.',
+      note: (mode === 'driving' ? 'Live traffic right now; it can change by the time they leave.' : `A ${mode} estimate.`) + ' Three buttons ride under your reply — "Directions in Lichen Maps" (the route with every turn), then Apple Maps and Google Maps for spoken turn-by-turn (ordered by what they used last on that device) — mention them, never paste a link. When they ask you to navigate or take them there, those buttons ARE the navigation.',
       map_link: gmaps,
-      map_door: `/maps?route=${from.at[0].toFixed(6)},${from.at[1].toFixed(6)};${to.at[0].toFixed(6)},${to.at[1].toFixed(6)}&to=${enc((to.via || to.label).slice(0, 80))}${from.via ? `&from=${enc(from.via.slice(0, 60))}` : ''}`,
+      apple_link: amaps,
+      map_door: `/maps?route=${from.at[0].toFixed(6)},${from.at[1].toFixed(6)};${to.at[0].toFixed(6)},${to.at[1].toFixed(6)}&to=${enc((to.via || to.label).slice(0, 80))}${from.via ? `&from=${enc((from.via === 'their home' ? 'your home' : from.via).slice(0, 60))}` : ''}`,
     };
   }
 

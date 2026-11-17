@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { navPref, outsideOrder, rememberNavApp } from '../lib/navApp';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -518,43 +519,44 @@ function RouteCard({ mapRef, spec, toLabel, fromLabel, onClose }: {
   const [o, d] = valid ? pts : [[0, 0], [0, 0]];
   const google = `https://www.google.com/maps/dir/?api=1&origin=${o[1]},${o[0]}&destination=${d[1]},${d[0]}&travelmode=driving&dir_action=navigate`;
   const apple = `https://maps.apple.com/?saddr=${o[1]},${o[0]}&daddr=${d[1]},${d[0]}&dirflg=d`;
-  // THE SMARTER START (founder 2026-11-17: "we can do it on lichen, but also,
-  // if smarter we can have people open in google maps or apple maps"): the
-  // device's own navigator leads — Apple Maps on iPhone/iPad/Mac, Google Maps
-  // elsewhere — and whichever one they last tapped leads from then on.
-  const navApps = (() => {
-    const g = { key: 'google', name: 'Google Maps', href: google };
-    const a = { key: 'apple', name: 'Apple Maps', href: apple };
-    let pref: string | null = null;
-    try { pref = localStorage.getItem('lichen.navApp'); } catch { /* none */ }
-    const apple1st = pref ? pref === 'apple' : /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
-    return apple1st ? [a, g] : [g, a];
-  })();
+  // THREE CHOICES, NEVER ASSUMED (founder 2026-11-17: "give someone the
+  // chance to pick lichen, apple or google - with lichen first and apple next
+  // if on an iphone, and google next if on an android...but let's not assume.
+  // I use google maps, for example, on Apple"): Lichen's own turns lead, then
+  // the member's remembered pick, else a device guess that reads the BROWSER
+  // too — Chrome anywhere (CriOS on iOS) reads as a Google person.
+  const pref = navPref();
+  const outside = outsideOrder().map((k) => (k === 'apple'
+    ? { key: 'apple' as const, name: 'Apple Maps', href: apple }
+    : { key: 'google' as const, name: 'Google Maps', href: google }));
+  const remember = rememberNavApp;
+  useEffect(() => { if (pref === 'lichen') setOpen(true); }, [pref]);
   const dist = (m: number) => (m < 160 ? `${Math.round(m * 3.281 / 10) * 10} ft` : `${(m / 1609.34).toFixed(1)} mi`);
   return (
     <div className="mapv__route">
       <div className="mapv__route-head">
         <div>
           <p className="mapv__route-to">To {toLabel || 'your destination'}</p>
-          {info && <p className="mapv__route-sum"><strong>{info.mins} min</strong> · {info.miles} mi · live traffic{fromLabel ? ` · from ${fromLabel}` : ''}</p>}
+          {info && <p className="mapv__route-sum"><strong>{info.mins >= 60 ? `${Math.floor(info.mins / 60)} hr${info.mins % 60 ? ` ${info.mins % 60} min` : ''}` : `${info.mins} min`}</strong> · {info.miles} mi · live traffic{fromLabel ? ` · from ${fromLabel === 'their home' ? 'your home' : fromLabel}` : ''}</p>}
           {!info && !err && <p className="mapv__route-sum">Finding the way…</p>}
           {err && <p className="mapv__route-sum">{err}</p>}
         </div>
         <button type="button" className="mapv__route-x" onClick={onClose} aria-label="Close the route">×</button>
       </div>
       {valid && (
-        <div className="mapv__route-go">
-          {navApps.map((a, i) => (
-            <a key={a.key} className={i === 0 ? 'mapv__route-start' : 'mapv__route-alt'} href={a.href} target="_blank" rel="noreferrer"
-              onClick={() => { try { localStorage.setItem('lichen.navApp', a.key); } catch { /* per-device nicety */ } }}>
-              {i === 0 ? `Start in ${a.name}` : a.name} ↗
+        <div className="mapv__route-go" role="group" aria-label="Start in">
+          <span className="mapv__route-golbl">Start in:</span>
+          <button type="button" className={`mapv__route-app${open ? ' is-on' : ''}`} aria-pressed={open}
+            disabled={!info || info.steps.length === 0}
+            onClick={() => { remember('lichen'); setOpen((v) => !v); }}>
+            Lichen Maps
+          </button>
+          {outside.map((x) => (
+            <a key={x.key} className="mapv__route-app" href={x.href} target="_blank" rel="noreferrer"
+              onClick={() => remember(x.key)}>
+              {x.name} ↗
             </a>
           ))}
-          {info && info.steps.length > 0 && (
-            <button type="button" className="mapv__route-alt" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-              {open ? 'Hide' : 'Show'} {info.steps.length} turns
-            </button>
-          )}
         </div>
       )}
       {open && info && (
@@ -564,7 +566,7 @@ function RouteCard({ mapRef, spec, toLabel, fromLabel, onClose }: {
           ))}
         </ol>
       )}
-      <p className="mapv__route-fine">Voice turn-by-turn runs in your phone’s maps app — Start hands this route over.</p>
+      <p className="mapv__route-fine">Lichen Maps lists every turn right here. Apple Maps and Google Maps take the same route with spoken turn-by-turn. Whichever you pick, Lichen remembers it on this device.</p>
     </div>
   );
 }

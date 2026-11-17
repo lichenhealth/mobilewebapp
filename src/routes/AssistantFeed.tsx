@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { isAppleMapsUrl, isGoogleMapsUrl, outsideOrder, rememberNavApp } from '../lib/navApp';
 import { renderBold } from '../lib/inlineBold';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
@@ -1515,16 +1516,23 @@ export default function AssistantFeed() {
                       </button>
                     </div>
                   ))}
-                {/* A ROUTE (founder 2026-11-17): drive_time's map button —
-                    the only outside link a reply carries, built server-side
-                    to Google Maps, never model-composed. */}
-                {p.author === 'claude' && (p.attachments ?? [])
-                  .flatMap((a) => (a.type === 'map_link' && /^https:\/\/www\.google\.com\/maps\//.test(a.url) ? [a] : []))
-                  .map((a) => (
+                {/* A ROUTE (founder 2026-11-17): drive_time hands Apple Maps
+                    AND Google Maps beside the Lichen door — built server-side,
+                    never model-composed — ordered by the member's own last
+                    pick, else the device + browser (src/lib/navApp.ts). */}
+                {p.author === 'claude' && (() => {
+                  const maps = (p.attachments ?? []).flatMap((a) => (a.type === 'map_link'
+                    && (isGoogleMapsUrl(a.url) || isAppleMapsUrl(a.url)) ? [a] : []));
+                  if (!maps.length) return null;
+                  const order = outsideOrder();
+                  const rank = (u: string) => order.indexOf(isAppleMapsUrl(u) ? 'apple' : 'google');
+                  return [...maps].sort((x, y) => rank(x.url) - rank(y.url)).map((a) => (
                     <div className="afeed__pubrow" key={`${p.id}:map:${a.url}`}>
-                      <a className="afeed__pubbtn" href={a.url} target="_blank" rel="noreferrer">{a.label} ↗</a>
+                      <a className="afeed__pubbtn" href={a.url} target="_blank" rel="noreferrer"
+                        onClick={() => rememberNavApp(isAppleMapsUrl(a.url) ? 'apple' : 'google')}>{a.label} ↗</a>
                     </div>
-                  ))}
+                  ));
+                })()}
                 {/* A DRAFTED POST (founder 2026-10-15: "draft, post and edit
                     posts for me"): the assistant wrote it into their drafts;
                     this button opens it in the composer, where THEIR tap on
