@@ -448,7 +448,8 @@ export default function MapView() {
 
       <div className="mapv__frame">
         <div ref={mapEl} className="mapv__map" />
-        {ready && totalPins === 0 && (
+        {mapParams.get('route') && <RouteCard mapRef={mapRef} spec={mapParams.get('route')!} toLabel={mapParams.get('to') ?? ''} fromLabel={mapParams.get('from') ?? ''} onClose={() => navigate('/maps', { replace: true })} />}
+        {ready && totalPins === 0 && !mapParams.get('route') && (
           <div className="mapv__empty">
             <Icon name="maps" size={20} />
             <p>Nothing on the map yet — add a place with the + button, or pick a real address when you post an event.</p>
@@ -456,6 +457,98 @@ export default function MapView() {
         )}
       </div>
 
+    </div>
+  );
+}
+
+/** NAVIGATION IN LICHEN MAPS (founder 2026-11-17: "can we build navigation
+ *  in as well, so it will swap me over to maps and then give me driving
+ *  directions to the facial?"). /maps?route=<lng,lat;lng,lat>&to=&from=
+ *  draws the live-traffic route and lists every turn; Start hands the same
+ *  route to the phone's own navigator for voice guidance. */
+type RouteStep = { text: string; dist: number };
+function RouteCard({ mapRef, spec, toLabel, fromLabel, onClose }: {
+  mapRef: React.MutableRefObject<mapboxgl.Map | null>; spec: string; toLabel: string; fromLabel: string; onClose: () => void;
+}) {
+  const pts = spec.split(';').map((p) => p.split(',').map(Number)) as [number, number][];
+  const valid = pts.length === 2 && pts.every((p) => p.length === 2 && p.every((n) => Number.isFinite(n)));
+  const [info, setInfo] = useState<{ mins: number; miles: number; steps: RouteStep[] } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!valid) { setErr('That route link is incomplete.'); return; }
+    let live = true;
+    const markers: mapboxgl.Marker[] = [];
+    void (async () => {
+      try {
+        const r = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${pts[0].join(',')};${pts[1].join(',')}?steps=true&geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`);
+        const route = r.ok ? (await r.json())?.routes?.[0] : null;
+        if (!live) return;
+        if (!route) { setErr('The route didn’t load — try again in a moment.'); return; }
+        const steps: RouteStep[] = (route.legs?.[0]?.steps ?? []).map((st: { maneuver?: { instruction?: string }; distance: number }) => ({ text: st.maneuver?.instruction ?? '', dist: st.distance }));
+        setInfo({ mins: Math.round(route.duration / 60), miles: Math.round((route.distance / 1609.34) * 10) / 10, steps });
+        const draw = () => {
+          const map = mapRef.current;
+          if (!map || !live) return;
+          const data = { type: 'Feature' as const, properties: {}, geometry: route.geometry };
+          const src = map.getSource('lichen-route') as mapboxgl.GeoJSONSource | undefined;
+          if (src) src.setData(data);
+          else {
+            map.addSource('lichen-route', { type: 'geojson', data });
+            map.addLayer({ id: 'lichen-route', type: 'line', source: 'lichen-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#E07B4F', 'line-width': 5, 'line-opacity': 0.9 } });
+          }
+          for (const p of pts) markers.push(new mapboxgl.Marker({ color: '#E07B4F' }).setLngLat(p).addTo(map));
+          const b = new mapboxgl.LngLatBounds();
+          for (const c of route.geometry.coordinates as [number, number][]) b.extend(c);
+          map.fitBounds(b, { padding: { top: 60, bottom: 220, left: 40, right: 40 }, duration: 800 });
+        };
+        const map = mapRef.current;
+        if (map?.isStyleLoaded()) draw(); else map?.once('load', draw);
+      } catch { if (live) setErr('The route didn’t load — try again in a moment.'); }
+    })();
+    return () => {
+      live = false;
+      markers.forEach((m) => m.remove());
+      const map = mapRef.current;
+      if (map?.getLayer('lichen-route')) map.removeLayer('lichen-route');
+      if (map?.getSource('lichen-route')) map.removeSource('lichen-route');
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spec]);
+  const [o, d] = valid ? pts : [[0, 0], [0, 0]];
+  const google = `https://www.google.com/maps/dir/?api=1&origin=${o[1]},${o[0]}&destination=${d[1]},${d[0]}&travelmode=driving&dir_action=navigate`;
+  const apple = `https://maps.apple.com/?saddr=${o[1]},${o[0]}&daddr=${d[1]},${d[0]}&dirflg=d`;
+  const dist = (m: number) => (m < 160 ? `${Math.round(m * 3.281 / 10) * 10} ft` : `${(m / 1609.34).toFixed(1)} mi`);
+  return (
+    <div className="mapv__route">
+      <div className="mapv__route-head">
+        <div>
+          <p className="mapv__route-to">To {toLabel || 'your destination'}</p>
+          {info && <p className="mapv__route-sum"><strong>{info.mins} min</strong> · {info.miles} mi · live traffic{fromLabel ? ` · from ${fromLabel}` : ''}</p>}
+          {!info && !err && <p className="mapv__route-sum">Finding the way…</p>}
+          {err && <p className="mapv__route-sum">{err}</p>}
+        </div>
+        <button type="button" className="mapv__route-x" onClick={onClose} aria-label="Close the route">×</button>
+      </div>
+      {valid && (
+        <div className="mapv__route-go">
+          <a className="mapv__route-start" href={google} target="_blank" rel="noreferrer">Start in Google Maps ↗</a>
+          <a className="mapv__route-alt" href={apple} target="_blank" rel="noreferrer">Apple Maps ↗</a>
+          {info && info.steps.length > 0 && (
+            <button type="button" className="mapv__route-alt" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+              {open ? 'Hide' : 'Show'} {info.steps.length} turns
+            </button>
+          )}
+        </div>
+      )}
+      {open && info && (
+        <ol className="mapv__route-steps">
+          {info.steps.map((st, i) => (
+            <li key={i}><span>{st.text}</span>{st.dist > 0 && <span className="mapv__route-dist">{dist(st.dist)}</span>}</li>
+          ))}
+        </ol>
+      )}
+      <p className="mapv__route-fine">Voice turn-by-turn runs in your phone’s maps app — Start hands this route over.</p>
     </div>
   );
 }
