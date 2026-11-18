@@ -112,6 +112,18 @@ export const LIFE_TOOLS = [
     },
   },
   {
+    name: 'my_imported_calendar',
+    description: 'Read the events imported into their Lichen calendar from Google Calendar or an ICS link (their own calendars only) — what Lichen holds covers about 30 days back and 180 days ahead. query = words from the event title (e.g. "Morgan Weekly"), empty to list everything in the range; from/to = YYYY-MM-DD to narrow it. Returns each match by date with weekday, time and which calendar it came from, plus a pattern line when a title repeats on the same weekday and time (e.g. weekly, Tuesdays 3pm–4pm, 50 min). Use it BEFORE asking the member when or how long an outside event runs — never say you can\'t see their imported calendar. If nothing matches, say what range you looked in.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Words from the title; empty lists everything in the range' },
+        from: { type: 'string', description: 'YYYY-MM-DD (default 30 days ago)' },
+        to: { type: 'string', description: 'YYYY-MM-DD (default 180 days ahead)' },
+      },
+    },
+  },
+  {
     name: 'my_calendar_drafts',
     description: 'Their DRAFT calendar events (unsaved calendar events, and event drafts from the event composer that sit on their calendar). Lists each with its date/time and whether it blocks their time (an unblocked draft is a dotted outline that helps them plan but never reads as busy; a blocked one holds the time like an event). Hands a door to open each (up to 4). title = exact title to pick one; block=true/false blocks or unblocks that draft (their own calendar — no confirm needed). Never claim a draft is live or that anyone was invited — nobody is until they open it and save.',
     input_schema: {
@@ -253,7 +265,7 @@ export const LIFE_TOOLS = [
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', drive_time: 'maps', set_care_funding: 'concierge', revenue_streams: 'concierge',
+  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', my_imported_calendar: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', drive_time: 'maps', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -677,6 +689,55 @@ export async function runLifeTool(
     const row = (await r.json().catch(() => null)) as { id: string }[] | null;
     if (!r.ok || !row?.[0]) return { ok: false, error: 'The calendar didn\'t take it — try again.' };
     return { ok: true, change: `added "${title}" to their calendar on ${date}${allDay ? ' (all day)' : ''}`, door: { path: `/calendar/edit/${row[0].id}`, label: `Open ${title} →` } };
+  }
+
+  if (name === 'my_imported_calendar') {
+    type X = { calendar_id: string; on_date: string; all_day: boolean; start_min: number | null; end_min: number | null; title: string | null; sub_cal: string | null; span_id: string | null; span_start: string | null; span_end: string | null };
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const okDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
+    const from = okDate(input.from) || iso(new Date(Date.now() - 30 * 86400_000));
+    const to = okDate(input.to) || iso(new Date(Date.now() + 180 * 86400_000));
+    const words = String(input.query ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 2).slice(0, 6);
+    const cols = 'calendar_id,on_date,all_day,start_min,end_min,title,sub_cal,span_id,span_start,span_end';
+    const titleFilter = words.length ? '&' + words.map((w) => `title=ilike.*${encodeURIComponent(w)}*`).join('&') : '';
+    const q = (t: string) => `${t}?profile_id=eq.${me}&on_date=gte.${from}&on_date=lte.${to}${titleFilter}&select=${cols}&order=on_date.asc,start_min.asc&limit=400`;
+    const [busy, show, cals] = await Promise.all([
+      sb(q('external_busy')).then((r) => r.json()).catch(() => []),
+      sb(q('external_show')).then((r) => r.json()).catch(() => []),
+      sb(`external_calendars?profile_id=eq.${me}&select=id,name,sub_settings`).then((r) => r.json()).catch(() => []),
+    ]);
+    const calRows = (Array.isArray(cals) ? cals : []) as { id: string; name?: string | null; sub_settings?: Record<string, { name?: string }> | null }[];
+    if (!calRows.length) return { ok: true, events: [], note: 'They have no outside calendar connected to Lichen yet (Calendar settings → bring in your Google or another calendar).' };
+    const calName = (r: X) => {
+      const c = calRows.find((x) => x.id === r.calendar_id);
+      return (r.sub_cal && c?.sub_settings?.[r.sub_cal]?.name) || c?.name || 'an imported calendar';
+    };
+    const rows = [...(Array.isArray(busy) ? busy : []), ...(Array.isArray(show) ? show : [])] as X[];
+    const seenSpan = new Set<string>();
+    const hm = (m: number | null) => { if (m == null) return ''; const h = Math.floor(m / 60), mm = m % 60; const ap = h >= 12 ? 'pm' : 'am'; const h12 = ((h + 11) % 12) + 1; return mm ? `${h12}:${String(mm).padStart(2, '0')}${ap}` : `${h12}${ap}`; };
+    const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dow = (d: string) => DOW[new Date(d + 'T12:00:00Z').getUTCDay()];
+    const evs: { title: string; date: string; weekday: string; time: string; minutes: number | null; calendar: string; until?: string }[] = [];
+    for (const r of rows.sort((a, b) => a.on_date.localeCompare(b.on_date) || (a.start_min ?? -1) - (b.start_min ?? -1))) {
+      if (r.span_id) { if (seenSpan.has(r.span_id)) continue; seenSpan.add(r.span_id); }
+      const multi = r.span_id && r.span_end && r.span_start && r.span_end !== r.span_start;
+      evs.push({
+        title: r.title || '(no title)', date: multi ? r.span_start! : r.on_date, weekday: dow(multi ? r.span_start! : r.on_date),
+        time: r.all_day ? 'all day' : `${hm(r.start_min)} – ${hm(r.end_min)}`,
+        minutes: !r.all_day && r.start_min != null && r.end_min != null ? r.end_min - r.start_min : null,
+        calendar: calName(r), ...(multi ? { until: r.span_end! } : {}),
+      });
+    }
+    // A title that repeats on the same weekday + time reads as a series.
+    const groups = new Map<string, typeof evs>();
+    for (const e of evs) { const k = `${e.title.toLowerCase()}|${e.weekday}|${e.time}`; groups.set(k, [...(groups.get(k) ?? []), e]); }
+    const patterns = [...groups.values()].filter((g) => g.length >= 2).map((g) => {
+      const gaps = g.slice(1).map((e, i) => Math.round((Date.parse(e.date) - Date.parse(g[i].date)) / 86400_000));
+      const every = gaps.every((x) => x === 7) ? 'weekly' : gaps.every((x) => x === 14) ? 'every other week' : gaps.every((x) => x % 7 === 0) ? 'on some weeks' : 'repeating';
+      return `"${g[0].title}" — ${every}, ${g[0].weekday}s ${g[0].time}${g[0].minutes ? ` (${g[0].minutes} min)` : ''}, ${g.length} times between ${g[0].date} and ${g[g.length - 1].date} (${g[0].calendar})`;
+    });
+    if (!evs.length) return { ok: true, events: [], note: `Nothing${words.length ? ` titled like "${input.query}"` : ''} on their imported calendars between ${from} and ${to}. Lichen only holds about 30 days back and 180 ahead from the last sync — older events would need the member to say when it ran.` };
+    return { ok: true, looked: `${from} to ${to}`, patterns, events: evs.slice(0, 60), ...(evs.length > 60 ? { more: evs.length - 60 } : {}) };
   }
 
   if (name === 'my_calendar_drafts') {
