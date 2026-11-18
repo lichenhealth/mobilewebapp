@@ -1512,7 +1512,7 @@ export default function AssistantFeed() {
                     <div className="afeed__pubrow" key={`${p.id}:door:${a.path}`}>
                       <button className="afeed__pubbtn" type="button"
                         onClick={() => navigate(a.path)}>
-                        {a.label} →
+                        {a.label.replace(/\s*[→›]\s*$/, "")} →
                       </button>
                     </div>
                   ))}

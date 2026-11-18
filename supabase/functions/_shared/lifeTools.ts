@@ -100,13 +100,24 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'add_calendar_event',
-    description: 'Put an event on their OWN Lichen calendar (private to them until they invite people) — a dog\'s vet visit, a dinner, a shift. title + date (YYYY-MM-DD); start_min/end_min = minutes since midnight in their time zone, or all_day=true. location and description only as they said them. Then invite_to_event can invite people, and my_event (make_link) can make an invite link. Hands a door to the event.',
+    description: 'Put an event on their OWN Lichen calendar (private to them until they invite people) — a dog\'s vet visit, a dinner, a shift. title + date (YYYY-MM-DD); start_min/end_min = minutes since midnight in their time zone, or all_day=true. location and description only as they said them. A REPEATING event is ONE event with repeat (never one event per date): repeat.freq daily|weekly|monthly|yearly, interval (every N), weekdays for weekly (0=Mon … 6=Sun, several allowed; default the date\'s weekday), monthly_by date|weekday, and an end — until (YYYY-MM-DD), count, or neither for forever. Then invite_to_event can invite people, and my_event (make_link) can make an invite link. Hands a door to the event.',
     input_schema: {
       type: 'object',
       properties: {
         title: { type: 'string' }, date: { type: 'string' }, end_date: { type: 'string' },
         start_min: { type: 'number' }, end_min: { type: 'number' }, all_day: { type: 'boolean' },
         location: { type: 'string' }, description: { type: 'string' },
+        repeat: {
+          type: 'object',
+          properties: {
+            freq: { type: 'string', enum: ['daily', 'weekly', 'monthly', 'yearly'] },
+            interval: { type: 'number' },
+            weekdays: { type: 'array', items: { type: 'number' } },
+            monthly_by: { type: 'string', enum: ['date', 'weekday'] },
+            until: { type: 'string' }, count: { type: 'number' },
+          },
+          required: ['freq'],
+        },
       },
       required: ['title', 'date'],
     },
@@ -681,14 +692,30 @@ export async function runLifeTool(
     const sm = allDay ? null : Math.max(0, Math.min(1439, Math.round(Number(input.start_min))));
     let em = allDay ? null : (typeof input.end_min === 'number' ? Math.round(Number(input.end_min)) : (sm! + 60));
     if (em != null) em = Math.max(sm! + 5, Math.min(1440, em));
+    // One event carries the whole series (recurrence.ts's shape) — never a copy per date.
+    let recurrence: Record<string, unknown> | null = null;
+    const rp = input.repeat as Record<string, unknown> | undefined;
+    if (rp && ['daily', 'weekly', 'monthly', 'yearly'].includes(String(rp.freq))) {
+      const freq = String(rp.freq);
+      const interval = Math.max(1, Math.min(99, Math.round(Number(rp.interval) || 1)));
+      const until = /^\d{4}-\d{2}-\d{2}$/.test(String(rp.until ?? '')) && String(rp.until) >= date ? String(rp.until) : '';
+      const count = Math.round(Number(rp.count) || 0);
+      recurrence = { freq, interval, end: until ? { type: 'until', date: until } : count >= 1 ? { type: 'count', n: Math.min(count, 999) } : { type: 'never' } };
+      if (freq === 'weekly') {
+        const wd = (new Date(date + 'T12:00:00Z').getUTCDay() + 6) % 7;
+        const days = Array.isArray(rp.weekdays) ? [...new Set((rp.weekdays as unknown[]).map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort() : [];
+        recurrence.byday = days.length ? days : [wd];
+      }
+      if (freq === 'monthly') recurrence.monthMode = rp.monthly_by === 'weekday' ? 'weekday' : 'date';
+    }
     const r = await sb('events', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({
-      creator_id: me, owner_profile_id: me, title, start_date: date, end_date: end, all_day: allDay,
+      creator_id: me, owner_profile_id: me, title, start_date: date, end_date: recurrence ? date : end, all_day: allDay, recurrence,
       start_min: sm, end_min: em, location: String(input.location ?? '').trim(),
       description: String(input.description ?? '').trim(),
     }) });
     const row = (await r.json().catch(() => null)) as { id: string }[] | null;
     if (!r.ok || !row?.[0]) return { ok: false, error: 'The calendar didn\'t take it — try again.' };
-    return { ok: true, change: `added "${title}" to their calendar on ${date}${allDay ? ' (all day)' : ''}`, door: { path: `/calendar/edit/${row[0].id}`, label: `Open ${title} →` } };
+    return { ok: true, change: `added "${title}" to their calendar on ${date}${allDay ? ' (all day)' : ''}${recurrence ? `, repeating ${recurrence.freq}${(recurrence.end as { type: string }).type === 'never' ? ' with no end date' : ''} — one event carrying the whole series` : ''}`, door: { path: `/calendar/edit/${row[0].id}`, label: `Open ${title} →` } };
   }
 
   if (name === 'my_imported_calendar') {
