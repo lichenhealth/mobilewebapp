@@ -17,6 +17,7 @@ import { isDocx, importDocxAsDoc } from '../lib/docxImport';
 import { uploadDriveFile, listDriveFiles, signDriveFiles, deleteDriveFile, type DriveFileRow, type DriveFileKind } from '../lib/driveFilesApi';
 import { createPersonalDoc, listMyPersonalDocs, deleteChatDoc, DOC_KIND_ICON, DOC_KIND_LABEL, type ChatDocRow } from '../lib/chatDocsApi';
 import { listMyPostDrafts, deletePostDraft, draftLabel, type PostDraftRow } from '../lib/postDraftsApi';
+import { startFolderDrag, endFolderDrag, folderDropProps, onFolderDrag } from '../lib/folderDrag';
 import { listMyCollections, createCollection, updateCollection, deleteCollection, duplicateCollection, listCollectionAreas, loadCollection, foldersHolding, moveCollection, folderPath, folderAndBelow, type CollectionRow } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
@@ -156,6 +157,11 @@ export default function Saved() {
   // NESTED FOLDERS (founder 2026-11-19): the folder whose Move… picker is open.
   const [folderMove, setFolderMove] = useState<string | null>(null);
   const [folderNote, setFolderNote] = useState<string | null>(null);
+  // DRAG A FOLDER INTO ANOTHER, OR OUT TO THE TOP (founder 2026-11-19 —
+  // "just like on apple desktop"). Mouse drags; phones keep the Move… menu.
+  const [dragFolder, setDragFolder] = useState<string | null>(null);
+  const [dropHot, setDropHot] = useState<string | null>(null);
+  useEffect(() => onFolderDrag(setDragFolder), []);
 
   // POST DRAFTS (founder 2026-10-15: "we will also need a drafts section"):
   // unfinished posts autosaved by Compose — a row reopens its draft, Delete
@@ -651,6 +657,32 @@ export default function Saved() {
 
   /** The folder ⋯ and its eight-entry menu — one definition worn by the row
    *  AND the large tile, so the two views can't drift. */
+  async function moveFolderTo(id: string, to: string | null) {
+    const c = collections.find((x) => x.id === id);
+    if (!c || c.parent_id === to) return;
+    const prev = c.parent_id;
+    setCollections((cur) => cur.map((x) => (x.id === id ? { ...x, parent_id: to } : x)));
+    try {
+      await moveCollection(id, to);
+      const where = to ? collections.find((x) => x.id === to)?.name : null;
+      setFolderNote(where ? `Moved “${c.name}” into “${where}” ✓` : `Moved “${c.name}” to the top of Drive ✓`);
+    } catch (e) {
+      setCollections((cur) => cur.map((x) => (x.id === id ? { ...x, parent_id: prev } : x)));
+      setFolderNote(e instanceof Error ? e.message : 'Could not move it.');
+    }
+  }
+  /** A folder as a drop target: anything but itself or one of its own. */
+  const intoProps = (c: CollectionRow) => folderDropProps(c.id, dropHot, setDropHot,
+    (d) => d !== c.id && !folderAndBelow(collections, d).has(c.id) && collections.find((x) => x.id === d)?.parent_id !== c.id,
+    (d) => void moveFolderTo(d, c.id));
+  const topProps = folderDropProps('top', dropHot, setDropHot,
+    (d) => !!collections.find((x) => x.id === d)?.parent_id,
+    (d) => void moveFolderTo(d, null));
+  const dragProps = (c: CollectionRow) => ({
+    draggable: renaming !== c.id,
+    onDragStart: (e: React.DragEvent) => startFolderDrag(e, c.id, c.name),
+    onDragEnd: () => { endFolderDrag(); setDropHot(null); },
+  });
   function folderActs(c: CollectionRow) {
     const link = `${window.location.origin}/collections/${c.id}`;
     const menuOpen = folderMenuFor === c.id;
@@ -699,19 +731,7 @@ export default function Saved() {
             .filter((x) => !blocked.has(x.id))
             .map((x) => ({ id: x.id, label: folderPath(collections, x.id) }))
             .sort((a, b) => a.label.localeCompare(b.label));
-          const go = async (to: string | null) => {
-            setFolderMove(null);
-            const prev = c.parent_id;
-            setCollections((cur) => cur.map((x) => (x.id === c.id ? { ...x, parent_id: to } : x)));
-            try {
-              await moveCollection(c.id, to);
-              const where = to ? collections.find((x) => x.id === to)?.name : null;
-              setFolderNote(where ? `Moved into “${where}” ✓` : 'Moved to the top of Drive ✓');
-            } catch (e) {
-              setCollections((cur) => cur.map((x) => (x.id === c.id ? { ...x, parent_id: prev } : x)));
-              setFolderNote(e instanceof Error ? e.message : 'Could not move it.');
-            }
-          };
+          const go = async (to: string | null) => { setFolderMove(null); await moveFolderTo(c.id, to); };
           return (
             <span className="drive__menu drive__menu--move" role="menu">
               <span className="drive__menu-label">Move “{c.name}” into…</span>
@@ -1025,7 +1045,8 @@ export default function Saved() {
         <nav className={wide ? 'drive__nav' : 'drive__bubbles'} aria-label="Drive sections">
           {navItems.map((n) => (
             <button key={n.id} type="button"
-              className={(wide ? 'drive__navitem' : 'drive__bubble') + (n.id === activePick && !query.trim() ? ' is-on' : '')}
+              {...(n.id === 'folders' ? topProps : {})}
+              className={(wide ? 'drive__navitem' : 'drive__bubble') + (n.id === activePick && !query.trim() ? ' is-on' : '') + (n.id === 'folders' && dropHot === 'top' ? ' is-droptarget' : '')}
               aria-current={n.id === activePick ? 'true' : undefined}
               aria-pressed={n.id === activePick}
               onClick={() => { setQuery(''); setPick(n.id === activePick ? 'recents' : n.id); }}>
@@ -1098,10 +1119,16 @@ export default function Saved() {
           <div className="drive__items-head">
             {foldHead('folders', 'Folders', foldersVisible.length)}
           </div>
+          {dragFolder && collections.find((x) => x.id === dragFolder)?.parent_id && (
+            <div className={'drive__droptop' + (dropHot === 'top' ? ' is-droptarget' : '')} {...topProps}>
+              <Icon name="drive" size={15} /> Drop here to move it out to the top of Drive
+            </div>
+          )}
           {foldOpen('folders') && view === 'rows' && (
           <div className="drive__list drive__list--flush">
             {folderShelf.map((c) => (
-              <div key={c.id} className="drive__row" role="button" tabIndex={0}
+              <div key={c.id} className={'drive__row' + (dropHot === c.id ? ' is-droptarget' : '') + (dragFolder === c.id ? ' is-dragging' : '')} role="button" tabIndex={0}
+                {...dragProps(c)} {...intoProps(c)}
                 onClick={() => { if (renaming !== c.id) navigate(`/collections/${c.id}`); }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && renaming !== c.id) navigate(`/collections/${c.id}`); }}>
                 <span className="drive__row-icon"><Icon name={folderIcon(c)} size={17} /></span>
@@ -1134,7 +1161,8 @@ export default function Saved() {
           {foldOpen('folders') && view === 'cards' && (
           <div className="drive__folder-grid">
             {folderShelf.map((c) => (
-              <div key={c.id} className="drive__folder" role="button" tabIndex={0}
+              <div key={c.id} className={'drive__folder' + (dropHot === c.id ? ' is-droptarget' : '') + (dragFolder === c.id ? ' is-dragging' : '')} role="button" tabIndex={0}
+                {...dragProps(c)} {...intoProps(c)}
                 onClick={() => { if (renaming !== c.id) navigate(`/collections/${c.id}`); }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && renaming !== c.id) navigate(`/collections/${c.id}`); }}>
                 <span className="drive__folder-top">

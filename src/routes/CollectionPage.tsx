@@ -32,8 +32,9 @@ import {
   suggestToCollection, listPendingSuggestions, resolveSuggestion,
   type CollectionRow, type OfferingMeta, type CollectionSuggestionRow,
   listCourseNotes, addCourseNote, updateCourseNote, deleteCourseNote, courseFolder,
-  type CourseNote, loadCollectionFiles, type FolderFile, createCollection,
+  type CourseNote, loadCollectionFiles, type FolderFile, createCollection, moveCollection,
 } from '../lib/collectionsApi';
+import { startFolderDrag, endFolderDrag, folderDropProps, onFolderDrag } from '../lib/folderDrag';
 import { DOC_KIND_ICON, DOC_KIND_LABEL, type ChatDocKind } from '../lib/chatDocsApi';
 import { signDriveFiles } from '../lib/driveFilesApi';
 import { useCollect } from '../collections/CollectPrompt';
@@ -96,6 +97,14 @@ export default function CollectionPage() {
   // first) and the ones sitting inside it.
   const [trail, setTrail] = useState<{ id: string; name: string }[]>([]);
   const [subs, setSubs] = useState<{ id: string; name: string; item_count: number }[]>([]);
+  // DRAG A FOLDER OUT OR IN (founder 2026-11-19 — "if you create a folder
+  // within a folder, but drag it out to general, it becomes a general
+  // folder… just like on apple desktop"). Mouse drags; the targets are the
+  // path above (Drive = the top) and the other folders inside this one.
+  const [dragSub, setDragSub] = useState<string | null>(null);
+  const [subHot, setSubHot] = useState<string | null>(null);
+  const [subNote, setSubNote] = useState('');
+  useEffect(() => onFolderDrag(setDragSub), []);
   const [newSubOpen, setNewSubOpen] = useState(false);
   const [newSubName, setNewSubName] = useState('');
 
@@ -509,6 +518,18 @@ export default function CollectionPage() {
   // anything else (a space's shelf, someone's published collection) gets the
   // plain history back, PostPage's shape.
   const ownFolder = !!me && !!meta && meta.owner_id === me && !meta.space_id;
+  async function moveSub(subId: string, to: string | null, where: string) {
+    const f = subs.find((x) => x.id === subId);
+    if (!f) return;
+    setSubs((cur) => cur.filter((x) => x.id !== subId));
+    try {
+      await moveCollection(subId, to);
+      setSubNote(`Moved “${f.name}” to ${where} ✓`);
+    } catch (e) {
+      setSubs((cur) => [...cur, f].sort((a, b) => a.name.localeCompare(b.name)));
+      setSubNote(e instanceof Error ? e.message : 'Could not move it.');
+    }
+  }
   const back = () => {
     // Inside another folder, the way back is one level up.
     if (trail.length > 0) { navigate(`/collections/${trail[trail.length - 1].id}`); return; }
@@ -627,11 +648,13 @@ export default function CollectionPage() {
             {meta.is_public ? 'Published' : 'Private'}
           </em>
         </p>
-        {trail.length > 0 && (
+        {(trail.length > 0 || (ownFolder && subs.length > 0)) && (
           <nav className="colp__trail" aria-label="Folder path">
-            {ownFolder && <><Link className="link-cue" to="/drive">Drive</Link><span aria-hidden="true"> / </span></>}
+            {ownFolder && <><Link className={'link-cue colp__trailstop' + (subHot === 'top' ? ' is-droptarget' : '')} to="/drive"
+              {...folderDropProps('top', subHot, setSubHot, (d) => subs.some((x) => x.id === d), (d) => void moveSub(d, null, 'the top of Drive'))}>Drive</Link><span aria-hidden="true"> / </span></>}
             {trail.map((t) => (
-              <span key={t.id}><Link className="link-cue" to={`/collections/${t.id}`}>{t.name}</Link><span aria-hidden="true"> / </span></span>
+              <span key={t.id}><Link className={'link-cue colp__trailstop' + (subHot === t.id ? ' is-droptarget' : '')} to={`/collections/${t.id}`}
+                {...folderDropProps(t.id, subHot, setSubHot, (d) => canEdit && subs.some((x) => x.id === d), (d) => void moveSub(d, t.id, `“${t.name}”`))}>{t.name}</Link><span aria-hidden="true"> / </span></span>
             ))}
           </nav>
         )}
@@ -1342,8 +1365,20 @@ export default function CollectionPage() {
         {(subs.length > 0 || (canEdit && meta.kind === 'collection')) && (
           <div className="colp__files">
             {(subs.length > 0 || newSubOpen) && <h3 className="colp__files-h">Folders</h3>}
+            {dragSub && ownFolder && subs.some((x) => x.id === dragSub) && (
+              <div className={'colp__droptop' + (subHot === 'top2' ? ' is-droptarget' : '')}
+                {...folderDropProps('top2', subHot, setSubHot, () => true, (d) => void moveSub(d, null, 'the top of Drive'))}>
+                <Icon name="drive" size={15} /> Drop here to move it out to the top of Drive
+              </div>
+            )}
+            {subNote && <p className="colp__subnote" role="status">{subNote}</p>}
             {subs.map((f) => (
-              <div key={f.id} className="colp__file" role="button" tabIndex={0}
+              <div key={f.id} role="button" tabIndex={0}
+                className={'colp__file' + (subHot === f.id ? ' is-droptarget' : '') + (dragSub === f.id ? ' is-dragging' : '')}
+                draggable={canEdit}
+                onDragStart={(e) => startFolderDrag(e, f.id, f.name)}
+                onDragEnd={() => { endFolderDrag(); setSubHot(null); }}
+                {...folderDropProps(f.id, subHot, setSubHot, (d) => canEdit && d !== f.id && subs.some((x) => x.id === d), (d) => void moveSub(d, f.id, `“${f.name}”`))}
                 onClick={() => navigate(`/collections/${f.id}`)} onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/collections/${f.id}`); }}>
                 <span className="colp__file-icon"><Icon name="drive" size={16} /></span>
                 <span className="colp__file-main">

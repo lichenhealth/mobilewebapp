@@ -311,3 +311,26 @@
 .drive__bubble.is-on .drive__bubblecount { color: var(--peach-deep); }
 .drive__stack { display: block; }
 .drive__uploading-line { font-size: 13px; color: var(--ink-muted); margin: 0 0 var(--s-3); }
+
+/* DRAG A FOLDER (founder 2026-11-19 — "just like on apple desktop"). */
+.drive__row[draggable='true'], .drive__folder[draggable='true'] { cursor: grab; }
+.drive__row.is-dragging, .drive__folder.is-dragging { opacity: 0.45; }
+.drive__row.is-droptarget, .drive__folder.is-droptarget, .drive__navitem.is-droptarget, .drive__bubble.is-droptarget {
+  background: var(--peach-tint);
+  box-shadow: inset 0 0 0 2px var(--peach);
+  border-radius: 10px;
+}
+.drive__droptop {
+  /* Floats — inserting it into the list would shift rows under the pointer
+     and stall the drag. */
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 60;
+  bottom: calc(var(--nav-h) + var(--safe-bot) + 16px); width: min(92vw, 420px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.12); background: var(--bone, #f6f1ea);
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 16px;
+  border: 1.5px dashed var(--peach); border-radius: 12px;
+  color: var(--peach-deep); font-size: 14px;
+}
+.drive__droptop.is-droptarget { background: var(--peach-tint); border-style: solid; }
+
+@media (min-width: 1024px) { .drive__droptop { bottom: 32px; } }

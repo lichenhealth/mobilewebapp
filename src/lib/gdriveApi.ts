@@ -148,11 +148,11 @@ async function xlsxToTabs(b64: string): Promise<SheetTab[]> {
 export type ImportResult = { kind: LichenKind; id: string; path: string; note?: string };
 
 /** Carry ONE Google file over as a Lichen thing, and remember it. */
-export async function importGDriveFile(account: { id: string; email: string }, f: GFile): Promise<ImportResult> {
+export async function importGDriveFile(account: { id: string; email: string }, f: GFile, opts: { name?: string } = {}): Promise<ImportResult> {
   const { kind } = lichenKindFor(f.mimeType, f.name);
   if (kind === 'folder') throw new Error('Open the folder and pick what’s inside.');
   if (kind === 'none') throw new Error('Google Forms, Sites and Maps can’t come over yet.');
-  const title = f.name.replace(/\.(docx?|txt|md|xlsx?|csv|ods)$/i, '').slice(0, 200) || 'Untitled';
+  const title = (opts.name?.trim() || f.name.replace(/\.(docx?|txt|md|xlsx?|csv|ods)$/i, '')).slice(0, 200) || 'Untitled';
   let res: ImportResult;
 
   if (kind === 'slides') {
@@ -177,7 +177,7 @@ export async function importGDriveFile(account: { id: string; email: string }, f
       ...(pics.get(s.id) ? { image: pics.get(s.id), layout: 'picture' }
         : { layout: i === 0 ? 'title' : s.body.includes('\n') ? 'bullets' : 'text' }),
     }));
-    const row = await createPersonalDoc('slides', deck.title || title, { data: { theme: 'paper', slides } as never, body: slides.map((s) => `${s.title}\n${s.body}`).join('\n\n').slice(0, 20000) });
+    const row = await createPersonalDoc('slides', opts.name?.trim() || deck.title || title, { data: { theme: 'paper', slides } as never, body: slides.map((s) => `${s.title}\n${s.body}`).join('\n\n').slice(0, 20000) });
     const missedSlides = deck.slides.length - pics.size;
     res = { kind, id: row.id, path: `/docs/${row.id}`, note: missedSlides > 0 && deck.slides.length ? `${missedSlides} slide${missedSlides === 1 ? '' : 's'} came over as words only — Google didn’t hand over ${missedSlides === 1 ? 'its picture' : 'their pictures'}` : undefined };
   } else {
@@ -207,7 +207,8 @@ export async function importGDriveFile(account: { id: string; email: string }, f
       res = { kind, id: row.id, path: `/docs/${row.id}` };
     } else {
       const mime = kind === 'photo' && c.mime === 'image/png' ? 'image/png' : (c.mime || f.mimeType || 'application/octet-stream');
-      const name = f.mimeType === 'application/vnd.google-apps.drawing' ? `${f.name}.png` : f.name;
+      const base = opts.name?.trim() ? opts.name.trim() + (f.name.match(/\.[a-z0-9]{1,5}$/i)?.[0] ?? '') : f.name;
+      const name = f.mimeType === 'application/vnd.google-apps.drawing' ? `${base}.png` : base;
       const file = new File([b64ToBytes(c.data ?? '')], name, { type: mime });
       const row = await uploadDriveFile(file, kind as DriveFileKind);
       res = { kind, id: row.id, path: '/drive' };
@@ -242,6 +243,7 @@ export type FolderImportResult = { folders: { id: string; name: string }[]; done
 export async function importGDriveFolder(
   account: { id: string; email: string }, folder: GFile,
   onProgress?: (n: number, name: string) => void,
+  opts: { parentId?: string | null; name?: string } = {},
 ): Promise<FolderImportResult> {
   const { createCollection, addToCollection } = await import('./collectionsApi');
   const out: FolderImportResult = { folders: [], done: 0, failed: [] };
@@ -271,6 +273,6 @@ export async function importGDriveFolder(
     if (depth < 12) for (const s of subs) await walk(s, s.name, depth + 1, colId);
     else for (const s of subs) out.failed.push({ name: s.name, error: 'folder nested too deep — bring it over on its own' });
   }
-  await walk(folder, folder.name, 1, null);
+  await walk(folder, opts.name?.trim() || folder.name, 1, opts.parentId ?? null);
   return out;
 }
