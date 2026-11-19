@@ -23,7 +23,13 @@ const FIELDS = 'id,name,mimeType,size,modifiedTime,parents,shared,owners(emailAd
 async function failWords(r: Response): Promise<never> {
   const t = (await r.text()).slice(0, 600);
   if (r.status === 403 && /accessNotConfigured|has not been used|is disabled/i.test(t)) {
-    throw new Error('Google Drive isn’t switched on for Lichen’s Google project yet (Google Drive API in the lichen-mail project).');
+    // Google names the exact project + the enable link — pass both on, so
+    // "still not on" can be told apart from "switched on in another project".
+    console.error('gdrive-disabled', t);
+    const proj = t.match(/project (\d{6,})/)?.[1];
+    const api = /slides/i.test(t) ? 'Google Slides API' : 'Google Drive API';
+    const link = t.match(/https:\/\/console\.developers\.google\.com\/apis\/[^\s"\\]+/)?.[0];
+    throw new Error(`The ${api} isn’t switched on for Lichen’s Google project yet${proj ? ` (Google project number ${proj})` : ''}. If it was just enabled, Google can take a few minutes.${link ? ` Enable link: ${link}` : ''}`);
   }
   if (r.status === 403 && /insufficient|scope/i.test(t)) {
     throw new Error('This Google account needs one Reconnect so Lichen can see its Drive.');
