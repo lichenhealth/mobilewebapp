@@ -196,6 +196,18 @@ export default function Invite() {
   const [intent, setIntent] = useState<'community' | 'client' | 'practitioner'>('community');
   // Which knock the prefilled form belongs to, so it resolves on send.
   const [pendingKnock, setPendingKnock] = useState<{ id: string; email: string } | null>(null);
+  // A contact card's "Invite them" door carries ?to= (an email or phone) and
+  // ?note= (founder 2026-11-19: a saved business can be invited to CLAIM
+  // its page) — prefilled, never sent until the member presses Send.
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current) return;
+    const to = params.get('to'); const n = params.get('note');
+    if (!to && !n) return;
+    prefilled.current = true;
+    if (to) setEmail(to);
+    if (n) setNote(n);
+  }, [params]);
   // Personalising an invitation before it goes (founder 2026-08-06): the note
   // is written on the row itself, so nothing is sent until you've read it.
   const [composeFor, setComposeFor] = useState<string | null>(null);

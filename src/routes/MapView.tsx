@@ -4,6 +4,7 @@ import { loadMyHome } from '../lib/locationApi';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { listPinnedContacts, onLichen, contactPath, kindMeta, type Contact } from '../lib/contactsApi';
 import { MAPBOX_TOKEN, geocodeSuggest, type GeoPoint, type GeoSuggestion } from '../lib/geoApi';
 import { supabase } from '../lib/supabase';
 import { areaLabel } from '../lib/locationApi';
@@ -44,7 +45,7 @@ const KIND_LABEL: Record<SpaceKind, string> = {
   place: 'Place', organization: 'Organization', community: 'Community', group: 'Group',
 };
 
-type LayerKey = 'events' | 'travel' | 'places' | 'orgs' | 'communities' | 'groups' | 'people';
+type LayerKey = 'events' | 'travel' | 'places' | 'orgs' | 'communities' | 'groups' | 'people' | 'contacts';
 // Each layer wears the mark that section wears everywhere else, so a pin and
 // its filter read as the same thing (founder 2026-08-15).
 const LAYERS: { key: LayerKey; label: string; icon: IconName }[] = [
@@ -57,11 +58,14 @@ const LAYERS: { key: LayerKey; label: string; icon: IconName }[] = [
   { key: 'communities', label: 'Communities', icon: 'user-multiple' },
   { key: 'groups', label: 'Groups', icon: 'groups' },
   { key: 'people', label: 'People', icon: 'member-heart' },
+  // ADD TO MAPS AND CONTACTS (founder 2026-11-19): the member's OWN contact
+  // cards that carry an address — private, only they ever see these pins.
+  { key: 'contacts', label: 'My contacts', icon: 'contacts' },
 ];
 /** The pin's glyph, drawn straight from Icon.tsx so map and app never drift. */
 const LAYER_ICON: Record<LayerKey, IconName> = {
   events: 'rsvp', travel: 'plane', places: 'location', orgs: 'globe',
-  communities: 'user-multiple', groups: 'groups', people: 'member-heart',
+  communities: 'user-multiple', groups: 'groups', people: 'member-heart', contacts: 'contacts',
 };
 const KIND_LAYER: Record<SpaceKind, LayerKey> = {
   place: 'places', organization: 'orgs', community: 'communities', group: 'groups',
@@ -156,6 +160,7 @@ export default function MapView() {
   const focusSpace = mapParams.get('space');
   const focusMember = mapParams.get('member');
   const focusEvent = mapParams.get('event');
+  const focusContact = mapParams.get('contact');
   const { user } = useAuth();
   const me = user?.id ?? '';
   const mapEl = useRef<HTMLDivElement>(null);
@@ -182,6 +187,13 @@ export default function MapView() {
   }, [layerSel]);
   const [peoplePins, setPeoplePins] = useState<MappableMember[]>([]);
   const [bizPins, setBizPins] = useState<BizLocationPin[]>([]);
+  const [contactPins, setContactPins] = useState<Contact[]>([]);
+  useEffect(() => {
+    if (!me) return;
+    let live = true;
+    void listPinnedContacts(me).then((cs) => { if (live) setContactPins(cs); });
+    return () => { live = false; };
+  }, [me]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetPrefill, setSheetPrefill] = useState<{ text: string; geo: GeoPoint } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -245,6 +257,12 @@ export default function MapView() {
   // Goods & Services addresses ride the Places layer — a pin already means
   // "somewhere you can go", and a member's farm stand is exactly that.
   const visibleBiz = useMemo(() => (layers.places ? bizPins : []), [bizPins, layers]);
+  // A card already linked to a page that's pinned here shows once, as that page.
+  const visibleContacts = useMemo(() => {
+    if (!layers.contacts) return [];
+    const pinned = new Set(spacePins.map((s) => s.id));
+    return contactPins.filter((c) => !(c.linked_space_id && pinned.has(c.linked_space_id)));
+  }, [contactPins, spacePins, layers]);
 
   // ── map init (once) ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -404,6 +422,30 @@ export default function MapView() {
       next.set(`biz:${b.id}`, marker);
     });
 
+    visibleContacts.forEach((c) => {
+      if (c.lat == null || c.lng == null) return;
+      const live = onLichen(c);
+      const name = c.name || c.address || 'Contact';
+      const el = makePin('mapv__pin--contact' + (live ? ' is-live' : ''), 'contacts', name);
+      const page = contactPath(c);
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([c.lng, c.lat])
+        .setPopup(makePopup(
+          [
+            { cls: 'mapv__popup-title', text: name },
+            { cls: 'mapv__popup-when', text: `In your contacts · ${kindMeta(c.kind).label}${live ? ' · on Lichen' : ''}` },
+            { cls: 'mapv__popup-loc', text: c.address ?? '' },
+          ],
+          [
+            page ? { label: c.linked_space_id ? 'View page' : 'View profile', onClick: () => navigate(page) }
+              : { label: 'Open the card', onClick: () => navigate(`/contacts?card=${c.id}`) },
+            dirAction({ lng: c.lng, lat: c.lat, label: name, addr: c.address ?? '' }),
+          ],
+        ))
+        .addTo(map);
+      next.set(`con:${c.id}`, marker);
+    });
+
     markersRef.current = next;
 
     // A route on screen owns the camera — fitting every pin would zoom back
@@ -414,9 +456,10 @@ export default function MapView() {
       visibleSpaces.forEach((s) => bounds.extend([s.lng!, s.lat!]));
       visiblePeople.forEach((m) => { if (m.lat != null && m.lng != null) bounds.extend([m.lng, m.lat]); });
       visibleBiz.forEach((b) => bounds.extend([b.lng, b.lat]));
+      visibleContacts.forEach((c) => { if (c.lat != null && c.lng != null) bounds.extend([c.lng, c.lat]); });
       map.fitBounds(bounds, { padding: 80, maxZoom: 11, duration: 600 });
     }
-  }, [visibleEvents, visibleTravel, visibleSpaces, visiblePeople, visibleBiz, navigate]);
+  }, [visibleEvents, visibleTravel, visibleSpaces, visiblePeople, visibleBiz, visibleContacts, navigate]);
 
   // Wait for the marker to exist (they're rebuilt whenever pins/layers
   // change), then fly once. `done` keeps a later re-render from yanking the
@@ -446,6 +489,17 @@ export default function MapView() {
       }
       return;
     }
+    if (focusContact) {
+      // Wait for every layer to land — markers rebuild when the rest arrives,
+      // which would close a popup opened on the first pass.
+      if (!ready) return;
+      const c = contactPins.find((x) => x.id === focusContact);
+      if (c?.lat != null && c?.lng != null) {
+        focusedOnce.current = true;
+        window.setTimeout(() => flyTo(c.lng!, c.lat!, 14, `con:${c.id}`), 350);
+      }
+      return;
+    }
     if (focusEvent) {
       const ev = eventPins.find((e) => e.post.id === focusEvent);
       if (ev) {
@@ -453,7 +507,7 @@ export default function MapView() {
         window.setTimeout(() => flyTo(ev.lng, ev.lat, 14, `evt:${ev.post.id}`), 350);
       }
     }
-  }, [focusSpace, focusMember, focusEvent, spacePins, peoplePins, bizPins, eventPins, flyTo]);
+  }, [focusSpace, focusMember, focusEvent, focusContact, spacePins, peoplePins, bizPins, eventPins, contactPins, ready, flyTo]);
 
   /** A searched address that isn't on Lichen gets a + teardrop (founder
    *  2026-11-17: "nothing happens… Do the map pin teardrop with a '+' button
@@ -487,10 +541,11 @@ export default function MapView() {
   /** Lichen places the From/To boxes know by name. */
   const places = useMemo<PlaceHit[]>(() => [
     ...spacePins.filter((x) => x.lat != null && x.lng != null).map((x) => ({ key: 'spc:' + x.id, label: x.name, sub: KIND_LABEL[x.kind], lng: x.lng!, lat: x.lat!, addr: x.location ?? '' })),
+    ...contactPins.filter((c) => c.lat != null && c.lng != null).map((c) => ({ key: 'con:' + c.id, label: c.name || c.address || 'Contact', sub: 'In your contacts', lng: c.lng!, lat: c.lat!, addr: c.address ?? undefined })),
     ...bizPins.map((b) => ({ key: 'biz:' + b.id, label: b.label || b.location, sub: b.owner_name ? `Goods & services · ${b.owner_name}` : 'Goods & services', lng: b.lng, lat: b.lat, addr: b.location })),
     ...eventPins.map(({ post, lat, lng }) => ({ key: 'evt:' + post.id, label: post.title || 'Event', sub: whenLabel(post) || 'Event', lng, lat, addr: typeof post.details?.location === 'string' ? post.details.location : '' })),
     ...peoplePins.filter((m) => m.level === 'exact' && m.lat != null && m.lng != null).map((m) => ({ key: 'usr:' + m.id, label: m.full_name ?? 'Member', sub: 'Member', lng: m.lng!, lat: m.lat!, addr: m.place ?? '' })),
-  ], [spacePins, bizPins, eventPins, peoplePins]);
+  ], [spacePins, bizPins, eventPins, peoplePins, contactPins]);
 
   const totalPins = eventPins.length + travelPins.length + spacePins.length + peoplePins.length + bizPins.length;
 

@@ -109,6 +109,9 @@
 .mapv__pin:hover { filter: brightness(0.95); }
 .mapv__pin--space { background: #7C8A6D; }
 .mapv__pin--person { background: #9C7355; }   /* tan = member home */
+/* My contacts — gray until they're on Lichen, peach once the card links (the cards' own grammar) */
+.mapv__pin--contact { background: #8C9296; }
+.mapv__pin--contact.is-live { background: var(--peach-deep); }
 
 /* Popup card (inside mapbox popup) */
 .mapboxgl-popup-content {

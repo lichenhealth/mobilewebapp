@@ -263,7 +263,7 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'contacts',
-    description: 'Their PRIVATE contact cards in Drive → Contacts — people (personal, professional or both), organizations (which can run places), places, communities, groups. A card is GRAY until that person/organization is on Lichen and PEACH once it links (Lichen links them by email/phone/website when they join, and on save if they already are). op: list (optional query/kind filter), read (one card by exact name), create, update (by exact name: new_name, add_emails, add_phones, website, address, notes [replaces], roles, kind, run_by), delete (by exact name — only when they asked), add_to_list (put the card on one of their guest lists by exact list name — created if missing). For a place an organization runs, create the place with run_by = the organization card\'s exact name. Emails, phones, websites and addresses ONLY as the member typed them in THIS conversation, as read from a photo/flyer they shared, or as found for a business this exchange (its own website, a web search, one of their emails or calendar entries) — never invent one. When you save something you found, offer the list it belongs on (e.g. "Beauty & Wellness"). Sharing a list stays theirs to set on the Contacts screen (hand the drive door).',
+    description: 'Their PRIVATE contact cards in Drive → Contacts — people (personal, professional or both), organizations (which can run places), places, communities, groups. A card is GRAY until that person/organization is on Lichen and PEACH once it links (Lichen links them by email/phone/website when they join, and on save if they already are). op: list (optional query/kind filter), read (one card by exact name), create, update (by exact name: new_name, add_emails, add_phones, website, address, notes [replaces], roles, kind, run_by), delete (by exact name — only when they asked), add_to_list (put the card on one of their guest lists by exact list name — created if missing). For a place an organization runs, create the place with run_by = the organization card\'s exact name. Emails, phones, websites and addresses ONLY as the member typed them in THIS conversation, as read from a photo/flyer they shared, or as found for a business this exchange (its own website, a web search, one of their emails or calendar entries) — never invent one. A card with an address is pinned on their private "My contacts" Maps layer automatically, so "Add to Maps and Contacts" is ONE create with the address (plus add_to_list for the list it belongs on, e.g. "Beauty & Wellness"). A business card that is not on Lichen yet links and turns peach by itself if its owner later makes her page (same website, email, phone, or same name at the same address) — the Contacts card also carries an "Invite them to claim their page" door; the owner never learns who saved her. Sharing a list stays theirs to set on the Contacts screen (hand the drive door).',
     input_schema: {
       type: 'object',
       properties: {
@@ -1369,6 +1369,19 @@ export async function runLifeTool(
         + `${c.website ? ` · ${c.website}` : ''} · ${live(c) ? 'ON LICHEN (peach)' : 'not on Lichen yet (gray)'}`;
     };
     const arr = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean) : []);
+    // ADD TO MAPS AND CONTACTS (founder 2026-11-19): an address carries its
+    // pin, so the card rides their private "My contacts" layer on Maps — and
+    // the pin is how the proprietor's own page finds it when she joins.
+    const pin = async (addr: string | null): Promise<{ lat: number | null; lng: number | null }> => {
+      if (!addr) return { lat: null, lng: null };
+      try {
+        const tok = Deno.env.get('MAPBOX_TOKEN') || 'pk.eyJ1IjoibGljaGVuaGVhbHRoIiwiYSI6ImNtcmNmcmZndjAzaXMyem9rcWk3MXE2dzgifQ.sV8h6aqBw8HeCTTfBOVblQ';
+        const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${enc(addr)}.json?limit=1&types=address,poi,place,postcode&access_token=${tok}`);
+        const c = r.ok ? (await r.json())?.features?.[0]?.center : null;
+        return Array.isArray(c) ? { lng: Number(c[0]), lat: Number(c[1]) } : { lat: null, lng: null };
+      } catch { return { lat: null, lng: null }; }
+    };
+    const mapNote = (lat: number | null) => (lat != null ? ' It is pinned on their private "My contacts" layer in Maps.' : '');
     const op = String(input.op ?? '');
     const cs = await all();
     const door = { app_door: '/contacts' };
@@ -1392,10 +1405,12 @@ export async function runLifeTool(
       const row = { owner_id: me, kind, name: nm.slice(0, 120), roles: kind === 'person' ? arr(input.roles) : [], parent_id: pid,
         emails: arr(input.emails), phones: arr(input.phones), website: input.website ? String(input.website).trim() : null,
         address: input.address ? String(input.address).trim() : null, notes: input.notes ? String(input.notes).slice(0, 4000) : null, source: 'assistant' };
+      Object.assign(row, await pin(row.address));
       const res = await sb('contacts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
       if (!res.ok) { const t = await res.text(); return { ok: false, error: (t.match(/"message":"([^"]+)"/)?.[1]) || 'The card would not save.' }; }
       const c = (await res.json())[0] as C;
-      return { ok: true, change: `made a ${kind} card for "${c.name}"`, card: line(c, [...cs, c]), ...door };
+      const linked = c.linked_space_id || c.linked_profile_id;
+      return { ok: true, change: `made a ${kind} card for "${c.name}"${linked ? ' — they are on Lichen already, so it is peach' : ''}.${mapNote((row as { lat?: number | null }).lat ?? null)}`, card: line(c, [...cs, c]), ...door };
     }
     if (!found.length) return { ok: false, error: `No card named "${nm}" — op=list shows their cards.` };
     if (found.length > 1) return { ok: false, error: `More than one card is named "${nm}" — this one needs the Contacts screen.` };
@@ -1414,7 +1429,7 @@ export async function runLifeTool(
       if (ae.length) { patch.emails = [...new Set([...(c.emails ?? []), ...ae])]; what.push(`added ${ae.join(', ')}`); }
       if (ap.length) { patch.phones = [...new Set([...(c.phones ?? []), ...ap])]; what.push(`added ${ap.join(', ')}`); }
       if (input.website !== undefined) { patch.website = String(input.website).trim() || null; what.push('website'); }
-      if (input.address !== undefined) { patch.address = String(input.address).trim() || null; what.push('address'); }
+      if (input.address !== undefined) { patch.address = String(input.address).trim() || null; Object.assign(patch, await pin(patch.address as string | null)); what.push(patch.lat != null ? 'address (pinned on their map)' : 'address'); }
       if (input.notes !== undefined) { patch.notes = String(input.notes).slice(0, 4000) || null; what.push('notes'); }
       if (input.run_by !== undefined) { const pid = await parentId(); if (pid === false) return { ok: false, error: `No single organization card named "${input.run_by}".` }; patch.parent_id = pid; what.push(pid ? `run by ${input.run_by}` : 'no longer run by an organization'); }
       if (!what.length) return { ok: false, error: 'Nothing to change.' };

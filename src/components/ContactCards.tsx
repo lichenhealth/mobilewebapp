@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from './Icon';
 import {
   listContacts, createContact, updateContact, deleteContact, onLichen, contactPath, splitList,
@@ -48,6 +48,15 @@ function entryFor(c: Contact): ListEntry | null {
   if (c.phones[0]) return { kind: 'phone', value: c.phones[0].replace(/\D/g, ''), sms: c.phones[0], name: c.name, ...{ contact_id: c.id } } as ListEntry;
   return null;
 }
+// The claim door (founder 2026-11-19): a saved business that isn't on Lichen
+// can be invited to make its own page — when it does, this card (and every
+// member's card for it) turns peach. Prefilled; nothing goes until Send.
+function inviteHref(c: Contact): string {
+  const to = c.emails[0] || c.phones[0] || '';
+  const biz = c.kind === 'organization' || c.kind === 'place';
+  const note = biz ? `I saved ${c.name || 'your business'} in my contacts on Lichen. If you make your own page there, people who've saved you will find it — and you'll be able to keep it up to date yourself.` : '';
+  return `/invite?to=${encodeURIComponent(to)}${note ? `&note=${encodeURIComponent(note)}` : ''}`;
+}
 const inList = (l: GuestList, c: Contact) => l.entries.some((e) => (e as { contact_id?: string }).contact_id === c.id);
 
 export default function ContactCards({ me, query, lists, onListsChanged }: {
@@ -64,6 +73,18 @@ export default function ContactCards({ me, query, lists, onListsChanged }: {
 
   async function refresh() { setCards(await listContacts(me)); }
   useEffect(() => { void refresh(); }, [me]);
+  // ?card=<id> (a Maps pin's "Open the card") opens that card once it's loaded.
+  const [params] = useSearchParams();
+  const wantCard = params.get('card');
+  const openedFromUrl = useMemo(() => ({ done: false }), []);
+  useEffect(() => {
+    if (!wantCard || openedFromUrl.done) return;
+    const c = cards.find((x) => x.id === wantCard);
+    if (!c) return;
+    openedFromUrl.done = true;
+    setOpen(c.id); setForm(toForm(c));
+    window.setTimeout(() => document.getElementById(`ccard-${c.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
+  }, [cards, wantCard, openedFromUrl]);
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const orgs = useMemo(() => cards.filter((c) => c.kind === 'organization'), [cards]);
@@ -94,7 +115,7 @@ export default function ContactCards({ me, query, lists, onListsChanged }: {
     if (!form.name.trim() && !form.emails.trim() && !form.phones.trim()) { setNote('Give the card a name, an email or a phone.'); return; }
     setBusy(true); setNote(null);
     try {
-      const saved = open === 'new' ? await createContact(me, fromForm(form)) : await updateContact(open as string, fromForm(form));
+      const saved = open === 'new' ? await createContact(me, fromForm(form)) : await updateContact(open as string, fromForm(form), byId.get(open as string));
       await refresh(); onListsChanged();
       setOpen(saved.id); setForm(toForm(saved));
       setNote(onLichen(saved) ? 'Saved ✓ — they’re on Lichen, so the card is peach.' : 'Saved ✓');
@@ -126,7 +147,7 @@ export default function ContactCards({ me, query, lists, onListsChanged }: {
     bits.push(live ? 'on Lichen' : 'not on Lichen yet');
     const isOpen = open === c.id;
     return (
-      <div key={c.id} className={'ccard' + (depth ? ' ccard--child' : '')}>
+      <div key={c.id} id={`ccard-${c.id}`} className={'ccard' + (depth ? ' ccard--child' : '')}>
         <div className={'drive__row ccard__row' + (isOpen ? ' is-open' : '')} role="button" tabIndex={0} aria-expanded={isOpen}
           onClick={() => openCard(c)} onKeyDown={(ev) => { if (ev.key === 'Enter') openCard(c); }}>
           <span className={'ccard__ava' + (live ? ' is-live' : '')} title={live ? 'On Lichen' : 'Not on Lichen yet'}>
@@ -155,7 +176,9 @@ export default function ContactCards({ me, query, lists, onListsChanged }: {
           <p className={'ccard__status' + (live ? ' is-live' : '')}>
             {live
               ? <>On Lichen ✓ {path && <button className="ccard__link" onClick={() => navigate(path)}>Open their {c.linked_space_id ? 'page' : 'profile'} ›</button>}</>
-              : <>Not on Lichen yet{c.emails[0] && <> · <button className="ccard__link" onClick={() => navigate(`/invite?email=${encodeURIComponent(c.emails[0])}`)}>Invite to Lichen ›</button></>}</>}
+              : <>Not on Lichen yet{(c.emails[0] || c.phones[0]) && <> · <button className="ccard__link" onClick={() => navigate(inviteHref(c))}>
+                  {c.kind === 'organization' || c.kind === 'place' ? 'Invite them to claim their page ›' : 'Invite to Lichen ›'}</button></>}</>}
+            {c.lat != null && <> · <button className="ccard__link" onClick={() => navigate(`/maps?contact=${c.id}`)}>On your map ›</button></>}
           </p>
         )}
         <div className="ccard__kinds" role="group" aria-label="What kind of contact">
