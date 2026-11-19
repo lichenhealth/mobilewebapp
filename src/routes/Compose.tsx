@@ -44,6 +44,7 @@ import TimeField from '../components/TimeField';
 import { todayISO } from '../lib/conciergeApi';
 import { useTopBackFor } from '../lib/topBack';
 import './Compose.css';
+import ProofreadBar from '../components/ProofreadBar';
 
 
 type MediaType = 'photo' | 'video' | 'audio';
@@ -2499,6 +2500,7 @@ export default function Compose() {
       <label className="cmp__label" htmlFor="cmp-body">Post</label>
       <textarea id="cmp-body" className="cmp__input cmp__textarea" value={body}
         onChange={(e) => setBody(e.target.value)} placeholder="What would you like to share?" />
+      <ProofreadBar text={body} onApply={setBody} />
 
       {/* Add context — media */}
       <label className="cmp__label">Add context</label>

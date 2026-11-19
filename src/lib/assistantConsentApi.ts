@@ -43,6 +43,7 @@ export const CONSENT_SECTIONS: { id: string; label: string }[] = [
   { id: 'places', label: 'Places' },
   { id: 'help', label: 'Help room' },
   { id: 'general', label: 'Claude feed' },
+  { id: 'writing', label: 'Spelling & grammar suggestions' },
 ];
 
 const key = (t: ScopeType, id: string) => `${t}:${id}`;
