@@ -13,6 +13,7 @@ import {
   loadMyWeb, loadMyRecommendations, loadEndorsements, setRecommend, posterTrustKey, trustPostPoster,
 } from '../lib/myceliumApi';
 import { loadSavedPostsTimed, setSaved, loadSavedMessages, type SavedMessage } from '../lib/savedApi';
+import { isDocx, importDocxAsDoc } from '../lib/docxImport';
 import { uploadDriveFile, listDriveFiles, signDriveFiles, deleteDriveFile, type DriveFileRow, type DriveFileKind } from '../lib/driveFilesApi';
 import { createPersonalDoc, listMyPersonalDocs, deleteChatDoc, DOC_KIND_ICON, DOC_KIND_LABEL, type ChatDocRow } from '../lib/chatDocsApi';
 import { listMyPostDrafts, deletePostDraft, draftLabel, type PostDraftRow } from '../lib/postDraftsApi';
@@ -212,6 +213,16 @@ export default function Saved() {
   const addFile = async (kind: DriveFileKind, f: File | undefined) => {
     if (!f) return;
     setFileBusy(true);
+    // A Word file becomes a real Lichen doc you can edit (founder 2026-11-19).
+    if (isDocx(f.name, f.type)) {
+      try {
+        const d = await importDocxAsDoc(f, f.name);
+        if (d.note) alert(d.note);
+        navigate(d.path);
+      } catch (e) { alert((e as { message?: string } | null)?.message ?? 'Could not read that Word file.'); }
+      setFileBusy(false);
+      return;
+    }
     try {
       const row = await uploadDriveFile(f, kind);
       setFiles((cur) => [row, ...cur]);

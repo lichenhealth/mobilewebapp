@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { mailAttachment, type MailFile, type MailMessage } from '../lib/mailApi';
 import { Link } from 'react-router-dom';
 import { Icon } from './Icon';
+import { isDocx, importDocxAsDoc } from '../lib/docxImport';
 import { uploadDriveFile, type DriveFileKind } from '../lib/driveFilesApi';
 import './MailBody.css';
 
@@ -292,6 +293,12 @@ export function MailFiles({ accountId, m }: { accountId: string; m: MailMessage 
     setErr(''); setBusy(f.attachment_id + ':s');
     try {
       const blob = await fileBlob(accountId, m.id, f);
+      // A Word attachment arrives as an editable Lichen doc.
+      if (isDocx(f.name || '', mimeOf(f))) {
+        await importDocxAsDoc(blob, f.name || 'Document.docx');
+        setSaved((cur) => ({ ...cur, [f.attachment_id]: true }));
+        return;
+      }
       const mt = mimeOf(f);
       const kind: DriveFileKind = mt.startsWith('image/') ? 'photo' : mt.startsWith('video/') ? 'video'
         : mt.startsWith('audio/') ? 'audio' : 'file';

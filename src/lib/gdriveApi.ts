@@ -15,6 +15,7 @@ import { supabase } from './supabase';
 import { call } from './mailApi';
 import { createPersonalDoc } from './chatDocsApi';
 import { uploadDriveFile, type DriveFileKind } from './driveFilesApi';
+import { docxToHtml, DOCX_MIME, isDocx } from './docxImport';
 import { sanitizeHtml, htmlToText, textToHtml } from './richText';
 import type { SheetTab } from './formula';
 import { uploadOfficeImage } from './officeMedia';
@@ -38,6 +39,7 @@ export function lichenKindFor(mime: string, name = ''): { kind: LichenKind; labe
   if (mime.startsWith('application/vnd.google-apps.')) return { kind: 'none', label: 'can’t come over yet' };
   if (/spreadsheetml|ms-excel|opendocument\.spreadsheet|text\/csv/.test(mime) || ['xlsx', 'xls', 'csv', 'ods'].includes(ext)) return { kind: 'sheet', label: 'becomes a Lichen spreadsheet' };
   if (mime === 'text/plain' || mime === 'text/markdown' || ['txt', 'md'].includes(ext)) return { kind: 'doc', label: 'becomes a Lichen doc' };
+  if (mime === DOCX_MIME || ext === 'docx') return { kind: 'doc', label: 'Word file — becomes a Lichen doc' };
   if (mime.startsWith('image/')) return { kind: 'photo', label: 'photo' };
   if (mime.startsWith('video/')) return { kind: 'video', label: 'video' };
   if (mime.startsWith('audio/')) return { kind: 'audio', label: 'audio' };
@@ -186,9 +188,12 @@ export async function importGDriveFile(account: { id: string; email: string }, f
         const g = inlineGoogleClasses(c.html);
         const carried = g.images ? await carryDocImages(g.html, c.images ?? []) : { html: g.html, missed: 0 };
         html = sanitizeHtml(carried.html); missed = carried.missed;
+      } else if (isDocx(f.name, f.mimeType)) {
+        const w = await docxToHtml(b64ToBytes(c.data ?? '').buffer);
+        html = w.html; missed = w.missed;
       } else html = sanitizeHtml(textToHtml(new TextDecoder().decode(b64ToBytes(c.data ?? ''))));
       const row = await createPersonalDoc('doc', title, { data: { html } as never, body: htmlToText(html).slice(0, 50000) });
-      res = { kind, id: row.id, path: `/docs/${row.id}`, note: missed ? `${missed} picture${missed === 1 ? '' : 's'} couldn’t be copied from Google — keep the original until you’ve checked` : undefined };
+      res = { kind, id: row.id, path: `/docs/${row.id}`, note: missed ? `${missed} picture${missed === 1 ? '' : 's'} couldn’t be copied over — keep the original until you’ve checked` : undefined };
     } else if (kind === 'sheet') {
       let tabs: SheetTab[];
       if (/csv/.test(c.mime) || f.name.toLowerCase().endsWith('.csv')) {
