@@ -1,0 +1,23 @@
+.proof {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: 6px 0 2px; font-size: 13px; line-height: 1.3;
+}
+.proof__lead { color: var(--ink-muted); font-size: 12px; margin-right: 2px; }
+.proof__chip {
+  display: inline-flex; align-items: baseline; gap: 5px; max-width: 100%;
+  padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  background: var(--peach-tint); border: 1px solid var(--peach); color: var(--ink);
+  font: inherit; text-align: left;
+}
+.proof__chip:hover { border-color: var(--peach-deep); }
+.proof__from { color: var(--ink-muted); text-decoration-color: var(--red-deep, #a0503c); overflow-wrap: anywhere; }
+.proof__arrow { color: var(--peach-deep); }
+.proof__to { color: var(--peach-deep); font-weight: 500; overflow-wrap: anywhere; }
+.proof__all {
+  padding: 4px 10px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 12px;
+  background: var(--white, #fff); border: 1px solid var(--bone-edge); color: var(--peach-deep);
+}
+.proof__x {
+  border: 0; background: none; cursor: pointer; color: var(--ink-faint);
+  font-size: 16px; line-height: 1; padding: 2px 4px;
+}

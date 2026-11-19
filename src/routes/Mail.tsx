@@ -14,6 +14,7 @@ import {
   type MailAccount, type ThreadSummary, type MailThread,
 } from '../lib/mailApi';
 import './Mail.css';
+import ProofreadBar from '../components/ProofreadBar';
 
 /** LICHEN MAIL (founder 2026-11-11: "let's create 'Mail' on Lichen and I can
  *  test it for personal use" — after "consolidate connect@lichen.health,
@@ -263,6 +264,7 @@ export default function Mail() {
       )}
       <textarea className="mail__body-in" rows={8} value={draft.body} autoFocus
         placeholder="Write it here…" onChange={(e) => setDraft({ ...draft, body: e.target.value })} />
+      <ProofreadBar text={draft.body} onApply={(b) => setDraft((d) => (d ? { ...d, body: b } : d))} />
       <div className="mail__compose-acts">
         <button className="btn btn-primary" disabled={!!busy} onClick={() => void submit(false)}>{busy === 'send' ? 'Sending…' : 'Send'}</button>
         <button className="btn" disabled={!!busy} onClick={() => void submit(true)}>{busy === 'draft' ? 'Saving…' : 'Save as draft'}</button>
@@ -490,6 +492,7 @@ function DraftInThread({ m, accountId, threadId, from, onDone }: {
         <label className="mail__field"><span>Cc</span>
           <input value={cc} onChange={(e) => setCc(e.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck={false} /></label>
         <textarea className="mail__body-in" rows={12} value={body} onChange={(e) => setBody(e.target.value)} />
+        <ProofreadBar text={body} onApply={setBody} />
         {err && <p className="mail__err">{err}</p>}
         <div className="mail__compose-acts">
           <button className="btn btn-primary" disabled={!!busy || !to.trim() || !body.trim()} onClick={() => void go('send')}>{busy === 'send' ? 'Sending…' : 'Send'}</button>

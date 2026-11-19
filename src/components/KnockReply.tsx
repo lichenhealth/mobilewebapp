@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { myBookingLink, replyToKnock } from '../lib/knockReplyApi';
 import './KnockReply.css';
+import ProofreadBar from './ProofreadBar';
 
 /** REPLY WITHOUT LETTING THEM IN (founder 2026-11-10: "reply to them with a
  *  custom message and some time to chat with me via my booking link, but not
@@ -84,6 +85,7 @@ export default function KnockReply({ knock, onSent }: { knock: ReplyableKnock; o
         placeholder={`Thank you for reaching out, ${first}…`}
         onChange={(e) => setText(e.target.value)}
       />
+      <ProofreadBar text={text} onApply={setText} />
       <div className="kreply__acts">
         {bookLink && (
           <button type="button" className="kreply__chip" onClick={addLink} disabled={hasLink}>
