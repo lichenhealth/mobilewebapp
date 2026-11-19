@@ -11,6 +11,7 @@ type SbFn = (path: string, init?: RequestInit) => Promise<Response>;
 type Out = { ok: boolean; change?: string; error?: string; [k: string]: unknown };
 
 import { findMember } from './findMember.ts';
+import { myFolders, resolveMyFolder, type MyFolder } from './driveFolders.ts';
 
 export const LIFE_TOOLS = [
   {
@@ -52,14 +53,15 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'drive_folder',
-    description: 'Their private Drive folders, which NEST (a folder can sit inside another, like Google Drive): create (name; inside = an existing folder to put it in), move (folder into another folder named by into, or into "" for the top of Drive), add a post (by its exact title — one of their own posts, a post they saved, or the post shared into this conversation), or remove a post. Folders hold posts by reference — to put a document, spreadsheet or presentation in a folder use drive_doc op add_to_folder. my_lists folders shows each folder with its path.',
+    description: 'Their private Drive folders, which NEST (a folder can sit inside another, like Google Drive). Name a folder by its name, or by its path ("Photos / Lisa\'s Farm") when names repeat. create (name; inside = an existing folder to put it in), rename (new_name), move (folder into another folder named by into, or into "" for the top of Drive), add a post (by its exact title — one of their own posts, a post they saved, or the post shared into this conversation), or remove a post. Folders hold posts by reference — to put a document, spreadsheet or presentation in a folder use drive_doc op add_to_folder. my_lists folders shows each folder with its path.',
     input_schema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['create', 'move', 'add', 'remove'] },
-        folder: { type: 'string', description: 'Folder name (exact, from my_lists folders, except when creating).' },
-        inside: { type: 'string', description: 'create only: the exact name of the folder to make it inside.' },
-        into: { type: 'string', description: 'move only: the exact name of the folder to move it into; empty = the top of Drive.' },
+        action: { type: 'string', enum: ['create', 'rename', 'move', 'add', 'remove'] },
+        folder: { type: 'string', description: 'The folder — its name, or its path when names repeat ("Photos / Lisa\'s Farm"), from my_lists folders. When creating, the new folder\'s name.' },
+        inside: { type: 'string', description: 'create only: the folder (name or path) to make it inside.' },
+        into: { type: 'string', description: 'move only: the folder (name or path) to move it into; empty = the top of Drive.' },
+        new_name: { type: 'string', description: 'rename only: the new name.' },
         post_title: { type: 'string' },
       },
       required: ['action', 'folder'],
@@ -461,37 +463,41 @@ export async function runLifeTool(
   }
 
   if (name === 'drive_folder') {
-    const folder = String(input.folder ?? '').trim().slice(0, 120);
+    const folder = String(input.folder ?? '').trim().slice(0, 240);
     if (!folder) return { ok: false, error: 'Name the folder.' };
-    const oneFolder = async (nm: string) => {
-      const r = await (await sb(`collections?owner_id=eq.${me}&space_id=is.null&name=ilike.${enc(nm)}&select=id,name&limit=2`)).json();
-      const l = (Array.isArray(r) ? r : []) as { id: string; name: string }[];
-      return l.length === 1 ? l[0] : (l.length ? 'many' as const : null);
-    };
+    const flist = await myFolders(me);
+    const pick = async (nm: string) => resolveMyFolder(me, nm, flist);
     if (input.action === 'create') {
-      let parent: { id: string; name: string } | null = null;
+      let parent: MyFolder | null = null;
       const inside = String(input.inside ?? '').trim();
       if (inside) {
-        const p = await oneFolder(inside);
-        if (p === 'many') return { ok: false, error: `Several folders are named "${inside}".` };
-        if (!p) return { ok: false, error: `No folder of theirs is named "${inside}" — read my_lists folders.` };
-        parent = p;
+        const p = await pick(inside);
+        if (!p.folder) return { ok: false, error: p.error };
+        parent = p.folder;
       }
-      const res = await sb('collections', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_id: me, name: folder, kind: 'collection', ...(parent ? { parent_id: parent.id } : {}) }) });
+      const nm = folder.slice(0, 120);
+      const res = await sb('collections', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_id: me, name: nm, kind: 'collection', ...(parent ? { parent_id: parent.id } : {}) }) });
       if (!res.ok) return { ok: false, error: 'The folder would not save.' };
-      return { ok: true, change: `created the private folder "${folder}"${parent ? ` inside "${parent.name}"` : ' in their Drive'}` };
+      return { ok: true, change: `created the private folder "${nm}"${parent ? ` inside "${parent.path}"` : ' at the top of their Drive'}` };
     }
-    const f1 = await oneFolder(folder);
-    if (f1 === 'many' || !f1) return { ok: false, error: f1 ? `Several folders are named "${folder}".` : `No folder of theirs is named "${folder}" — read my_lists folders.` };
+    const r1 = await pick(folder);
+    if (!r1.folder) return { ok: false, error: r1.error };
+    const f1 = r1.folder;
     const fl = [f1];
+    if (input.action === 'rename') {
+      const nn = String(input.new_name ?? '').trim().slice(0, 120);
+      if (!nn) return { ok: false, error: 'What should it be called? Give new_name.' };
+      const res = await sb(`collections?id=eq.${f1.id}&owner_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ name: nn }) });
+      if (!res.ok) return { ok: false, error: 'It would not rename.' };
+      return { ok: true, change: `renamed the folder "${f1.path}" to "${nn}"` };
+    }
     if (input.action === 'move') {
       const into = String(input.into ?? '').trim();
-      let target: { id: string; name: string } | null = null;
+      let target: MyFolder | null = null;
       if (into) {
-        const t = await oneFolder(into);
-        if (t === 'many') return { ok: false, error: `Several folders are named "${into}".` };
-        if (!t) return { ok: false, error: `No folder of theirs is named "${into}" — read my_lists folders.` };
-        target = t;
+        const t = await pick(into);
+        if (!t.folder) return { ok: false, error: t.error };
+        target = t.folder;
       }
       const res = await sb(`collections?id=eq.${f1.id}&owner_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ parent_id: target ? target.id : null }) });
       if (!res.ok) {
@@ -499,7 +505,7 @@ export async function runLifeTool(
         const m = /"message"\s*:\s*"([^"]+)"/.exec(txt)?.[1];
         return { ok: false, error: m ?? 'It would not move.' };
       }
-      return { ok: true, change: target ? `moved the folder "${f1.name}" inside "${target.name}"` : `moved the folder "${f1.name}" to the top of their Drive` };
+      return { ok: true, change: target ? `moved the folder "${f1.name}" inside "${target.path}"` : `moved the folder "${f1.name}" to the top of their Drive` };
     }
     const pt = String(input.post_title ?? '').trim();
     if (!pt) return { ok: false, error: 'Which post? Give its exact title.' };

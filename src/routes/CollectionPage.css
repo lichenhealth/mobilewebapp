@@ -520,3 +520,28 @@
   background: var(--peach); color: #fff; cursor: pointer;
 }
 .colp__subnew-go:disabled { opacity: .5; cursor: default; }
+
+/* DRAG A FOLDER OUT OR IN (founder 2026-11-19). */
+.colp__file[draggable='true'] { cursor: grab; }
+.colp__file.is-dragging { opacity: 0.45; }
+.colp__file.is-droptarget, .colp__trailstop.is-droptarget {
+  background: var(--peach-tint);
+  box-shadow: inset 0 0 0 2px var(--peach);
+  border-radius: 8px;
+}
+.colp__trailstop.is-droptarget { padding: 2px 6px; }
+.colp__droptop {
+  /* Floats — inserting it into the list would shift rows under the pointer
+     and stall the drag. */
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 60;
+  bottom: calc(var(--nav-h) + var(--safe-bot) + 16px); width: min(92vw, 420px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.12); background: var(--bone, #f6f1ea);
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 16px;
+  border: 1.5px dashed var(--peach); border-radius: 12px;
+  color: var(--peach-deep); font-size: 14px;
+}
+.colp__droptop.is-droptarget { background: var(--peach-tint); border-style: solid; }
+.colp__subnote { margin: 0 0 8px; color: var(--green-deep, #3d6b45); font-size: 13px; }
+
+@media (min-width: 1024px) { .colp__droptop { bottom: 32px; } }

@@ -7,6 +7,7 @@
 // so every Lichen file is born through the member's own session.
 // Every account resolves against the SENDER's own mail_accounts rows.
 import { mailAccountsOf } from './gmail.ts';
+import { resolveMyFolder } from './driveFolders.ts';
 import { listDrive, trashFiles, fileMeta, lichenKindFor, type GFile } from './gdrive.ts';
 
 type Out = { ok: boolean; [k: string]: unknown };
@@ -16,13 +17,14 @@ export const GDRIVE_TOOLS = [
     name: 'google_drive',
     description: 'The member\'s connected Google Drives (same Google accounts as their Lichen Mail). action: "list" (a folder\'s files — folder = a folder id from an earlier list, empty = My Drive), "search" (query matches names and contents across that Drive), "recent", "shared" (shared with them), "trash_view" (what\'s in Google\'s Trash). account = one of their addresses (empty = the first). Returns files with id, name, kind (what it would become on Lichen), size and modified date. '
       + 'action "trash" moves file_ids to that account\'s Google Trash (recoverable 30 days) — ONLY when they asked in their own words, ONLY ids you listed in this conversation. action "restore" brings them back out of Google Trash. '
-      + 'action "import" puts an import card under your reply for file_ids — the card\'s button re-creates each file as a Lichen doc / spreadsheet / presentation / Drive file; set then_trash=true if they want the Google copy trashed after. It does NOT import by itself: say the card is waiting for their tap. A FOLDER can be imported whole: it becomes a Lichen folder holding every file re-created (sub-folders come over as real folders inside it). Google Docs keep their pictures, and each Google slide comes over looking exactly as Google draws it (a full-slide picture, words + speaker notes kept).',
+      + 'action "import" puts an import card under your reply for file_ids — the card\'s button re-creates each file as a Lichen doc / spreadsheet / presentation / Drive file; set then_trash=true if they want the Google copy trashed after; into = one of their Lichen folders (name, or path like "Photos / Clients") to drop what comes over inside it; rename_to = a new name for what comes over (only when importing ONE file or folder — "bring Lisa\'s Farm over as Lichen Kickoff inside Photos" is file_ids=[that folder], rename_to="Lichen Kickoff", into="Photos"). It does NOT import by itself: say the card is waiting for their tap. A FOLDER can be imported whole: it becomes a Lichen folder holding every file re-created (sub-folders come over as real folders inside it). Google Docs keep their pictures, and each Google slide comes over looking exactly as Google draws it (a full-slide picture, words + speaker notes kept).',
     input_schema: {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['list', 'search', 'recent', 'shared', 'trash_view', 'trash', 'restore', 'import'] },
         account: { type: 'string' }, folder: { type: 'string' }, query: { type: 'string' },
         file_ids: { type: 'array', items: { type: 'string' } }, then_trash: { type: 'boolean' },
+        into: { type: 'string' }, rename_to: { type: 'string' },
       },
       required: ['action'],
     },
@@ -72,9 +74,19 @@ export async function runGDriveTool(profileId: string, input: Record<string, unk
     if (action === 'import') {
       const files = ids.map((id) => known.get(id)!).filter((f) => lichenKindFor(f.mimeType, f.name).kind !== 'none');
       if (!files.length) return { ok: false, error: 'None of those can come over (Forms and Sites can\'t).' };
+      const renameTo = String(input.rename_to ?? '').trim().slice(0, 120);
+      if (renameTo && files.length > 1) return { ok: false, error: 'rename_to works on ONE file or folder at a time — import the others separately.' };
+      let into: { id: string; path: string } | null = null;
+      if (String(input.into ?? '').trim()) {
+        const r = await resolveMyFolder(profileId, String(input.into));
+        if (!r.folder) return { ok: false, error: r.error ?? 'That Lichen folder wasn\'t found.' };
+        into = { id: r.folder.id, path: r.folder.path };
+      }
       return {
         ok: true, account: acct.email, waiting_for_tap: files.length,
+        ...(into ? { lands_in: into.path } : {}), ...(renameTo ? { named: renameTo } : {}),
         importCard: { type: 'gdrive_import', account_id: acct.id, account: acct.email, then_trash: input.then_trash === true,
+          ...(into ? { into_id: into.id, into_path: into.path } : {}), ...(renameTo ? { rename_to: renameTo } : {}),
           files: files.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, size: f.size, modifiedTime: f.modifiedTime })) },
       };
     }

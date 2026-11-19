@@ -1604,7 +1604,7 @@ export default function AssistantFeed() {
                   .flatMap((a) => (a.type === 'gdrive_import' ? [a] : []))
                   .map((a, i) => (
                     <div className="afeed__pubrow" key={`${p.id}:gdi:${i}`}>
-                      <GDriveImportCard accountId={a.account_id} account={a.account} files={a.files} thenTrash={a.then_trash} />
+                      <GDriveImportCard accountId={a.account_id} account={a.account} files={a.files} thenTrash={a.then_trash} intoId={a.into_id} intoPath={a.into_path} renameTo={a.rename_to} />
                     </div>
                   ))}
                 {/* RECONNECT, ONE TAP EACH (founder 2026-11-14: "i know the
