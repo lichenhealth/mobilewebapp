@@ -184,6 +184,21 @@ export default function AssistantComposer({
           ))}
         </div>
       )}
+      {/* Words on top, full width; the tools ride a bar beneath (founder
+          2026-11-19: the placeholder broke onto two lines beside an empty
+          column of icons — "move the text over so its 1 line"). */}
+      <textarea
+        className="assist-composer__input"
+        rows={1}
+        ref={taRef}
+        value={ask}
+        placeholder={placeholder}
+        onChange={(e) => setAsk(e.target.value)}
+        onPaste={onPaste}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit(); }
+        }}
+      />
       <div className="assist-composer__row">
         {uploaderId && (
           <label className={'assist-composer__btn' + (upBusy ? ' is-live' : '')} aria-label="Add a photo">
@@ -198,18 +213,6 @@ export default function AssistantComposer({
             <Icon name="mic" size={17} />
           </button>
         )}
-        <textarea
-          className="assist-composer__input"
-          rows={1}
-          ref={taRef}
-          value={ask}
-          placeholder={placeholder}
-          onChange={(e) => setAsk(e.target.value)}
-          onPaste={onPaste}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit(); }
-          }}
-        />
         <button className="assist-composer__send" type="submit"
           disabled={(!ask.trim() && images.length === 0 && !attachment) || sending || upBusy}
           aria-label="Send to your assistant">

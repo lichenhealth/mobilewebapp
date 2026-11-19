@@ -166,6 +166,14 @@
 .abrief__card .abrief__sumfold.is-open { position: static; float: right; margin-top: 6px; }
 .abrief__sumfold.is-open svg { transform: rotate(-90deg); }
 .abrief__sumfold:hover { background: var(--peach-tint); }
+/* THE TWO BUBBLES MATCH (founder 2026-11-19): the label rows share one
+   height so the boxes start level, the composer stands a little taller, and
+   the summary card takes its exact height (set inline from the composer). */
 @media (min-width: 1024px) {
-  .abrief__split .abrief__ask { min-height: 160px; }
+  .abrief__split .abrief__run { gap: 8px; }
+  .abrief__split .abrief__run-meta,
+  .abrief__split .abrief__ask .abrief__convos-h { height: 30px; margin: 0; display: flex; align-items: center; }
+  .abrief__split .abrief__ask .assist-composer { margin-top: 8px; min-height: 140px; box-sizing: border-box; }
+  .abrief__split .abrief__ask .assist-composer__input { flex: 1; }
+  .abrief__split .abrief__card { box-sizing: border-box; }
 }

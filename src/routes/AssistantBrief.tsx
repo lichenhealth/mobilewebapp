@@ -280,8 +280,12 @@ export default function AssistantBrief() {
   useEffect(() => {
     const el = askRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => setAskH(el.offsetHeight));
-    ro.observe(el); setAskH(el.offsetHeight);
+    // The two BUBBLES match (founder 2026-11-19: "the height of the two
+    // bubbles is different, which looks sloppy"): measure the composer box
+    // itself, not the whole ask section with its heading.
+    const box = (el.querySelector('.assist-composer') as HTMLElement | null) ?? el;
+    const ro = new ResizeObserver(() => setAskH(box.offsetHeight));
+    ro.observe(box); setAskH(box.offsetHeight);
     return () => ro.disconnect();
   }, []);
   const [sumOverflows, setSumOverflows] = useState(false);
@@ -1322,7 +1326,7 @@ export default function AssistantBrief() {
       <div
         ref={cardRef}
         className={'abrief__card' + (sumClamped ? ' is-clamped' : '') + (sumClamped && sumOverflows ? ' is-folded' : '')}
-        style={sumClamped ? { maxHeight: Math.max(110, askH - (runMetaRef.current?.offsetHeight ?? 26) - 6) } : undefined}
+        style={sumClamped ? { height: askH, maxHeight: askH } : (wideSplit && askH > 0 ? { minHeight: askH } : undefined)}
         onClick={(e) => {
           if (!sumClamped || !sumOverflows) return;
           if ((e.target as HTMLElement).closest('a,button')) return;
@@ -1393,7 +1397,7 @@ export default function AssistantBrief() {
         initialText={params.get('ask') ?? undefined}
         uploaderId={me || undefined}
         attachment={mailRef ? <MailRefCard m={mailRef} onRemove={() => setMailRef(null)} /> : undefined}
-        placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : 'Reply to the summary, or ask anything at all…'}
+        placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : 'Reply to the summary, or ask anything…'}
       />
       </div>
       </div>
