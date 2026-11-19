@@ -610,6 +610,21 @@ export default function CalendarSettings() {
                   </p>
                 )}
               </>)}
+              {/* Bill right after the session (founder 2026-11-19): a bell the
+                  moment a confirmed session ends — for billing done outside
+                  Lichen (Ivy Pay). Lichen never charges anyone. */}
+              <span className="cset__flab">After the session</span>
+              <label className="cset__zoomcheck">
+                <input
+                  type="checkbox"
+                  checked={!!bkEdit.bill_reminder}
+                  onChange={(e) => setBkEdit((c) => ({ ...c, bill_reminder: e.target.checked }))}
+                />
+                <span>
+                  <strong>Remind me to bill</strong> the moment each session ends — a notification
+                  naming who and how long. Lichen doesn&rsquo;t charge anyone.
+                </span>
+              </label>
               <span className="cset__flab">Where it happens</span>
               <input
                 className="cedit__input cset__fwide"
@@ -1227,7 +1242,7 @@ export default function CalendarSettings() {
                 </span>
               </div>
               <p className="cset__bkmeta">
-                {bt.duration_min} min{bt.slot_increment_min != null && bt.slot_increment_min !== bt.duration_min ? ` · starts every ${bt.slot_increment_min} min` : ''}{bt.price ? ` · ${bt.price}` : ''}{bt.price_cents != null ? ` · collects ${usdLabel(bt.price_cents)} online` : ''}{realPayMethods(bt.pay_methods).length ? ` · takes ${realPayMethods(bt.pay_methods).map((m) => m.kind === 'other' ? m.value : (PAY_METHOD_KINDS.find((k) => k.kind === m.kind)?.label ?? m.kind)).join(', ')}` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}
+                {bt.duration_min} min{bt.slot_increment_min != null && bt.slot_increment_min !== bt.duration_min ? ` · starts every ${bt.slot_increment_min} min` : ''}{bt.price ? ` · ${bt.price}` : ''}{bt.price_cents != null ? ` · collects ${usdLabel(bt.price_cents)} online` : ''}{realPayMethods(bt.pay_methods).length ? ` · takes ${realPayMethods(bt.pay_methods).map((m) => m.kind === 'other' ? m.value : (PAY_METHOD_KINDS.find((k) => k.kind === m.kind)?.label ?? m.kind)).join(', ')}` : ''} · {bt.approval === 'instant' ? 'books instantly' : 'by request'}{bt.bill_reminder ? ' · bill reminder' : ''}
                 {bt.audience === 'mycelium' ? ' · my-celium only'
                   : bt.audience === 'public' ? ' · public link'
                   : bt.audience === 'space' ? ` · ${(() => {
