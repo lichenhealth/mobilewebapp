@@ -12,6 +12,7 @@ import {
 } from '../lib/myceliumApi';
 import ConsentBubble from '../components/ConsentBubble';
 import { loadPrompts, promptSeen, markPrompt } from '../lib/promptsApi';
+import { listContacts, kindMeta, type Contact } from '../lib/contactsApi';
 import './Directory.css';
 
 interface DirRow { id: string; full_name: string | null; headline: string | null; avatar_url: string | null; kind: string | null; jurisdiction: string | null; }
@@ -87,7 +88,7 @@ export default function Directory() {
   // space reads and writes ITS OWN web (mycelium.truster_space_id), starts
   // empty until its admins weave, and holds no trust at all — the shield is
   // a person's, so it doesn't render while you wear a space's hat.
-  const { actor } = useActing();
+  const { actor, ready: actingReady } = useActing();
   const asSpace = actor.type === 'space' ? actor.id : undefined;
   useEffect(() => {
     if (!me) return;
@@ -166,7 +167,32 @@ export default function Directory() {
     return !q ? spaces : spaces.filter((sp) =>
       sp.name.toLowerCase().includes(q) || (sp.description?.toLowerCase().includes(q) ?? false));
   }, [query, spaces]);
-  const anyHits = hits.length > 0 || spaceHits.length > 0;
+  // FROM YOUR CONTACTS (founder 2026-11-19, "Add to Maps and Contacts"):
+  // the businesses and people you've saved who aren't on Lichen yet — gray,
+  // private to you, each naming the list it sits on ("Beauty & Wellness").
+  // A card that's on Lichen already shows above as the real member or page.
+  const [cards, setCards] = useState<(Contact & { lists: string[] })[]>([]);
+  useEffect(() => {
+    if (!me || !actingReady || actor.type !== 'self') { setCards([]); return; }
+    let live = true;
+    void (async () => {
+      const [cs, { data: ls }] = await Promise.all([
+        listContacts(me),
+        supabase.from('guest_lists').select('name, entries').eq('owner_id', me),
+      ]);
+      const listsOf = new Map<string, string[]>();
+      for (const l of (ls as { name: string; entries: { contact_id?: string }[] }[] | null) ?? []) {
+        for (const e of l.entries ?? []) if (e.contact_id) listsOf.set(e.contact_id, [...(listsOf.get(e.contact_id) ?? []), l.name]);
+      }
+      if (live) setCards(cs.filter((c) => !c.linked_profile_id && !c.linked_space_id).map((c) => ({ ...c, lists: listsOf.get(c.id) ?? [] })));
+    })();
+    return () => { live = false; };
+  }, [me, actingReady, actor.type]);
+  const cardHits = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return !q ? cards : cards.filter((c) => [c.name, c.address ?? '', c.notes ?? '', ...c.lists].join(' ').toLowerCase().includes(q));
+  }, [query, cards]);
+  const anyHits = hits.length > 0 || spaceHits.length > 0 || cardHits.length > 0;
 
   return (
     <div className="dir">
@@ -323,6 +349,28 @@ export default function Directory() {
             </div>
           );
         })}
+        {cardHits.length > 0 && (
+          <div>
+            <h2 className="dir__section">From your contacts</h2>
+            <p className="dir__cardsnote">Only you see these. They turn peach when they join Lichen.</p>
+            {cardHits.map((c) => (
+              <button key={c.id} type="button" className="dir__card" onClick={() => navigate(`/contacts?card=${c.id}`)}>
+                <span className="dir__card-ava" aria-hidden="true"><Icon name={kindMeta(c.kind).icon} size={16} /></span>
+                <span className="dir__card-main">
+                  <span className="dir__card-name">{c.name || c.emails[0] || c.phones[0] || 'Unnamed'}</span>
+                  <span className="dir__card-sub">{[kindMeta(c.kind).label, c.lists.join(', '), c.address].filter(Boolean).join(' · ')}</span>
+                </span>
+                {c.lat != null && (
+                  <span role="link" tabIndex={0} className="dir__card-map" data-tip="On your map" aria-label="Show on your map"
+                    onClick={(ev) => { ev.stopPropagation(); navigate(`/maps?contact=${c.id}`); }}
+                    onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); navigate(`/maps?contact=${c.id}`); } }}>
+                    <Icon name="location" size={15} />
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

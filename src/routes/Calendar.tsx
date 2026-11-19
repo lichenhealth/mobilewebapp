@@ -845,11 +845,11 @@ export default function Calendar() {
           </button>
           <AssistantDoor section="calendar" label="Your assistant — what's coming, what's unanswered" />
           <span className="calp__tb-spacer" aria-hidden="true" />
-          <div className="calp__nav">
-            <button className="calp__navbtn" onClick={() => page(-1)} aria-label="Previous"><Icon name="chevron-left" size={16} /></button>
-            <button className="calp__month" onClick={() => setAnchor(todayISO())}>{headerLabel}</button>
-            <button className="calp__navbtn" onClick={() => page(1)} aria-label="Next"><Icon name="chevron-right" size={16} /></button>
-          </div>
+          {/* THE ARROWS FLANK THE VIEW (founder 2026-11-19, circling the
+              seams either side of "Week": "Calendar needs back buttons and
+              forward buttons here so you can move around") — ‹ Week › steps by
+              whatever view is showing; the month label is the jump to today. */}
+          <button className="calp__month" onClick={() => setAnchor(todayISO())} data-tip="Jump to today">{headerLabel}</button>
           <button
             className={'calp__todo-toggle' + (view === 'todo' ? ' is-on' : '')}
             onClick={toggleTodo}
@@ -858,9 +858,13 @@ export default function Calendar() {
           >
             To Do
           </button>
-          <select className="calp__vselect" value={view === 'todo' ? prevGridView : view} onChange={(e) => setView(e.target.value as View)} aria-label="View">
-            {(Object.keys(VIEW_LABELS) as GridView[]).map((v) => <option key={v} value={v}>{VIEW_LABELS[v]}</option>)}
-          </select>
+          <div className="calp__nav">
+            <button className="calp__navbtn" onClick={() => page(-1)} disabled={view === 'todo'} aria-label="Previous" data-tip="Back"><Icon name="chevron-left" size={16} /></button>
+            <select className="calp__vselect" value={view === 'todo' ? prevGridView : view} onChange={(e) => setView(e.target.value as View)} aria-label="View">
+              {(Object.keys(VIEW_LABELS) as GridView[]).map((v) => <option key={v} value={v}>{VIEW_LABELS[v]}</option>)}
+            </select>
+            <button className="calp__navbtn" onClick={() => page(1)} disabled={view === 'todo'} aria-label="Next" data-tip="Forward"><Icon name="chevron-right" size={16} /></button>
+          </div>
           {hasBookables && (
             <button className="calp__tool" onClick={() => navigate('/bookings')} aria-label="Bookings" data-tip="Bookings">
               <Icon name="booking-tap" size={16} />

@@ -77,13 +77,15 @@
   color: var(--ink-soft); overflow: hidden;
 }
 
-.calp__nav { display: flex; align-items: center; gap: var(--s-2); }
+.calp__nav { display: flex; align-items: center; gap: 4px; }
+.calp__navbtn:disabled { opacity: .4; cursor: default; }
 .calp__navbtn {
   width: 34px; height: 34px; border-radius: var(--r-full);
   display: inline-flex; align-items: center; justify-content: center;
   color: var(--ink-muted); border: 1px solid var(--bone-edge); background: var(--bone-warm);
 }
-.calp__month { font-family: var(--font-mono); font-size: 13px; color: var(--ink); padding: 4px 8px; white-space: nowrap; }
+.calp__month { font-family: var(--font-mono); font-size: 13px; color: var(--ink); padding: 4px 8px; white-space: nowrap; border-radius: var(--r-full); }
+.calp__month:hover { color: var(--peach-deep); }
 
 /* Grid card — the PAGE scrolls (not the card), so the day header can stick.
    No overflow:hidden here: it would become the sticky containing block and

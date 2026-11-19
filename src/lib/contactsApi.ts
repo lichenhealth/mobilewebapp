@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { IconName } from '../components/Icon';
+import { geocodeSuggest } from './geoApi';
 
 // CONTACT CARDS (founder 2026-11-15) — a member's own private cards: people
 // (personal, professional, or both), organizations (which can run places),
@@ -31,6 +32,8 @@ export type Contact = {
   website: string | null;
   socials: Record<string, string>;
   address: string | null;
+  lat: number | null;
+  lng: number | null;
   notes: string | null;
   source: string | null;
   linked_profile_id: string | null;
@@ -40,7 +43,7 @@ export type Contact = {
 };
 export type ContactDraft = Partial<Omit<Contact, 'id' | 'owner_id' | 'updated_at'>>;
 
-const COLS = 'id, owner_id, kind, name, roles, parent_id, photo_url, emails, phones, website, socials, address, notes, source, linked_profile_id, linked_space_id, linked_at, updated_at';
+const COLS = 'id, owner_id, kind, name, roles, parent_id, photo_url, emails, phones, website, socials, address, lat, lng, notes, source, linked_profile_id, linked_space_id, linked_at, updated_at';
 
 export const onLichen = (c: Pick<Contact, 'linked_profile_id' | 'linked_space_id'>) => !!(c.linked_profile_id || c.linked_space_id);
 
@@ -49,13 +52,29 @@ export async function listContacts(ownerId: string): Promise<Contact[]> {
   return (data as Contact[] | null) ?? [];
 }
 
+// ADD TO MAPS AND CONTACTS (founder 2026-11-19): a card with an address
+// carries its pin, so it rides the private "My contacts" layer on Maps — and
+// a pin is also how a proprietor's own page finds the cards saved for her
+// (same name, same spot). A failed lookup just leaves the card unpinned.
+async function withPin(d: ContactDraft, prevAddress?: string | null): Promise<ContactDraft> {
+  if (d.address === undefined || d.lat !== undefined) return d;
+  const a = (d.address ?? '').trim();
+  if (!a) return { ...d, lat: null, lng: null };
+  if (prevAddress !== undefined && a === (prevAddress ?? '').trim()) return d;
+  const hit = (await geocodeSuggest(a))[0];
+  return hit ? { ...d, lat: hit.lat, lng: hit.lng } : d;
+}
+
 export async function createContact(ownerId: string, d: ContactDraft): Promise<Contact> {
+  d = await withPin(d);
   const { data, error } = await supabase.from('contacts').insert({ ...d, owner_id: ownerId }).select(COLS).single();
   if (error) throw new Error(error.message);
   return data as Contact;
 }
 
-export async function updateContact(id: string, d: ContactDraft): Promise<Contact> {
+export async function updateContact(id: string, d: ContactDraft, prev?: Pick<Contact, 'address' | 'lat'>): Promise<Contact> {
+  // Re-pin when the address changed, or when an addressed card never got one.
+  d = await withPin(d, prev && prev.lat != null ? prev.address : undefined);
   const { data, error } = await supabase.from('contacts').update(d).eq('id', id).select(COLS).single();
   if (error) throw new Error(error.message);
   return data as Contact;
@@ -133,4 +152,11 @@ export async function listSharedWithMe(me: string): Promise<SharedList[]> {
     out.push({ ...r, owner_name: r.owner?.full_name ?? 'A member', level: (lvl as ShareLevel) ?? 'see' });
   }
   return out;
+}
+
+/** My own pinned cards — the private "My contacts" layer on Maps. */
+export async function listPinnedContacts(ownerId: string): Promise<Contact[]> {
+  const { data } = await supabase.from('contacts').select(COLS).eq('owner_id', ownerId)
+    .not('lat', 'is', null).not('lng', 'is', null).order('name');
+  return (data as Contact[] | null) ?? [];
 }

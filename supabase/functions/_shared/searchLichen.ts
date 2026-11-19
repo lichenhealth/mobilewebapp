@@ -87,7 +87,7 @@ export async function searchMyLichen(sb: SbFn, me: string, query: string, offSec
         hits.push({ source: 'Saved post (Drive)', title: String(p.title || cut(p.body, 60)), detail: cut(p.body), open: `/posts/${p.id}`, text: `${p.title} ${p.body}` });
       // Contact cards + guest lists live under the same switch.
       for (const c of arr<Record<string, unknown>>(await get(`contacts?owner_id=eq.${me}&${or(['name', 'notes', 'address', 'website'])}&select=id,kind,name,address,website,phones,emails,notes&limit=10`)))
-        hits.push({ source: `Contact card (${c.kind})`, title: String(c.name ?? ''), detail: cut([c.address, c.website, arr<string>(c.phones)[0], arr<string>(c.emails)[0], c.notes].filter(Boolean).join(' · ')), open: '/contacts', text: `${c.name} ${c.notes} ${c.address} ${c.website}` });
+        hits.push({ source: `Contact card (${c.kind})`, title: String(c.name ?? ''), detail: cut([c.address, c.website, arr<string>(c.phones)[0], arr<string>(c.emails)[0], c.notes].filter(Boolean).join(' · ')), open: `/contacts?card=${c.id}`, text: `${c.name} ${c.notes} ${c.address} ${c.website}` });
       for (const g of arr<Record<string, unknown>>(await get(`guest_lists?owner_id=eq.${me}&select=name,entries&limit=50`))) {
         const names = arr<Record<string, unknown>>(g.entries).map((e) => String(e.name ?? e.value ?? '')).filter(Boolean);
         const blob = `${g.name} ${names.join(' ')}`.toLowerCase();
