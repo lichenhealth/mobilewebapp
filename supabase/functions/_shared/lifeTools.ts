@@ -10,6 +10,8 @@
 type SbFn = (path: string, init?: RequestInit) => Promise<Response>;
 type Out = { ok: boolean; change?: string; error?: string; [k: string]: unknown };
 
+import { findMember } from './findMember.ts';
+
 export const LIFE_TOOLS = [
   {
     name: 'my_lists',
@@ -146,6 +148,15 @@ export const LIFE_TOOLS = [
     },
   },
   {
+    name: 'draft_message',
+    description: 'Write a Lichen chat message to ONE person, ready for the member to send — a direct message in their own Lichen chat. person = the name they gave (spelling is forgiven; a member close to them wins); body = the message in their voice. It NEVER sends: a card under your reply shows the message with Send, and their tap sends it from them. Use this whenever they ask you to message, text on Lichen, tell or ping someone — never say you can\'t send Lichen messages. If the name could be several people, ask which.',
+    input_schema: {
+      type: 'object',
+      properties: { person: { type: 'string' }, body: { type: 'string' } },
+      required: ['person', 'body'],
+    },
+  },
+  {
     name: 'invite_to_event',
     description: 'Invite people to an event they HOST (calendar event or formal event), by name and/or email. It never sends by itself: a card under your reply lists who will be invited and the MEMBER taps Send. people = names; each must match exactly one Lichen member (their invitation reaches them in Lichen and, if calendar=true, as a real calendar invitation at the email they signed up with — Lichen never shows that address) or a name on the member\'s own saved contacts/guest lists (that saved email is used). emails = addresses they typed in THIS conversation (others are refused). calendar=true (default) emails everyone a real Google/Apple/Outlook invitation with Yes/No/Maybe. Say plainly who could not be matched.',
     input_schema: {
@@ -276,7 +287,7 @@ export const LIFE_TOOLS = [
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', my_imported_calendar: 'calendar', invite_to_event: 'calendar', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', drive_time: 'maps', set_care_funding: 'concierge', revenue_streams: 'concierge',
+  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', my_imported_calendar: 'calendar', invite_to_event: 'calendar', draft_message: 'chat', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', drive_time: 'maps', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -792,6 +803,20 @@ export async function runLifeTool(
     return { ok: true, drafts: rows.map(describe), doors: rows.slice(0, 4).map((x) => ({ path: pathOf(x), label: `Open ${x.title || 'the draft'} →` })) };
   }
 
+  if (name === 'draft_message') {
+    const person = String(input.person ?? '').trim();
+    const body = String(input.body ?? '').trim().slice(0, 4000);
+    if (!person || !body) return { ok: false, error: 'Who to message and what to say are both needed.' };
+    const found = await findMember(sb, me, person);
+    if (found.kind === 'several') return { ok: false, error: `"${person}" could be ${found.candidates.map((c) => c.name).join(' or ')} — ask which.` };
+    if (found.kind === 'none') return { ok: false, error: `No Lichen member matches "${person}", even allowing for spelling. Ask for their full name, or offer to invite them to Lichen.` };
+    return {
+      ok: true,
+      message: { type: 'chat_draft', profile_id: found.member.id, name: found.member.name, body },
+      note: `A card under your reply holds the message to ${found.member.name} — it goes when they tap Send.${found.exact ? '' : ` ("${person}" read as ${found.member.name} — say the real name.)`}`,
+    };
+  }
+
   if (name === 'invite_to_event') {
     const arr = <T,>(x: unknown) => (Array.isArray(x) ? x : []) as T[];
     const since = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
@@ -812,17 +837,20 @@ export async function runLifeTool(
     const members: { id: string; name: string }[] = [];
     const emails: { email: string; name: string }[] = [];
     const unplaced: string[] = [];
+    const respelled: string[] = [];
     const lists = arr<{ entries: { kind: string; name?: string; value?: string }[] }>(await (await sb(`guest_lists?owner_id=eq.${me}&select=entries`)).json());
     const norm = (x: string) => x.trim().toLowerCase().replace(/\s+/g, ' ');
     for (const raw of arr<string>(input.people).map((x) => String(x).trim()).filter(Boolean).slice(0, 25)) {
       const n = norm(raw);
-      const hits = arr<{ id: string; full_name: string | null }>(await (await sb(`profiles?full_name=ilike.${encodeURIComponent(raw)}&kind=eq.person&onboarded=eq.true&select=id,full_name&limit=3`)).json());
+      const found = await findMember(sb, me, raw);
       const saved = lists.flatMap((l) => l.entries).filter((e) => e.kind === 'email' && e.value && e.name
         && (norm(e.name) === n || norm(e.name).split(' ')[0] === n));
-      if (hits.length === 1 && hits[0].id !== me) { if (!members.some((m) => m.id === hits[0].id)) members.push({ id: hits[0].id, name: hits[0].full_name ?? raw }); }
-      else if (hits.length > 1) { unplaced.push(`${raw} (more than one member has that name — ask for the full name)`); continue; }
+      if (found.kind === 'match') {
+        if (!members.some((m) => m.id === found.member.id)) members.push({ id: found.member.id, name: found.member.name });
+        if (!found.exact) respelled.push(`"${raw}" is ${found.member.name}`);
+      } else if (found.kind === 'several') { unplaced.push(`${raw} (could be ${found.candidates.map((c) => c.name).join(' or ')} — ask which)`); continue; }
       for (const e of saved) if (!emails.some((x) => x.email === e.value)) emails.push({ email: e.value!.toLowerCase(), name: e.name! });
-      if (hits.length === 0 && !saved.length) unplaced.push(`${raw} (no member or saved contact by that name — ask for their email)`);
+      if (found.kind === 'none' && !saved.length) unplaced.push(`${raw} (no member or saved contact by that name, even allowing for spelling — ask for their email)`);
     }
     const said = memberText.toLowerCase();
     for (const raw of arr<string>(input.emails).map((x) => String(x).trim().toLowerCase()).filter(Boolean).slice(0, 25)) {
@@ -835,7 +863,7 @@ export async function runLifeTool(
     return {
       ok: true,
       invite: { type: 'cal_invite', event_id: ev.id, title: ev.title ?? 'the event', members, emails, calendar },
-      note: `A card under your reply lists who will be invited to "${ev.title}" — nothing is sent until they tap Send.${calendar ? ' Each person will also get a real calendar invitation by email.' : ''}${unplaced.length ? ' Could not match: ' + unplaced.join('; ') + '.' : ''}`,
+      note: `A card under your reply lists who will be invited to "${ev.title}" — nothing is sent until they tap Send.${calendar ? ' Each person will also get a real calendar invitation by email.' : ''}${respelled.length ? ' Matched despite spelling: ' + respelled.join('; ') + ' — say the real name back to them.' : ''}${unplaced.length ? ' Could not match: ' + unplaced.join('; ') + '.' : ''}`,
     };
   }
 
@@ -864,10 +892,9 @@ export async function runLifeTool(
     if (phone && (pd.length < 7 || !saidDigits.replace(/\s/g, '').includes(pd.slice(-7)))) return { ok: false, error: 'Use only a phone number they typed in this conversation.' };
     let memberId: string | null = null; let name = person;
     if (person) {
-      const hits = arr<{ id: string; full_name: string | null }>(await (await sb(`profiles?full_name=ilike.${encodeURIComponent(person)}&kind=eq.person&onboarded=eq.true&select=id,full_name&limit=3`)).json())
-        .filter((h) => h.id !== me);
-      if (hits.length > 1) return { ok: false, error: `More than one member is named "${person}" — ask for the full name.` };
-      if (hits.length === 1) { memberId = hits[0].id; name = hits[0].full_name ?? person; }
+      const found = await findMember(sb, me, person);
+      if (found.kind === 'several') return { ok: false, error: `"${person}" could be ${found.candidates.map((c) => c.name).join(' or ')} — ask which.` };
+      if (found.kind === 'match') { memberId = found.member.id; name = found.member.name; }
       if (!email || !phone) {
         const lists = arr<{ entries: { kind: string; name?: string; value?: string }[] }>(await (await sb(`guest_lists?owner_id=eq.${me}&select=entries`)).json());
         for (const e of lists.flatMap((l) => l.entries)) {
