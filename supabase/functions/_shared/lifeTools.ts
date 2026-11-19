@@ -263,7 +263,7 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'contacts',
-    description: 'Their PRIVATE contact cards in Drive → Contacts — people (personal, professional or both), organizations (which can run places), places, communities, groups. A card is GRAY until that person/organization is on Lichen and PEACH once it links (Lichen links them by email/phone/website when they join, and on save if they already are). op: list (optional query/kind filter), read (one card by exact name), create, update (by exact name: new_name, add_emails, add_phones, website, address, notes [replaces], roles, kind, run_by), delete (by exact name — only when they asked), add_to_list (put the card on one of their guest lists by exact list name — created if missing). For a place an organization runs, create the place with run_by = the organization card\'s exact name. Emails and phones ONLY as the member typed them in THIS conversation or as read from a photo/flyer they shared — never invent an address. Sharing a list stays theirs to set on the Contacts screen (hand the drive door).',
+    description: 'Their PRIVATE contact cards in Drive → Contacts — people (personal, professional or both), organizations (which can run places), places, communities, groups. A card is GRAY until that person/organization is on Lichen and PEACH once it links (Lichen links them by email/phone/website when they join, and on save if they already are). op: list (optional query/kind filter), read (one card by exact name), create, update (by exact name: new_name, add_emails, add_phones, website, address, notes [replaces], roles, kind, run_by), delete (by exact name — only when they asked), add_to_list (put the card on one of their guest lists by exact list name — created if missing). For a place an organization runs, create the place with run_by = the organization card\'s exact name. Emails, phones, websites and addresses ONLY as the member typed them in THIS conversation, as read from a photo/flyer they shared, or as found for a business this exchange (its own website, a web search, one of their emails or calendar entries) — never invent one. When you save something you found, offer the list it belongs on (e.g. "Beauty & Wellness"). Sharing a list stays theirs to set on the Contacts screen (hand the drive door).',
     input_schema: {
       type: 'object',
       properties: {
@@ -1371,7 +1371,7 @@ export async function runLifeTool(
     const arr = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean) : []);
     const op = String(input.op ?? '');
     const cs = await all();
-    const door = { app_door: '/drive?contacts=1' };
+    const door = { app_door: '/contacts' };
     if (op === 'list') {
       const q = String(input.query ?? '').trim().toLowerCase(); const k = String(input.kind ?? '');
       const hits = cs.filter((c) => (!k || c.kind === k) && (!q || [c.name, ...(c.emails ?? []), ...(c.phones ?? []), c.website ?? '', c.notes ?? ''].join(' ').toLowerCase().includes(q)));
