@@ -125,6 +125,19 @@ export const LIFE_TOOLS = [
     },
   },
   {
+    name: 'delete_calendar_event',
+    description: 'Remove one of THEIR OWN private calendar events (one add_calendar_event made, or any plain personal entry on their Lichen calendar) by its exact title. Never a formal Event with its own page/guests (RSVP, payments, a shareable link) — that\'s cancelled from the event page, not here; this tool refuses those and says so. date (YYYY-MM-DD) picks one occurrence when several share a title (e.g. leftover single-date copies made before a repeat option existed). all=true removes every NON-repeating match sharing that title in one go, but always leaves a true repeating series alone (say so) — to remove a repeating series itself, it must be the ONLY match. If several matches remain ambiguous, lists them by date and asks which rather than guessing.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        date: { type: 'string', description: 'YYYY-MM-DD — picks one occurrence among several sharing the title' },
+        all: { type: 'boolean', description: 'Remove every non-repeating match sharing the title; a repeating series is never swept up by this' },
+      },
+      required: ['title'],
+    },
+  },
+  {
     name: 'my_imported_calendar',
     description: 'Read the events imported into their Lichen calendar from Google Calendar or an ICS link (their own calendars only) — what Lichen holds covers about 30 days back and 180 days ahead. query = words from the event title (e.g. "Morgan Weekly"), empty to list everything in the range; from/to = YYYY-MM-DD to narrow it. Returns each match by date with weekday, time and which calendar it came from, plus a pattern line when a title repeats on the same weekday and time (e.g. weekly, Tuesdays 3pm–4pm, 50 min). Use it BEFORE asking the member when or how long an outside event runs — never say you can\'t see their imported calendar. If nothing matches, say what range you looked in.',
     input_schema: {
@@ -287,7 +300,7 @@ export const LIFE_TOOLS = [
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
   my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
-  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', my_calendar_drafts: 'calendar', my_imported_calendar: 'calendar', invite_to_event: 'calendar', draft_message: 'chat', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', drive_time: 'maps', set_care_funding: 'concierge', revenue_streams: 'concierge',
+  drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', delete_calendar_event: 'calendar', my_calendar_drafts: 'calendar', my_imported_calendar: 'calendar', invite_to_event: 'calendar', draft_message: 'chat', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', drive_time: 'maps', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
 const enc = encodeURIComponent;
@@ -727,6 +740,42 @@ export async function runLifeTool(
     const row = (await r.json().catch(() => null)) as { id: string }[] | null;
     if (!r.ok || !row?.[0]) return { ok: false, error: 'The calendar didn\'t take it — try again.' };
     return { ok: true, change: `added "${title}" to their calendar on ${date}${allDay ? ' (all day)' : ''}${recurrence ? `, repeating ${recurrence.freq}${(recurrence.end as { type: string }).type === 'never' ? ' with no end date' : ''} — one event carrying the whole series` : ''}`, door: { path: `/calendar/edit/${row[0].id}`, label: `Open ${title} →` } };
+  }
+
+  if (name === 'delete_calendar_event') {
+    const title = String(input.title ?? '').trim();
+    if (!title) return { ok: false, error: 'A title is needed.' };
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(input.date ?? '')) ? String(input.date) : '';
+    const wantAll = !!input.all;
+    type E = { id: string; title: string | null; start_date: string; recurrence: unknown };
+    const rows = ((await (await sb(`events?creator_id=eq.${me}&is_draft=eq.false&select=id,title,start_date,recurrence&order=start_date.asc&limit=300`)).json().catch(() => [])) ?? []) as E[];
+    const want = title.toLowerCase();
+    let hits = rows.filter((e) => (e.title ?? '').trim().toLowerCase() === want);
+    if (!hits.length) return { ok: false, error: `No calendar event of theirs titled "${title}".` };
+    // Never a formal Event (its own page, guests, RSVPs) — that's cancelled from the event page.
+    const ids = hits.map((e) => e.id);
+    const linkedRows = ((await (await sb(`posts?linked_event_id=in.(${ids.join(',')})&select=linked_event_id`)).json().catch(() => [])) ?? []) as { linked_event_id: string }[];
+    const linked = new Set(linkedRows.map((l) => l.linked_event_id));
+    const formalCount = hits.filter((e) => linked.has(e.id)).length;
+    hits = hits.filter((e) => !linked.has(e.id));
+    if (!hits.length) return { ok: false, error: `"${title}" is a formal Event with its own page and guests — cancel it from the event page, not here.` };
+    if (date) hits = hits.filter((e) => e.start_date === date);
+    if (date && !hits.length) return { ok: false, error: `None of their "${title}" calendar events fall on ${date}.` };
+    if (hits.length > 1) {
+      const single = hits.filter((e) => !e.recurrence);
+      if (!wantAll || !single.length) {
+        return { ok: false, error: `${hits.length} of their calendar events are titled "${title}"${date ? ` on ${date}` : ''}: ${hits.map((e) => `${e.start_date}${e.recurrence ? ' (repeating series)' : ''}`).join(', ')}${formalCount ? ` (plus ${formalCount} formal Event${formalCount === 1 ? '' : 's'}, left alone)` : ''}. Say which one to remove, or ask to remove all the non-repeating ones.` };
+      }
+      hits = single; // an "all" sweep never takes a repeating series with it
+    }
+    let removed = 0;
+    for (const e of hits) {
+      const r = await sb(`events?id=eq.${e.id}&creator_id=eq.${me}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      if (r.ok) removed++;
+    }
+    if (!removed) return { ok: false, error: 'Nothing was removed — try again.' };
+    const keptSeries = rows.some((e) => !linked.has(e.id) && (e.title ?? '').trim().toLowerCase() === want && !!e.recurrence && !hits.find((h) => h.id === e.id));
+    return { ok: true, change: `removed ${removed} calendar event${removed === 1 ? '' : 's'} titled "${title}"${date ? ` on ${date}` : ''}${keptSeries ? ' (kept their repeating series as it stands)' : ''}${formalCount ? ` — left ${formalCount} formal Event${formalCount === 1 ? '' : 's'} of that name alone` : ''}` };
   }
 
   if (name === 'my_imported_calendar') {
