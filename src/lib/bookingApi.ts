@@ -50,6 +50,10 @@ export interface BookingType {
    *  options); false = payment asked up front. Only meaningful with a
    *  price_cents. */
   allow_pay_later?: boolean;
+  /** Remind the provider to bill right after each confirmed session ends
+   *  (founder 2026-11-19 — she bills by hand in Ivy Pay). A bell only;
+   *  Lichen never charges anyone. */
+  bill_reminder?: boolean;
   /** HOW TO COLLECT PAYMENT, off-platform (founder 2026-11-02: "buttons to
    *  all the options - credit card, venmo, etc"): the provider's own
    *  pointers — Venmo/PayPal/Cash App/Zelle handles or free words. Card or
@@ -102,7 +106,7 @@ export interface BookingRow {
   booker?: { full_name: string | null } | null;
 }
 
-const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, slot_increment_min, price_cents, allow_pay_later, pay_methods, active';
+const TYPE_COLS = 'id, profile_id, title, description, duration_min, buffer_min, price, location, approval, audience, audience_space_id, min_notice_min, max_days_out, max_per_day, capacity, questions, slug, hours_kind, slot_increment_min, price_cents, allow_pay_later, pay_methods, bill_reminder, active';
 
 // ── Off-platform payment methods (founder 2026-11-02) ───────────────────────
 /** One way a provider collects payment outside Lichen's own checkout. */

@@ -275,6 +275,7 @@ const CALENDAR_TOOLS = [
         duration_min: { type: 'number', description: '15–480 minutes.' },
         price: { type: 'string' },
         collect_online_usd: { type: 'number', description: 'Collect this many DOLLARS at booking through Lichen, by card or US bank transfer ($1–$5,000; decimals fine). The provider receives it as Current-cy 1:1, or as dollars via their wallet\'s cash-out choice. 0 = no online payment (the default — the words-price above is just display). Request-approval types never charge before the provider accepts.' },
+        bill_reminder: { type: 'boolean', description: 'true = the member gets a notification the moment each confirmed session of this type ENDS, naming who to bill and how long — for billing they do outside Lichen (e.g. Ivy Pay). Lichen never charges anyone. Default false.' },
         invoice_later: { type: 'boolean', description: 'Offer "invoice me later" at booking (default true): the booker may choose to settle from their booking link any time instead of paying up front. false = payment asked up front. Only meaningful with collect_online_usd.' },
         pay_methods: { type: 'array', items: { type: 'object', properties: { kind: { type: 'string' }, value: { type: 'string' } }, required: ['kind', 'value'] }, description: 'Off-platform ways the member collects payment (founder 2026-11-02): an array of {kind, value} — kind is venmo|paypal|cashapp|zelle|other, value the handle/link/words. ⚠ A payment handle is money\'s address: for venmo/paypal/cashapp/zelle the value must appear EXACTLY in the member\'s own words in this conversation, or it is refused — never compose or guess one. kind=other is free words (\"Cash at the door\", \"Ivy Pay invoice\"). An empty array removes them all. Shown to bookers once a booking is confirmed.' },
         approval: { type: 'string', enum: ['request', 'instant'], description: 'request = they approve each booking; instant = it books straight in.' },
@@ -311,6 +312,7 @@ const CALENDAR_TOOLS = [
         price: { type: 'string' },
         collect_online_usd: { type: 'number', description: 'Dollars collected at booking by card or bank ($1–$5,000); 0 removes online payment.' },
         invoice_later: { type: 'boolean', description: 'Offer "invoice me later" at booking; false = payment up front.' },
+        bill_reminder: { type: 'boolean', description: 'true = notify the member to bill the moment each confirmed session ends (billing done outside Lichen); false = stop.' },
         pay_methods: { type: 'array', items: { type: 'object', properties: { kind: { type: 'string' }, value: { type: 'string' } }, required: ['kind', 'value'] }, description: 'Off-platform ways the member collects payment (founder 2026-11-02): an array of {kind, value} — kind is venmo|paypal|cashapp|zelle|other, value the handle/link/words. ⚠ A payment handle is money\'s address: for venmo/paypal/cashapp/zelle the value must appear EXACTLY in the member\'s own words in this conversation, or it is refused — never compose or guess one. kind=other is free words (\"Cash at the door\", \"Ivy Pay invoice\"). An empty array removes them all. Shown to bookers once a booking is confirmed.' },
         approval: { type: 'string', enum: ['request', 'instant'] },
         audience: { type: 'string', enum: ['everyone', 'mycelium', 'public'] },
@@ -2107,7 +2109,7 @@ Deno.serve(async (req) => {
     if (name === 'my_calendar_setup') {
       const [hours, types, care, prof] = await Promise.all([
         (await sb(`availability_windows?profile_id=eq.${profile_id}&booking_type_id=is.null&select=weekday,start_min,end_min,kind&order=weekday,start_min`)).json(),
-        (await sb(`booking_types?profile_id=eq.${profile_id}&select=id,title,duration_min,price,approval,audience,active,slug,min_notice_min,max_days_out,max_per_day,capacity,questions,hours_kind,slot_increment_min,price_cents,allow_pay_later,pay_methods&order=created_at`)).json(),
+        (await sb(`booking_types?profile_id=eq.${profile_id}&select=id,title,duration_min,price,approval,audience,active,slug,min_notice_min,max_days_out,max_per_day,capacity,questions,hours_kind,slot_increment_min,price_cents,allow_pay_later,pay_methods,bill_reminder&order=created_at`)).json(),
         (await sb(`care_team_members?caregiver_id=eq.${profile_id}&status=eq.active&select=id&limit=1`)).json(),
         (await sb(`profiles?id=eq.${profile_id}&select=handle`)).json(),
       ]);
@@ -2125,7 +2127,7 @@ Deno.serve(async (req) => {
         hours: hs.length
           ? hs.map((h) => `${kindOut(h.kind)}: ${DAYS[h.weekday]} ${minLabel(h.start_min)}–${minLabel(h.end_min)}`)
           : 'none set — they are not bookable and never counted available',
-        booking_types: (Array.isArray(types) ? types : []).map((t: { id: string; title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean; slug: string | null; min_notice_min: number | null; max_days_out: number | null; max_per_day: number | null; capacity: number | null; questions: string[] | null; hours_kind: string | null; slot_increment_min: number | null; price_cents: number | null; allow_pay_later: boolean | null }) =>
+        booking_types: (Array.isArray(types) ? types : []).map((t: { id: string; title: string; duration_min: number; price: string | null; approval: string; audience: string; active: boolean; slug: string | null; min_notice_min: number | null; max_days_out: number | null; max_per_day: number | null; capacity: number | null; questions: string[] | null; hours_kind: string | null; slot_increment_min: number | null; price_cents: number | null; allow_pay_later: boolean | null; bill_reminder?: boolean | null }) =>
           `${t.title} (${t.duration_min}min, ${t.price || 'no price words'}, ${t.approval}, ${t.audience}`
           + `${t.hours_kind && t.hours_kind !== 'work' ? `, books from ${t.hours_kind === 'custom' ? 'its OWN hours' : t.hours_kind.replace('_', '-') + ' hours'}` : ''}`
           + `${(t.capacity ?? 1) > 1 ? `, group of up to ${t.capacity}` : ''}`
@@ -2134,6 +2136,7 @@ Deno.serve(async (req) => {
           + `${t.max_per_day != null ? `, max ${t.max_per_day}/day` : ''}`
           + `${t.slot_increment_min != null ? `, starts every ${t.slot_increment_min} min` : ''}`
           + `${t.price_cents != null ? `, collects $${(t.price_cents / 100).toFixed(t.price_cents % 100 ? 2 : 0)} online (card or bank${t.allow_pay_later === false ? '; payment up front, no invoice-later' : '; invoice-later offered'})` : ''}`
+          + `${t.bill_reminder ? ', reminds them to bill right after each session' : ''}`
           + `${Array.isArray((t as { pay_methods?: { kind?: string; value?: string }[] }).pay_methods) && (t as { pay_methods?: { kind?: string; value?: string }[] }).pay_methods!.some((m) => (m?.value ?? '').trim()) ? `, also takes ${(t as { pay_methods?: { kind?: string; value?: string }[] }).pay_methods!.filter((m) => (m?.value ?? '').trim()).map((m) => m.kind === 'other' ? m.value : `${m.kind === 'cashapp' ? 'Cash App' : m.kind === 'paypal' ? 'PayPal' : (m.kind ?? '').charAt(0).toUpperCase() + (m.kind ?? '').slice(1)} ${m.value}`).join(', ')}` : ''}`
           + `${t.questions?.length ? `, ${t.questions.length} intake question${t.questions.length === 1 ? '' : 's'}` : ''}`
           + `${meetBy.get(t.id)?.zoom_unique ? ', unique Zoom meeting minted per booking' : ''}`
@@ -2211,6 +2214,7 @@ Deno.serve(async (req) => {
         else errs.push('collect_online_usd must be $1–$5,000, or 0 for no online payment');
       }
       if (inp.invoice_later !== undefined) out.allow_pay_later = !!inp.invoice_later;
+      if (inp.bill_reminder !== undefined) out.bill_reminder = !!inp.bill_reminder;
       if (inp.pay_methods !== undefined) {
         const list = Array.isArray(inp.pay_methods) ? inp.pay_methods : [];
         if (!list.length) out.pay_methods = null;
