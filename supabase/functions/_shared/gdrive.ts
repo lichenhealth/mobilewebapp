@@ -215,6 +215,7 @@ export function lichenKindFor(mime: string, name = ''): { kind: 'doc' | 'sheet' 
   if (mime.startsWith('application/vnd.google-apps.')) return { kind: 'none', label: 'Can’t be carried over yet' };
   if (/spreadsheetml|ms-excel|opendocument\.spreadsheet|text\/csv/.test(mime) || ['xlsx', 'xls', 'csv', 'ods'].includes(ext)) return { kind: 'sheet', label: 'Spreadsheet → Lichen spreadsheet' };
   if (mime === 'text/plain' || mime === 'text/markdown' || ['txt', 'md'].includes(ext)) return { kind: 'doc', label: 'Text → Lichen doc' };
+  if (mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || ext === 'docx') return { kind: 'doc', label: 'Word → Lichen doc' };
   if (mime.startsWith('image/')) return { kind: 'photo', label: 'Photo' };
   if (mime.startsWith('video/')) return { kind: 'video', label: 'Video' };
   if (mime.startsWith('audio/')) return { kind: 'audio', label: 'Audio' };
