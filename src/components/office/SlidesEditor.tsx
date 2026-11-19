@@ -9,11 +9,12 @@ import './Office.css';
  *  place, layouts, themes, speaker notes, a full-screen Present with a
  *  speaker-notes view, PDF (print) and PowerPoint download. */
 
-export type SlideLayout = 'title' | 'bullets' | 'section' | 'two' | 'quote' | 'big' | 'text' | 'image' | 'imagetext';
+export type SlideLayout = 'title' | 'bullets' | 'section' | 'two' | 'quote' | 'big' | 'text' | 'image' | 'imagetext' | 'picture';
 export const LAYOUTS: { id: SlideLayout; label: string }[] = [
   { id: 'title', label: 'Title slide' }, { id: 'bullets', label: 'Title & bullets' }, { id: 'text', label: 'Title & text' },
   { id: 'two', label: 'Two columns' }, { id: 'section', label: 'Section header' }, { id: 'quote', label: 'Quote' }, { id: 'big', label: 'Big number' },
   { id: 'image', label: 'Title & image' }, { id: 'imagetext', label: 'Image & text' },
+  { id: 'picture', label: 'Full-slide picture' },
 ];
 export const THEMES: Record<string, { label: string; bg: string; ink: string; accent: string; font: string }> = {
   paper: { label: 'Paper', bg: '#fbf7f0', ink: '#1f2a30', accent: '#c9733d', font: "'Cormorant Garamond', Georgia, serif" },
@@ -49,7 +50,15 @@ export function SlideView({ s, i, theme, edit, img, onPickImage }: {
     <div className={`slx__slide slx__slide--${L}`} style={{ background: th.bg, color: th.ink, ['--sl-accent' as string]: th.accent, ['--sl-font' as string]: th.font }}>
       {L === 'section' && <span className="slx__band" />}
       {L === 'quote' && <span className="slx__qmark">“</span>}
-      {(L === 'image' || L === 'imagetext') ? (() => {
+      {L === 'picture' ? (() => {
+        // FULL-SLIDE PICTURE (founder 2026-11-19: an imported Google slide
+        // looks exactly as Google drew it). The slide's words stay in its
+        // data for search and the brain; switch the layout to edit them.
+        const url = s.image ? img?.[s.image] : undefined;
+        return url ? <div className="slx__full"><img src={url} alt={s.title || ''} /></div>
+          : edit ? <button className="slx__img slx__img--empty slx__full" onClick={onPickImage}>＋ Add a picture</button>
+          : <div className="slx__full" />;
+      })() : (L === 'image' || L === 'imagetext') ? (() => {
         const url = s.image ? img?.[s.image] : undefined;
         const pic = url ? <div className="slx__img"><img src={url} alt="" /></div>
           : edit ? <button className="slx__img slx__img--empty" onClick={onPickImage}>＋ Add an image</button>
@@ -129,7 +138,7 @@ export default function SlidesEditor({ slides, theme, onChange, title, chatId, o
     try {
       const ref = await uploadOfficeImage(f, chatId ?? null);
       const L = layoutOf(s, i);
-      patch({ image: ref, ...(L === 'image' || L === 'imagetext' ? {} : { layout: s.body?.trim() ? 'imagetext' : 'image' }) });
+      patch({ image: ref, ...(L === 'image' || L === 'imagetext' || L === 'picture' ? {} : { layout: s.body?.trim() ? 'imagetext' : 'image' }) });
     } catch { window.alert("That image didn't upload — try again in a moment."); }
     finally { setBusy(false); }
   };
@@ -175,7 +184,9 @@ export default function SlidesEditor({ slides, theme, onChange, title, chatId, o
       p.background = { color: hex(th.bg) };
       const face = th.font.includes('Archivo') ? 'Arial' : 'Georgia';
       const tx = { color: hex(th.ink), fontFace: face };
-      if ((L === 'image' || L === 'imagetext') && sl.image && pics[sl.image]) {
+      if (L === 'picture' && sl.image && pics[sl.image]) {
+        p.addImage({ data: pics[sl.image], x: 0, y: 0, w: 13.33, h: 7.5, sizing: { type: 'contain', w: 13.33, h: 7.5 } });
+      } else if ((L === 'image' || L === 'imagetext') && sl.image && pics[sl.image]) {
         const data = pics[sl.image];
         if (L === 'image') {
           p.addText(sl.title || ' ', { ...tx, x: 0.6, y: 0.3, w: 12, h: 0.9, fontSize: 32, bold: true });

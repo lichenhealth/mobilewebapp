@@ -276,6 +276,10 @@ ul.slx__b li { margin-bottom: .45em; }
 /* ── images on slides ── */
 .slx__img { position: relative; overflow: hidden; border-radius: 1.2cqw; background: rgba(0,0,0,.06); }
 .slx__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Full-slide picture — an imported Google slide, exactly as drawn. */
+.slx__slide--picture { padding: 0 !important; }
+.slx__full { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.slx__full img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .slx__img--empty { display: flex; align-items: center; justify-content: center; font-size: 2.2cqw; opacity: .55; border: .25cqw dashed currentColor; background: none; }
 .slx__slide--image { display: flex; flex-direction: column; }
 .slx__slide--image .slx__img { flex: 1; min-height: 0; margin-top: 2cqw; }

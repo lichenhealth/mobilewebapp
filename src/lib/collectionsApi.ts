@@ -71,6 +71,9 @@ export interface CollectionRow {
   space_id: string | null;
   space: { name: string | null } | null;
   item_count: number;
+  /** NESTED FOLDERS (founder 2026-11-19): the folder this one sits inside;
+   *  null = the top of Drive (or of the space's shelf). */
+  parent_id: string | null;
 }
 
 type RawRow = Omit<CollectionRow, 'item_count' | 'owner' | 'details' | 'space'> & {
@@ -81,7 +84,7 @@ type RawRow = Omit<CollectionRow, 'item_count' | 'owner' | 'details' | 'space'> 
 };
 
 const COLLECTION_SELECT =
-  'id, owner_id, name, description, is_public, kind, details, created_at, space_id, space:spaces!collections_space_id_fkey(name), owner:profiles!collections_owner_id_fkey(full_name), collection_items(count)';
+  'id, owner_id, name, description, is_public, kind, details, created_at, space_id, parent_id, space:spaces!collections_space_id_fkey(name), owner:profiles!collections_owner_id_fkey(full_name), collection_items(count)';
 // pre-migration fallback (no space_id column yet)
 const COLLECTION_SELECT_LEGACY =
   'id, owner_id, name, description, is_public, kind, details, created_at, owner:profiles!collections_owner_id_fkey(full_name), collection_items(count)';
@@ -90,6 +93,7 @@ function shape(r: RawRow): CollectionRow {
   return {
     ...r, details: r.details ?? {}, item_count: r.collection_items?.[0]?.count ?? 0,
     space_id: r.space_id ?? null, space: r.space ?? null,
+    parent_id: (r as { parent_id?: string | null }).parent_id ?? null,
   };
 }
 
@@ -149,12 +153,12 @@ export async function listSpaceCollections(spaceId: string, kind?: CollectionKin
   return rows.map(shape);
 }
 
-export async function createCollection(name: string, kind: CollectionKind = 'collection', spaceId?: string): Promise<string> {
+export async function createCollection(name: string, kind: CollectionKind = 'collection', spaceId?: string, parentId?: string | null): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
   const { data, error } = await supabase
     .from('collections')
-    .insert({ owner_id: user.id, name: name.trim(), kind, ...(spaceId ? { space_id: spaceId } : {}) })
+    .insert({ owner_id: user.id, name: name.trim(), kind, ...(spaceId ? { space_id: spaceId } : {}), ...(parentId ? { parent_id: parentId } : {}) })
     .select('id').single();
   if (error) throw error;
   return (data as { id: string }).id;
@@ -291,8 +295,56 @@ export async function resolveSuggestion(id: string, accept: boolean): Promise<vo
   if (error) throw error;
 }
 
+/** Move a folder inside another (or to the top with null). The database
+ *  refuses a loop or a folder from another home in plain words. */
+export async function moveCollection(id: string, parentId: string | null): Promise<void> {
+  const { error } = await supabase.from('collections').update({ parent_id: parentId }).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+/** The chain of folders from the top down to (not including) this one. */
+export function folderAncestors(rows: { id: string; name: string; parent_id: string | null }[], id: string) {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const out: { id: string; name: string }[] = [];
+  let cur = byId.get(id)?.parent_id ?? null;
+  let guard = 0;
+  while (cur && guard++ < 14) {
+    const r = byId.get(cur);
+    if (!r) break;
+    out.unshift({ id: r.id, name: r.name });
+    cur = r.parent_id;
+  }
+  return out;
+}
+
+/** "Parent / Sub / Folder" — how a picker names a nested folder. */
+export function folderPath(rows: { id: string; name: string; parent_id: string | null }[], id: string): string {
+  const me = rows.find((r) => r.id === id);
+  return [...folderAncestors(rows, id).map((a) => a.name), me?.name ?? ''].join(' / ');
+}
+
+/** This folder and every folder beneath it (what a Move must not land in). */
+export function folderAndBelow(rows: { id: string; parent_id: string | null }[], id: string): Set<string> {
+  const out = new Set([id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const r of rows) if (r.parent_id && out.has(r.parent_id) && !out.has(r.id)) { out.add(r.id); grew = true; }
+  }
+  return out;
+}
+
+/** A folder about to go: its sub-folders step up to where it sat (nested
+ *  folders, 2026-11-19 — never deleted with it). */
+export async function liftSubfolders(id: string): Promise<void> {
+  const { data } = await supabase.from('collections').select('parent_id').eq('id', id).maybeSingle();
+  const up = (data as { parent_id: string | null } | null)?.parent_id ?? null;
+  await supabase.from('collections').update({ parent_id: up }).eq('parent_id', id);
+}
+
 /** Deleting a collection frees its posts (they stay saved/published). */
 export async function deleteCollection(id: string): Promise<void> {
+  await liftSubfolders(id);
   const { error } = await supabase.from('collections').delete().eq('id', id);
   if (error) throw error;
 }

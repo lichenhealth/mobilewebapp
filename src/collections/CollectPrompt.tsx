@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/Icon';
 import {
-  listMyCollections, createCollection, addToCollection, type CollectionRow, type FolderTarget,
+  listMyCollections, createCollection, addToCollection, folderPath, type CollectionRow, type FolderTarget,
 } from '../lib/collectionsApi';
 import { loadPost } from '../lib/postsApi';
 import { supabase } from '../lib/supabase';
@@ -148,7 +148,7 @@ export function CollectPromptProvider({ children }: { children: React.ReactNode 
             {!noWeaveBy && cols.map((c) => (
               <button key={c.id} className="collect__row" onClick={() => void addTo(c.id, pickerFor)}>
                 <Icon name={c.is_public ? 'book' : 'bookmark'} size={14} />
-                <span>{c.name}</span>
+                <span>{c.parent_id ? folderPath(cols, c.id) : c.name}</span>
                 <em>{c.item_count}</em>
               </button>
             ))}

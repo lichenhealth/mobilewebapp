@@ -315,6 +315,12 @@
  "collectionsApi:deleteCollection": {
   "gap": "1"
  },
+ "collectionsApi:liftSubfolders": {
+  "exempt": "plumbing — the step inside a folder delete, not a member act"
+ },
+ "collectionsApi:moveCollection": {
+  "tool": "drive_folder (action move)"
+ },
  "collectionsApi:duplicateCollection": {
   "gap": "1"
  },

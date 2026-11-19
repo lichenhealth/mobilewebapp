@@ -16,7 +16,7 @@ import { loadSavedPostsTimed, setSaved, loadSavedMessages, type SavedMessage } f
 import { uploadDriveFile, listDriveFiles, signDriveFiles, deleteDriveFile, type DriveFileRow, type DriveFileKind } from '../lib/driveFilesApi';
 import { createPersonalDoc, listMyPersonalDocs, deleteChatDoc, DOC_KIND_ICON, DOC_KIND_LABEL, type ChatDocRow } from '../lib/chatDocsApi';
 import { listMyPostDrafts, deletePostDraft, draftLabel, type PostDraftRow } from '../lib/postDraftsApi';
-import { listMyCollections, createCollection, updateCollection, deleteCollection, duplicateCollection, listCollectionAreas, loadCollection, foldersHolding, type CollectionRow } from '../lib/collectionsApi';
+import { listMyCollections, createCollection, updateCollection, deleteCollection, duplicateCollection, listCollectionAreas, loadCollection, foldersHolding, moveCollection, folderPath, folderAndBelow, type CollectionRow } from '../lib/collectionsApi';
 import { useCollect } from '../collections/CollectPrompt';
 import { setHidden } from '../lib/hiddenApi';
 import './Mycelium.css';   // shares the myc__ lens vocabulary
@@ -152,6 +152,8 @@ export default function Saved() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameVal, setRenameVal] = useState('');
   const [folderDel, setFolderDel] = useState<string | null>(null);
+  // NESTED FOLDERS (founder 2026-11-19): the folder whose Move… picker is open.
+  const [folderMove, setFolderMove] = useState<string | null>(null);
   const [folderNote, setFolderNote] = useState<string | null>(null);
 
   // POST DRAFTS (founder 2026-10-15: "we will also need a drafts section"):
@@ -357,7 +359,31 @@ export default function Saved() {
       .sort((a, b) => a.name.localeCompare(b.name))
       .filter((c) => !q || c.name.toLowerCase().includes(q));
   }, [collections, query]);
-  const folderShelf = folderAll || query ? foldersVisible : foldersVisible.slice(0, 8);
+  // NESTED FOLDERS: the shelf holds the TOP of Drive — a folder inside
+  // another lives on that folder's page. A search reaches every folder.
+  const subCount = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of collections) if (c.parent_id) m.set(c.parent_id, (m.get(c.parent_id) ?? 0) + 1);
+    return m;
+  }, [collections]);
+  const folderTop = useMemo(() => {
+    if (query.trim()) return foldersVisible;
+    const ids = new Set(collections.map((c) => c.id));
+    return foldersVisible.filter((c) => !c.parent_id || !ids.has(c.parent_id));
+  }, [foldersVisible, collections, query]);
+  const folderShelf = folderAll || query ? folderTop : folderTop.slice(0, 8);
+  /** "Folder · 2 folders · 5 items", plus where it sits when searching. */
+  function folderCountLine(c: CollectionRow): string {
+    const subs = subCount.get(c.id) ?? 0;
+    const bits = ['Folder'];
+    if (subs) bits.push(subs === 1 ? '1 folder' : `${subs} folders`);
+    bits.push(c.item_count === 1 ? '1 item' : `${c.item_count} items`);
+    if (query.trim() && c.parent_id) {
+      const path = folderPath(collections, c.id).split(' / ').slice(0, -1).join(' / ');
+      if (path) bits.push(`in ${path}`);
+    }
+    return bits.join(' · ');
+  }
 
   // Drafts answer the one search box too (title or body words).
   const draftsVisible = useMemo(() => {
@@ -445,7 +471,7 @@ export default function Saved() {
     for (const c of foldersVisible) rows.push({
       kind: 'folders', t: c.created_at, key: 'col:' + c.id, icon: folderIcon(c),
       title: c.name,
-      meta: `Folder · ${c.item_count === 1 ? '1 item' : `${c.item_count} items`}`,
+      meta: folderCountLine(c),
       areas: folderAreaList(c),
       go: () => navigate(`/collections/${c.id}`),
     });
@@ -647,6 +673,7 @@ export default function Saved() {
             <button onClick={() => { setRenameVal(c.name); setRenaming(c.id); setFolderMenuFor(null); }}>
               Rename
             </button>
+            <button onClick={() => { setFolderMenuFor(null); setFolderMove(c.id); }}>Move…</button>
             <button className="drive__menu-danger" onClick={() => {
               if (folderDel !== c.id) { setFolderDel(c.id); return; }
               setFolderMenuFor(null); setFolderDel(null);
@@ -655,6 +682,39 @@ export default function Saved() {
             }}>{folderDel === c.id ? 'Move to trash?' : 'Delete'}</button>
           </span>
         )}
+        {folderMove === c.id && (() => {
+          const blocked = folderAndBelow(collections, c.id);
+          const targets = collections
+            .filter((x) => !blocked.has(x.id))
+            .map((x) => ({ id: x.id, label: folderPath(collections, x.id) }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+          const go = async (to: string | null) => {
+            setFolderMove(null);
+            const prev = c.parent_id;
+            setCollections((cur) => cur.map((x) => (x.id === c.id ? { ...x, parent_id: to } : x)));
+            try {
+              await moveCollection(c.id, to);
+              const where = to ? collections.find((x) => x.id === to)?.name : null;
+              setFolderNote(where ? `Moved into “${where}” ✓` : 'Moved to the top of Drive ✓');
+            } catch (e) {
+              setCollections((cur) => cur.map((x) => (x.id === c.id ? { ...x, parent_id: prev } : x)));
+              setFolderNote(e instanceof Error ? e.message : 'Could not move it.');
+            }
+          };
+          return (
+            <span className="drive__menu drive__menu--move" role="menu">
+              <span className="drive__menu-label">Move “{c.name}” into…</span>
+              {c.parent_id && <button onClick={() => void go(null)}>Top of Drive</button>}
+              {targets.filter((t) => t.id !== c.parent_id).map((t) => (
+                <button key={t.id} onClick={() => void go(t.id)}>{t.label}</button>
+              ))}
+              {targets.length === 0 && !c.parent_id && (
+                <span className="drive__menu-label">Make another folder first.</span>
+              )}
+              <button onClick={() => setFolderMove(null)}>Cancel</button>
+            </span>
+          );
+        })()}
       </span>
     );
   }
@@ -1037,7 +1097,7 @@ export default function Saved() {
                 <span className="drive__row-main" onClick={(e) => { if (renaming === c.id) e.stopPropagation(); }}>
                   {folderNameEl(c, 'drive__row-title')}
                   <span className="drive__row-meta">
-                    Folder · {c.item_count === 1 ? '1 item' : `${c.item_count} items`}
+                    {folderCountLine(c)}
                     {folderKindLabel(c) ? ` · ${folderKindLabel(c)}` : ''}
                     {c.is_public ? ' · Published' : ' · Private'}
                   </span>
@@ -1073,7 +1133,7 @@ export default function Saved() {
                 <span className="drive__folder-body" onClick={(e) => { if (renaming === c.id) e.stopPropagation(); }}>
                   {folderNameEl(c, 'drive__folder-name')}
                   <span className="drive__folder-meta">
-                    {c.item_count === 1 ? '1 item' : `${c.item_count} items`}
+                    {folderCountLine(c).replace(/^Folder · /, '')}
                     {folderKindLabel(c) ? ` · ${folderKindLabel(c)}` : ''}
                     {c.is_public ? ' · Published' : ''}
                   </span>

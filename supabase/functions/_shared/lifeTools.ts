@@ -52,12 +52,14 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'drive_folder',
-    description: 'Their private Drive folders: create (name), add a post (by its exact title — one of their own posts, a post they saved, or the post shared into this conversation), or remove a post. Folders hold posts by reference — to put a document, spreadsheet or presentation in a folder use drive_doc op add_to_folder.',
+    description: 'Their private Drive folders, which NEST (a folder can sit inside another, like Google Drive): create (name; inside = an existing folder to put it in), move (folder into another folder named by into, or into "" for the top of Drive), add a post (by its exact title — one of their own posts, a post they saved, or the post shared into this conversation), or remove a post. Folders hold posts by reference — to put a document, spreadsheet or presentation in a folder use drive_doc op add_to_folder. my_lists folders shows each folder with its path.',
     input_schema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['create', 'add', 'remove'] },
+        action: { type: 'string', enum: ['create', 'move', 'add', 'remove'] },
         folder: { type: 'string', description: 'Folder name (exact, from my_lists folders, except when creating).' },
+        inside: { type: 'string', description: 'create only: the exact name of the folder to make it inside.' },
+        into: { type: 'string', description: 'move only: the exact name of the folder to move it into; empty = the top of Drive.' },
         post_title: { type: 'string' },
       },
       required: ['action', 'folder'],
@@ -365,9 +367,18 @@ export async function runLifeTool(
         `"${r.label}" ${((r.amount_cents ?? 0) / 100).toFixed(2)} · ${r.bucket} · ${r.cadence}${r.on_date ? ` on ${r.on_date}` : ''}`) };
     }
     if (which === 'folders') {
-      const rows = await (await sb(`collections?owner_id=eq.${me}&space_id=is.null&select=name,kind,is_public&order=created_at.desc&limit=60`)).json();
-      return { ok: true, folders: (Array.isArray(rows) ? rows : []).map((r: { name: string; kind: string; is_public: boolean }) =>
-        `"${r.name}"${r.kind !== 'collection' ? ` (${r.kind})` : ''}${r.is_public ? ' · published' : ''}`) };
+      const rows = await (await sb(`collections?owner_id=eq.${me}&space_id=is.null&select=id,name,kind,is_public,parent_id&order=created_at.desc&limit=200`)).json();
+      const all = (Array.isArray(rows) ? rows : []) as { id: string; name: string; kind: string; is_public: boolean; parent_id: string | null }[];
+      const byId = new Map(all.map((r) => [r.id, r]));
+      const pathOf = (r: { parent_id: string | null }) => {
+        const up: string[] = []; let cur = r.parent_id; let g = 0;
+        while (cur && g++ < 13) { const p = byId.get(cur); if (!p) break; up.unshift(p.name); cur = p.parent_id; }
+        return up;
+      };
+      return { ok: true, folders: all.map((r) => {
+        const up = pathOf(r);
+        return `"${r.name}"${up.length ? ` (inside ${up.join(' / ')})` : ''}${r.kind !== 'collection' ? ` (${r.kind})` : ''}${r.is_public ? ' · published' : ''}`;
+      }) };
     }
     if (which === 'rsvps') {
       const rows = await (await sb(`event_attendees?profile_id=eq.${me}&select=status,events(title,start_date)&limit=60`)).json();
@@ -452,14 +463,44 @@ export async function runLifeTool(
   if (name === 'drive_folder') {
     const folder = String(input.folder ?? '').trim().slice(0, 120);
     if (!folder) return { ok: false, error: 'Name the folder.' };
+    const oneFolder = async (nm: string) => {
+      const r = await (await sb(`collections?owner_id=eq.${me}&space_id=is.null&name=ilike.${enc(nm)}&select=id,name&limit=2`)).json();
+      const l = (Array.isArray(r) ? r : []) as { id: string; name: string }[];
+      return l.length === 1 ? l[0] : (l.length ? 'many' as const : null);
+    };
     if (input.action === 'create') {
-      const res = await sb('collections', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_id: me, name: folder, kind: 'collection' }) });
+      let parent: { id: string; name: string } | null = null;
+      const inside = String(input.inside ?? '').trim();
+      if (inside) {
+        const p = await oneFolder(inside);
+        if (p === 'many') return { ok: false, error: `Several folders are named "${inside}".` };
+        if (!p) return { ok: false, error: `No folder of theirs is named "${inside}" — read my_lists folders.` };
+        parent = p;
+      }
+      const res = await sb('collections', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ owner_id: me, name: folder, kind: 'collection', ...(parent ? { parent_id: parent.id } : {}) }) });
       if (!res.ok) return { ok: false, error: 'The folder would not save.' };
-      return { ok: true, change: `created the private folder "${folder}" in their Drive` };
+      return { ok: true, change: `created the private folder "${folder}"${parent ? ` inside "${parent.name}"` : ' in their Drive'}` };
     }
-    const fr = await (await sb(`collections?owner_id=eq.${me}&space_id=is.null&name=ilike.${enc(folder)}&select=id,name&limit=2`)).json();
-    const fl = Array.isArray(fr) ? fr : [];
-    if (fl.length !== 1) return { ok: false, error: fl.length ? `Several folders are named "${folder}".` : `No folder of theirs is named "${folder}" — read my_lists folders.` };
+    const f1 = await oneFolder(folder);
+    if (f1 === 'many' || !f1) return { ok: false, error: f1 ? `Several folders are named "${folder}".` : `No folder of theirs is named "${folder}" — read my_lists folders.` };
+    const fl = [f1];
+    if (input.action === 'move') {
+      const into = String(input.into ?? '').trim();
+      let target: { id: string; name: string } | null = null;
+      if (into) {
+        const t = await oneFolder(into);
+        if (t === 'many') return { ok: false, error: `Several folders are named "${into}".` };
+        if (!t) return { ok: false, error: `No folder of theirs is named "${into}" — read my_lists folders.` };
+        target = t;
+      }
+      const res = await sb(`collections?id=eq.${f1.id}&owner_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ parent_id: target ? target.id : null }) });
+      if (!res.ok) {
+        const txt = await res.text();
+        const m = /"message"\s*:\s*"([^"]+)"/.exec(txt)?.[1];
+        return { ok: false, error: m ?? 'It would not move.' };
+      }
+      return { ok: true, change: target ? `moved the folder "${f1.name}" inside "${target.name}"` : `moved the folder "${f1.name}" to the top of their Drive` };
+    }
     const pt = String(input.post_title ?? '').trim();
     if (!pt) return { ok: false, error: 'Which post? Give its exact title.' };
     const post = await findPost(sb, me, pt, sharedPostId, false);

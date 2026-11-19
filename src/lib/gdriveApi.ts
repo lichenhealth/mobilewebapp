@@ -4,9 +4,10 @@
 // rest"). Rides the Lichen Mail Google connection (mail_accounts); the
 // gdrive-api edge fn reads live from Google, and THIS file re-creates each
 // file as a real Lichen thing:
-//   Google Doc / .txt / .md  → a Lichen doc (formatting carried, images not yet)
+//   Google Doc / .txt / .md  → a Lichen doc (formatting AND pictures carried)
 //   Google Sheet / .xlsx / .csv → a Lichen spreadsheet (formulas + tabs)
-//   Google Slides             → a Lichen presentation (titles, words, speaker notes)
+//   Google Slides             → a Lichen presentation: each slide exactly as Google
+//                               draws it (a full picture), words + speaker notes kept
 //   photos / video / audio / PDFs / everything else → a Lichen Drive file
 // Nothing is copied into a database except the result, and gdrive_imports
 // remembers what's already been carried over.
@@ -16,6 +17,7 @@ import { createPersonalDoc } from './chatDocsApi';
 import { uploadDriveFile, type DriveFileKind } from './driveFilesApi';
 import { sanitizeHtml, htmlToText, textToHtml } from './richText';
 import type { SheetTab } from './formula';
+import { uploadOfficeImage } from './officeMedia';
 
 export type GFile = {
   id: string; name: string; mimeType: string; size?: string; modifiedTime?: string;
@@ -93,6 +95,32 @@ function inlineGoogleClasses(html: string): { html: string; images: number } {
   return { html: doc.body.innerHTML, images };
 }
 
+/** Put a Doc's pictures in place (founder 2026-11-19: "an import to be
+ *  exactly what is exported"): each Google-hosted picture becomes a copy in
+ *  the member's own private Drive storage, referenced the way Lichen docs
+ *  hold images, at the width it had on Google's page (6.5in = 624px). */
+async function carryDocImages(html: string, pics: { src: string; mime: string; data: string }[]): Promise<{ html: string; missed: number }> {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const bySrc = new Map(pics.map((p) => [p.src, p]));
+  let missed = 0;
+  for (const img of Array.from(doc.body.querySelectorAll('img'))) {
+    const src = (img.getAttribute('src') ?? '').replace(/&amp;/g, '&');
+    const pic = bySrc.get(src);
+    if (!pic) { missed++; continue; }
+    try {
+      const ext = pic.mime.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
+      const ref = await uploadOfficeImage(new File([b64ToBytes(pic.data)], `doc-image.${ext}`, { type: pic.mime }), null);
+      const px = Number(/width:\s*([\d.]+)px/.exec(img.getAttribute('style') ?? '')?.[1] ?? 0);
+      const pct = px ? Math.max(10, Math.min(100, Math.round((px / 624) * 100))) : 100;
+      img.removeAttribute('src');
+      img.setAttribute('data-store', ref);
+      img.setAttribute('style', `width: ${pct}%`);
+      img.removeAttribute('title');
+    } catch { missed++; }
+  }
+  return { html: doc.body.innerHTML, missed };
+}
+
 async function xlsxToTabs(b64: string): Promise<SheetTab[]> {
   const XLSX = await import('xlsx');
   const wb = XLSX.read(b64ToBytes(b64), { type: 'array', cellFormula: true });
@@ -126,21 +154,41 @@ export async function importGDriveFile(account: { id: string; email: string }, f
   let res: ImportResult;
 
   if (kind === 'slides') {
-    const deck = await call<{ title: string; slides: { title: string; body: string; notes: string }[] }>('gdrive-api', { action: 'slides', accountId: account.id, fileId: f.id });
-    const slides = (deck.slides.length ? deck.slides : [{ title: deck.title || title, body: '', notes: '' }]).map((s, i) => ({
+    const deck = await call<{ title: string; slides: { id: string; title: string; body: string; notes: string }[] }>('gdrive-api', { action: 'slides', accountId: account.id, fileId: f.id });
+    // Each slide exactly as Google draws it (founder 2026-11-19): a full-slide
+    // picture, with its words kept underneath for search and the brain, and
+    // the speaker notes intact. A slide whose picture didn't come keeps its
+    // words as an ordinary editable slide.
+    const pics = new Map<string, string>();
+    const ids = deck.slides.map((s) => s.id).filter(Boolean);
+    for (let i = 0; i < ids.length && i < 120; i += 10) {
+      try {
+        const r = await call<{ pictures: { id: string; mime: string; data: string }[] }>('gdrive-api', { action: 'slide_pictures', accountId: account.id, fileId: f.id, pageIds: ids.slice(i, i + 10) });
+        for (const p of r.pictures) {
+          const ref = await uploadOfficeImage(new File([b64ToBytes(p.data)], 'slide.png', { type: p.mime }), null);
+          pics.set(p.id, ref);
+        }
+      } catch (e) { console.warn('slide pictures', e); }
+    }
+    const slides = (deck.slides.length ? deck.slides : [{ id: '', title: deck.title || title, body: '', notes: '' }]).map((s, i) => ({
       title: s.title, body: s.body, notes: s.notes || undefined,
-      layout: i === 0 ? 'title' : s.body.includes('\n') ? 'bullets' : 'text',
+      ...(pics.get(s.id) ? { image: pics.get(s.id), layout: 'picture' }
+        : { layout: i === 0 ? 'title' : s.body.includes('\n') ? 'bullets' : 'text' }),
     }));
     const row = await createPersonalDoc('slides', deck.title || title, { data: { theme: 'paper', slides } as never, body: slides.map((s) => `${s.title}\n${s.body}`).join('\n\n').slice(0, 20000) });
-    res = { kind, id: row.id, path: `/docs/${row.id}` };
+    const missedSlides = deck.slides.length - pics.size;
+    res = { kind, id: row.id, path: `/docs/${row.id}`, note: missedSlides > 0 && deck.slides.length ? `${missedSlides} slide${missedSlides === 1 ? '' : 's'} came over as words only — Google didn’t hand over ${missedSlides === 1 ? 'its picture' : 'their pictures'}` : undefined };
   } else {
-    const c = await call<{ mime: string; data?: string; html?: string }>('gdrive-api', { action: 'fetch', accountId: account.id, fileId: f.id });
+    const c = await call<{ mime: string; data?: string; html?: string; images?: { src: string; mime: string; data: string }[] }>('gdrive-api', { action: 'fetch', accountId: account.id, fileId: f.id });
     if (kind === 'doc') {
-      let html: string; let images = 0;
-      if (c.html) { const g = inlineGoogleClasses(c.html); html = sanitizeHtml(g.html); images = g.images; }
-      else html = sanitizeHtml(textToHtml(new TextDecoder().decode(b64ToBytes(c.data ?? ''))));
+      let html: string; let missed = 0;
+      if (c.html) {
+        const g = inlineGoogleClasses(c.html);
+        const carried = g.images ? await carryDocImages(g.html, c.images ?? []) : { html: g.html, missed: 0 };
+        html = sanitizeHtml(carried.html); missed = carried.missed;
+      } else html = sanitizeHtml(textToHtml(new TextDecoder().decode(b64ToBytes(c.data ?? ''))));
       const row = await createPersonalDoc('doc', title, { data: { html } as never, body: htmlToText(html).slice(0, 50000) });
-      res = { kind, id: row.id, path: `/docs/${row.id}`, note: images ? `${images} image${images === 1 ? '' : 's'} stayed behind in Google — images don’t come over yet` : undefined };
+      res = { kind, id: row.id, path: `/docs/${row.id}`, note: missed ? `${missed} picture${missed === 1 ? '' : 's'} couldn’t be copied from Google — keep the original until you’ve checked` : undefined };
     } else if (kind === 'sheet') {
       let tabs: SheetTab[];
       if (/csv/.test(c.mime) || f.name.toLowerCase().endsWith('.csv')) {
@@ -183,9 +231,9 @@ export type FolderImportResult = { folders: { id: string; name: string }[]; done
 /** A WHOLE GOOGLE FOLDER (founder 2026-11-15: "allow moving folders from
  *  google drive and keep the contents within them as lichen spreadsheets,
  *  slides, etc"). The folder becomes a Lichen folder holding every file,
- *  each re-created as a Lichen doc/sheet/slides/file. Lichen folders don't
- *  nest, so a sub-folder becomes its own folder named "Parent / Sub" (up to
- *  3 levels, 200 files). */
+ *  each re-created as a Lichen doc/sheet/slides/file. Sub-folders come over
+ *  as REAL folders inside it (founder 2026-11-19, nesting built), up to 12
+ *  levels and 200 files in one go. */
 export async function importGDriveFolder(
   account: { id: string; email: string }, folder: GFile,
   onProgress?: (n: number, name: string) => void,
@@ -193,8 +241,8 @@ export async function importGDriveFolder(
   const { createCollection, addToCollection } = await import('./collectionsApi');
   const out: FolderImportResult = { folders: [], done: 0, failed: [] };
   let budget = 200;
-  async function walk(f: GFile, label: string, depth: number) {
-    const colId = await createCollection(label.slice(0, 120));
+  async function walk(f: GFile, label: string, depth: number, parentId: string | null) {
+    const colId = await createCollection(label.slice(0, 120), 'collection', undefined, parentId);
     out.folders.push({ id: colId, name: label });
     let page: string | undefined;
     const subs: GFile[] = [];
@@ -215,9 +263,9 @@ export async function importGDriveFolder(
       }
       page = r.next ?? undefined;
     } while (page);
-    if (depth < 3) for (const s of subs) await walk(s, `${label} / ${s.name}`, depth + 1);
+    if (depth < 12) for (const s of subs) await walk(s, s.name, depth + 1, colId);
     else for (const s of subs) out.failed.push({ name: s.name, error: 'folder nested too deep — bring it over on its own' });
   }
-  await walk(folder, folder.name, 1);
+  await walk(folder, folder.name, 1, null);
   return out;
 }

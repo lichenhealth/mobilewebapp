@@ -93,8 +93,14 @@ export async function trashFolder(id: string): Promise<void> {
   const { data: row } = await supabase.from('collections').select('*').eq('id', id).maybeSingle();
   if (row) {
     const { data: items } = await supabase.from('collection_items').select('*').eq('collection_id', id);
-    await stash('folder', row.kind === 'course' ? 'courses' : 'drive', (row.name as string) || 'Folder', id, row, { items: items ?? [] });
+    // Its sub-folders step up to where it sat while it waits in the trash;
+    // remember them so a restore gathers them back.
+    const { data: kids } = await supabase.from('collections').select('id').eq('parent_id', id);
+    await stash('folder', row.kind === 'course' ? 'courses' : 'drive', (row.name as string) || 'Folder', id, row,
+      { items: items ?? [], children: ((kids as { id: string }[] | null) ?? []).map((k) => k.id) });
   }
+  const { liftSubfolders } = await import('./collectionsApi');
+  await liftSubfolders(id);
   const { error } = await supabase.from('collections').delete().eq('id', id);
   if (error) throw error;
 }
@@ -112,7 +118,11 @@ const TABLE: Record<TrashKind, string> = {
 
 /** Put it back where it lived, under the same id. */
 export async function restoreTrash(item: TrashItem): Promise<void> {
-  const { error } = await supabase.from(TABLE[item.kind]).insert(item.payload);
+  let { error } = await supabase.from(TABLE[item.kind]).insert(item.payload);
+  // A folder whose own parent folder is gone comes back at the top of Drive.
+  if (error && item.kind === 'folder' && item.payload.parent_id && /isn.t there anymore/.test(error.message)) {
+    ({ error } = await supabase.from(TABLE[item.kind]).insert({ ...item.payload, parent_id: null }));
+  }
   if (error) {
     if (error.code === '23505') throw new Error('Something with that address or name already exists — rename it, then try again.');
     throw new Error(error.message);
@@ -121,6 +131,8 @@ export async function restoreTrash(item: TrashItem): Promise<void> {
     const items = (item.extra?.items as Record<string, unknown>[] | undefined) ?? [];
     // One at a time: a piece its author has since held back is skipped, never the folder.
     for (const it of items) await supabase.from('collection_items').insert(it);
+    const kids = (item.extra?.children as string[] | undefined) ?? [];
+    if (kids.length) await supabase.from('collections').update({ parent_id: item.ref_id }).in('id', kids);
   }
   await supabase.from('trash_items').delete().eq('id', item.id);
 }
