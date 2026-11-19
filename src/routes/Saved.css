@@ -188,6 +188,12 @@
 }
 .drive__menu > button:hover { background: var(--bone-warm); }
 .drive__menu-danger { color: var(--red-deep) !important; }
+/* NESTED FOLDERS — the Move… picker: a scrolling list of every folder by path. */
+.drive__menu--move { min-width: 230px; max-width: min(320px, 86vw); max-height: 320px; overflow-y: auto; }
+.drive__menu-label {
+  display: block; padding: 6px 11px 4px; font-size: 11.5px; letter-spacing: .04em;
+  color: var(--ink-muted); text-transform: uppercase;
+}
 
 /* ── DRAFTS (founder 2026-10-15: "we will also need a drafts section") —
    unfinished posts Compose autosaved, as drive rows between Folders and

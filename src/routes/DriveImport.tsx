@@ -87,7 +87,7 @@ export default function DriveImport() {
   const setRow = (id: string, s: RowState) => setRows((cur) => ({ ...cur, [id]: s }));
 
   // A WHOLE FOLDER (founder 2026-11-15) — becomes a Lichen folder holding
-  // every file, re-created; sub-folders become "Parent / Sub" folders.
+  // every file, re-created; sub-folders become real folders inside it.
   const bringFolder = async (f: GFile) => {
     if (!account) return;
     setRow(f.id, { status: 'busy' });

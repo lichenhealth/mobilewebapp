@@ -499,3 +499,24 @@
 .colp__file-meta { font-size: 12px; color: var(--ink-muted); }
 .colp__file-x { border: 0; background: none; color: var(--ink-muted); font: inherit; font-size: 12px; cursor: pointer; }
 .colp__file-x:hover { color: var(--peach-deep); }
+
+/* NESTED FOLDERS (founder 2026-11-19) — the path above the title, the
+   "New folder inside" door and its inline name box. */
+.colp__trail { font-size: 13px; color: var(--ink-muted); margin: 0 0 4px; overflow-wrap: anywhere; }
+.colp__trail a { color: var(--ink-soft); }
+.colp__subadd {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+  border: 1px dashed var(--bone-edge); background: none; border-radius: 999px;
+  padding: 7px 14px; font: inherit; font-size: 13px; color: var(--peach-deep); cursor: pointer;
+}
+.colp__subadd:hover { border-color: var(--peach); }
+.colp__subnew { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.colp__subnew input {
+  flex: 1 1 180px; min-width: 0; font: inherit; padding: 9px 12px;
+  border: 1px solid var(--bone-edge); border-radius: 10px; background: var(--bone);
+}
+.colp__subnew-go {
+  border: 0; border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 13px;
+  background: var(--peach); color: #fff; cursor: pointer;
+}
+.colp__subnew-go:disabled { opacity: .5; cursor: default; }

@@ -32,7 +32,7 @@ import {
   suggestToCollection, listPendingSuggestions, resolveSuggestion,
   type CollectionRow, type OfferingMeta, type CollectionSuggestionRow,
   listCourseNotes, addCourseNote, updateCourseNote, deleteCourseNote, courseFolder,
-  type CourseNote, loadCollectionFiles, type FolderFile,
+  type CourseNote, loadCollectionFiles, type FolderFile, createCollection,
 } from '../lib/collectionsApi';
 import { DOC_KIND_ICON, DOC_KIND_LABEL, type ChatDocKind } from '../lib/chatDocsApi';
 import { signDriveFiles } from '../lib/driveFilesApi';
@@ -92,6 +92,12 @@ export default function CollectionPage() {
   const [suggNote, setSuggNote] = useState('');
   const [suggSent, setSuggSent] = useState(false);
   const [folderFiles, setFolderFiles] = useState<FolderFile[]>([]);
+  // NESTED FOLDERS (founder 2026-11-19): the folders above this one (top
+  // first) and the ones sitting inside it.
+  const [trail, setTrail] = useState<{ id: string; name: string }[]>([]);
+  const [subs, setSubs] = useState<{ id: string; name: string; item_count: number }[]>([]);
+  const [newSubOpen, setNewSubOpen] = useState(false);
+  const [newSubName, setNewSubName] = useState('');
 
   const load = useCallback(async () => {
     setReady(false);
@@ -112,6 +118,22 @@ export default function CollectionPage() {
     setSpaceDuty(duty);
     setMeta(col.meta); setPosts(col.posts);
     setFolderFiles(await loadCollectionFiles(id));
+    // The way up: walk parent_id (each read rides RLS — a parent you can't
+    // see simply ends the trail). The way down: folders sitting inside.
+    const up: { id: string; name: string }[] = [];
+    let cur = col.meta.parent_id;
+    for (let i = 0; cur && i < 12; i++) {
+      const { data: pr } = await supabase.from('collections').select('id, name, parent_id').eq('id', cur).maybeSingle();
+      if (!pr) break;
+      const r = pr as { id: string; name: string; parent_id: string | null };
+      up.unshift({ id: r.id, name: r.name });
+      cur = r.parent_id;
+    }
+    setTrail(up);
+    const { data: kids } = await supabase.from('collections')
+      .select('id, name, collection_items(count)').eq('parent_id', id).order('name');
+    setSubs(((kids as { id: string; name: string; collection_items: { count: number }[] }[] | null) ?? [])
+      .map((k) => ({ id: k.id, name: k.name, item_count: k.collection_items?.[0]?.count ?? 0 })));
     setName(col.meta.name); setDescription(col.meta.description ?? ''); setForm(col.meta.details ?? {});
     setEnrolled(prog.enrolled); setDone(prog.done);
     setMyWebSet(web); setMyMyc(myc); setMyRecs(recs); setMySaves(saves); setOverlays(ov);
@@ -488,6 +510,8 @@ export default function CollectionPage() {
   // plain history back, PostPage's shape.
   const ownFolder = !!me && !!meta && meta.owner_id === me && !meta.space_id;
   const back = () => {
+    // Inside another folder, the way back is one level up.
+    if (trail.length > 0) { navigate(`/collections/${trail[trail.length - 1].id}`); return; }
     if (ownFolder) { navigate('/drive'); return; }
     if (window.history.length > 1) navigate(-1);
     else navigate('/home');
@@ -603,6 +627,14 @@ export default function CollectionPage() {
             {meta.is_public ? 'Published' : 'Private'}
           </em>
         </p>
+        {trail.length > 0 && (
+          <nav className="colp__trail" aria-label="Folder path">
+            {ownFolder && <><Link className="link-cue" to="/drive">Drive</Link><span aria-hidden="true"> / </span></>}
+            {trail.map((t) => (
+              <span key={t.id}><Link className="link-cue" to={`/collections/${t.id}`}>{t.name}</Link><span aria-hidden="true"> / </span></span>
+            ))}
+          </nav>
+        )}
         <h1 className="colp__title display-italic">{meta.name}</h1>
         <p className="colp__by">
           {meta.space_id && (
@@ -1307,6 +1339,39 @@ export default function CollectionPage() {
         {/* FILES IN THE FOLDER (founder 2026-11-14) — docs, sheets,
             presentations and uploads from someone's own Drive, by reference.
             One only its owner can open says so instead of vanishing. */}
+        {(subs.length > 0 || (canEdit && meta.kind === 'collection')) && (
+          <div className="colp__files">
+            {(subs.length > 0 || newSubOpen) && <h3 className="colp__files-h">Folders</h3>}
+            {subs.map((f) => (
+              <div key={f.id} className="colp__file" role="button" tabIndex={0}
+                onClick={() => navigate(`/collections/${f.id}`)} onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/collections/${f.id}`); }}>
+                <span className="colp__file-icon"><Icon name="drive" size={16} /></span>
+                <span className="colp__file-main">
+                  <span className="colp__file-title">{f.name}</span>
+                  <span className="colp__file-meta">Folder · {f.item_count === 1 ? '1 item' : `${f.item_count} items`}</span>
+                </span>
+              </div>
+            ))}
+            {canEdit && meta.kind === 'collection' && (newSubOpen ? (
+              <form className="colp__subnew" onSubmit={(e) => {
+                e.preventDefault();
+                const nm = newSubName.trim();
+                if (!nm) return;
+                void createCollection(nm, 'collection', meta.space_id ?? undefined, id)
+                  .then((nid) => { setSubs((cur) => [...cur, { id: nid, name: nm, item_count: 0 }].sort((a, b) => a.name.localeCompare(b.name))); setNewSubOpen(false); setNewSubName(''); })
+                  .catch((err) => alert(err instanceof Error ? err.message : 'Could not make the folder.'));
+              }}>
+                <input autoFocus value={newSubName} onChange={(e) => setNewSubName(e.target.value)} placeholder="Name the folder" aria-label="New folder name" />
+                <button type="submit" className="colp__subnew-go" disabled={!newSubName.trim()}>Make it</button>
+                <button type="button" className="colp__file-x" onClick={() => { setNewSubOpen(false); setNewSubName(''); }}>Cancel</button>
+              </form>
+            ) : (
+              <button type="button" className="colp__subadd" onClick={() => setNewSubOpen(true)}>
+                <Icon name="plus" size={14} /> New folder inside
+              </button>
+            ))}
+          </div>
+        )}
         {folderFiles.length > 0 && (
           <div className="colp__files">
             <h3 className="colp__files-h">Files &amp; docs</h3>
@@ -1340,7 +1405,7 @@ export default function CollectionPage() {
             })}
           </div>
         )}
-        {posts.length === 0 && folderFiles.length === 0 && (
+        {posts.length === 0 && folderFiles.length === 0 && subs.length === 0 && (
           <p className="colp__muted">
             {structured ? `No ${itemWord(meta.kind)}s yet` : 'Nothing here yet'}
             {canEdit ? ' — add pieces from your posts (⋯ → Add to collection…).' : '.'}

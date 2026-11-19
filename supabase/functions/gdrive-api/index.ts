@@ -7,7 +7,7 @@
 //   trash  { accountId, ids, restore? } → into (or back out of) that account's Google Trash
 // Every account is checked against the CALLER's own mail_accounts row (accessTokenFor).
 import { mailTester } from '../_shared/gmail.ts';
-import { listDrive, fetchContent, readSlides, trashFiles } from '../_shared/gdrive.ts';
+import { listDrive, fetchContent, readSlides, slidePictures, trashFiles } from '../_shared/gdrive.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -38,6 +38,10 @@ Deno.serve(async (req) => {
         return json(await fetchContent(me, s('accountId'), s('fileId')));
       case 'slides':
         return json(await readSlides(me, s('accountId'), s('fileId')));
+      case 'slide_pictures': {
+        const ids = Array.isArray(b.pageIds) ? (b.pageIds as unknown[]).map(String) : [];
+        return json({ pictures: await slidePictures(me, s('accountId'), s('fileId'), ids) });
+      }
       case 'trash': {
         const ids = Array.isArray(b.ids) ? (b.ids as unknown[]).map(String) : [];
         return json(await trashFiles(me, s('accountId'), ids, b.restore === true));

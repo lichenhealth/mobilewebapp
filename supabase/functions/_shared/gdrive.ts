@@ -105,8 +105,55 @@ export async function fetchContent(profileId: string, accountId: string, fileId:
   const buf = await r!.arrayBuffer();
   if (buf.byteLength > MAX_BYTES) throw new Error('That file is over 15 MB — too big to carry over here yet.');
   const mime = exp ?? meta.mimeType ?? 'application/octet-stream';
-  if (mime === 'text/html') return { meta, mime, html: new TextDecoder().decode(buf) };
+  if (mime === 'text/html') {
+    const html = new TextDecoder().decode(buf);
+    return { meta, mime, html, images: await docImages(token, html) };
+  }
   return { meta, mime, data: b64(buf) };
+}
+
+/** The pictures inside an exported Google Doc (founder 2026-11-19: "import
+ *  photos in docs, i want an import to be exactly what is exported"). The
+ *  export points at Google-hosted copies; fetch each here (the browser can't —
+ *  cross-origin) so the client can store them beside the new Lichen doc.
+ *  Google image hosts only; up to 80 pictures / 30 MB. */
+async function docImages(token: string, html: string): Promise<{ src: string; mime: string; data: string }[]> {
+  const srcs = [...new Set([...html.matchAll(/<img[^>]+src="([^"]+)"/gi)].map((m) => m[1].replace(/&amp;/g, '&')))];
+  const out: { src: string; mime: string; data: string }[] = [];
+  let total = 0;
+  for (const src of srcs.slice(0, 80)) {
+    try {
+      const u = new URL(src);
+      if (u.protocol !== 'https:' || !/(^|\.)(googleusercontent\.com|google\.com|gstatic\.com)$/.test(u.hostname)) continue;
+      let r = await fetch(src);
+      if (!r.ok) r = await fetch(src, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) continue;
+      const mime = (r.headers.get('content-type') ?? 'image/png').split(';')[0];
+      if (!mime.startsWith('image/')) continue;
+      const bytes = await r.arrayBuffer();
+      total += bytes.byteLength;
+      if (total > 30 * 1024 * 1024) break;
+      out.push({ src, mime, data: b64(bytes) });
+    } catch { /* one picture failing never sinks the doc */ }
+  }
+  return out;
+}
+
+/** Each slide as Google draws it — a full picture of the slide, so an
+ *  imported deck LOOKS exactly like the original. Up to 10 per call. */
+export async function slidePictures(profileId: string, accountId: string, fileId: string, pageIds: string[]): Promise<{ id: string; mime: string; data: string }[]> {
+  const token = await accessTokenFor(profileId, accountId);
+  const out: { id: string; mime: string; data: string }[] = [];
+  for (const id of pageIds.slice(0, 10)) {
+    const r = await fetch(`https://slides.googleapis.com/v1/presentations/${encodeURIComponent(fileId)}/pages/${encodeURIComponent(id)}/thumbnail?thumbnailProperties.thumbnailSize=LARGE&thumbnailProperties.mimeType=PNG`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) { if (r.status === 403 || r.status === 404) await failWords(r); continue; }
+    const j = await r.json() as { contentUrl?: string };
+    if (!j.contentUrl) continue;
+    const pic = await fetch(j.contentUrl);
+    if (!pic.ok) continue;
+    out.push({ id, mime: 'image/png', data: b64(await pic.arrayBuffer()) });
+  }
+  return out;
 }
 
 /** A Google Slides deck read as slides: each slide's title + body text +
@@ -117,7 +164,7 @@ export async function readSlides(profileId: string, accountId: string, fileId: s
   if (!r.ok) await failWords(r);
   type TE = { textRun?: { content?: string } };
   type El = { shape?: { placeholder?: { type?: string }; text?: { textElements?: TE[] } }; table?: { tableRows?: { tableCells?: { text?: { textElements?: TE[] } }[] }[] } };
-  type Pg = { pageElements?: El[]; slideProperties?: { notesPage?: { pageElements?: El[] } } };
+  type Pg = { objectId?: string; pageElements?: El[]; slideProperties?: { notesPage?: { pageElements?: El[] } } };
   const p = await r.json() as { title?: string; slides?: Pg[] };
   const text = (t?: { textElements?: TE[] }) => (t?.textElements ?? []).map((e) => e.textRun?.content ?? '').join('').replace(/\n{3,}/g, '\n\n').trim();
   const slides = (p.slides ?? []).map((s) => {
@@ -136,7 +183,7 @@ export async function readSlides(profileId: string, accountId: string, fileId: s
     if (!title && body.length) title = body.shift()!.split('\n')[0];
     const notes = (s.slideProperties?.notesPage?.pageElements ?? [])
       .filter((el) => el.shape?.placeholder?.type === 'BODY').map((el) => text(el.shape?.text)).filter(Boolean).join('\n');
-    return { title: title.slice(0, 200), body: body.join('\n\n').slice(0, 4000), notes: notes.slice(0, 4000) };
+    return { id: s.objectId ?? '', title: title.slice(0, 200), body: body.join('\n\n').slice(0, 4000), notes: notes.slice(0, 4000) };
   });
   return { title: p.title ?? '', slides };
 }
