@@ -28,6 +28,7 @@
 
 import { LICHEN_DOCTRINE } from '../_shared/doctrine.ts';
 import { assistantConsentOff } from '../_shared/consent.ts';
+import { findMember } from '../_shared/findMember.ts';
 import { SPACE_PAGE_TOOLS, isSpacePageTool, runSpacePageTool } from '../_shared/spaceEdit.ts';
 import { READ_WEBSITE_TOOL, SAVE_WEB_IMAGE_TOOL, readWebPage, rehostWebImage, placeImage } from '../_shared/webRead.ts';
 import { readPageState, writePageDraft, DRAFT_NOTE } from '../_shared/pageDraft.ts';
@@ -1418,6 +1419,7 @@ Deno.serve(async (req) => {
   const lifeRule = canLife
     ? '\n\nTHEIR LIFE, BY WORD (the parity rule — anything they can do by hand on a screen, you do from their words): my_lists then change_task (done, move, rename, delete), budget_line, drive_folder (create, add/remove a post), save_or_hide_post, rsvp, set_candle. Do these directly when asked and report exactly what changed — they are the member\'s own, private, and undoable. Never answer "go do it on the X screen" when one of these fits.'
       + '\n\nACTS THAT NEED THEIR YES (confirm card + Always allow): send_currentcy (money to another member), network_signal (trust / recommend / weave), space_membership (ask to join / leave), set_money_floor (their Current-cy floor — never Always allow). Use the names and figures exactly as they wrote them. Each one PROPOSES — the card under your reply is where THEY decide; never say it happened unless the tool says done. They can tap Always allow to skip the card next time (money stays capped at ⚡100 a send, ⚡300 a day; anything over ⚡500 waits 24 hours, cancellable). You can never grant that allowance yourself.'
+      + '\n\nMESSAGES: draft_message writes a Lichen chat message to one person for the member to send with one tap — use it whenever they ask you to message someone; names are matched forgiving spelling.'
       + '\n\nINVITATIONS & LINKS: add_calendar_event puts an event on their own calendar — a repeating one is ONE event with repeat (weekly on Wednesdays, no end = forever), never one event per date; invite_to_event invites people to an event they host by name or email (members get it in Lichen and, with calendar=true, as a real Google/Apple/Outlook invitation at their signup email — never say you can see that address; saved contacts on their own lists supply outside emails) — it never sends, the card under your reply is their Send; my_event with make_link=true makes the event\'s invite link and link_access sets who it lets in (anyone / invited [others ask, they approve] / members / circles with exact group names). OUTSIDE CALENDARS: my_imported_calendar reads the events imported from their Google/ICS calendars (titles, dates, times, which calendar, and repeating patterns) — use it before asking them when or how long an outside event runs, never say you can\'t see it. DRAFTS: my_calendar_drafts lists their draft calendar events (with Open doors) and block=true/false makes a draft hold its time or stop holding it — an unblocked draft is a dotted outline that never reads as busy. Never tell them to go do it by hand.'
       + '\n\nCONTACT CARDS: contacts manages their private cards in Drive → Contacts — people (personal/professional/both), organizations (which can run places — create the place with run_by), places, communities, groups. Gray = not on Lichen yet, peach = linked to their real profile or page (Lichen links them on its own when they join, and bells the member). When they share a business card, flyer, brochure or sign photo, read it and make the card(s) — an organization plus the place it runs when that fits — with only the emails/phones/websites actually printed or typed. Sharing a list (circles, people, exclusions) is set on the Contacts screen — hand the door.'
       + '\n\nDRIVE TIME: when they ask how long it takes to get somewhere or when to leave, find the address (their calendar entry, then their emails, then the business site) and call drive_time — it reads live traffic from where their device is right now when it shared its location (else their saved home, or an address they name) — say which starting point you used and hands three buttons: Directions in Lichen Maps (the route with every turn), then Apple Maps and Google Maps for spoken guidance — never assume which maps app they use. "Navigate me there" / "take me there" = call drive_time and point at those buttons. Never tell them you can\'t calculate travel time or send them off to a maps app.' + '\n\nA DOUBLED MESSAGE: when they say someone got a message twice, remove_duplicate_messages (by that person\'s name) deletes the later identical copies they sent in that direct chat — do it, then say how many went. To RESEND a calendar share, call share_calendar again (it reuses their link) and point at the card\'s Send it again — the send tap stays theirs.\n\nCALENDARS SHARED WITH THEM: when someone shared their calendar with this member ("add Galyn\'s calendar", "how do I see her calendar"), call calendars_shared_with_me — add_to_lichen does it in Lichen at once, and the attached one-tap buttons cover Google and Apple; never walk them through settings or URL pasting.\n\nSHARING THEIR CALENDAR: share_calendar gives someone (by name, or an email/cell they typed) their OWN private link to see this calendar in Google/Apple/Outlook — a card under your reply holds the message and the send buttons (Lichen chat for members, a text from their own phone, email). Always say in plain words what that person will see (the result\'s `sees`), and when it is the full-detail level mention that session titles show too and "Only busy times" is one tap on the card. action=list / action=stop manage who has a link. Never hand their personal calendar_feed_link to another person — that is theirs alone. YOUR BRAIN CAN SEND IT FOR THEM: for a member on Lichen the card leads with "Let my Brain send it" — one tap and their Brain (you, AI on their behalf, shown with their face and a little brain) messages that person in their own Lichen chat with the link + setup steps, answers setup questions there, and bells them if something goes wrong or the person writes something meant for them. When they ask you to message someone their calendar, make the share and point at that button — never say you can\'t message people. The tap is theirs; you never send on your own.'
@@ -1501,6 +1503,7 @@ Deno.serve(async (req) => {
   const gdriveImports: Record<string, unknown>[] = [];
   // Calendar invitations drafted this exchange — a Send card the PERSON taps.
   const calInvites: Record<string, unknown>[] = [];
+  const chatDrafts: Record<string, unknown>[] = [];
   const calShares: Record<string, unknown>[] = [];
   const mailReconnect: string[] = [];
   // The space-side twins of readPage/patchMe — scoped to the THREAD's space
@@ -1587,6 +1590,7 @@ Deno.serve(async (req) => {
       const lifeMemberText = rows.filter((p: { author: string }) => p.author !== 'claude')
         .map((p: { body?: string }) => p.body ?? '').join(' ');
       const lr = await runLifeTool(sb, profile_id, name, input as Record<string, unknown>, offSections, trigger?.source_post_id ?? null, lifeMemberText, hereAt);
+      if (name === 'draft_message' && lr.ok && lr.message) { chatDrafts.push(lr.message as Record<string, unknown>); delete lr.message; }
       if (name === 'invite_to_event' && lr.ok && lr.invite) { calInvites.push(lr.invite as Record<string, unknown>); delete lr.invite; }
       if (name === 'share_calendar' && lr.ok && lr.share) { calShares.push(lr.share as Record<string, unknown>); delete lr.share; }
       if (name === 'calendars_shared_with_me' && lr.ok && Array.isArray(lr.feeds)) { for (const f of lr.feeds as Record<string, unknown>[]) calShares.push(f); delete lr.feeds; }
@@ -2984,9 +2988,9 @@ Deno.serve(async (req) => {
           else notes.push(`${gname || phoneRaw}'s phone isn't in their own words — left out`);
         }
         if (!placed && !email && !digits && gname) {
-          const hits = await (await sb(`profiles?full_name=ilike.${encodeURIComponent(gname)}&findable=eq.true&onboarded=eq.true&select=id,full_name&limit=2`)).json();
-          const list = Array.isArray(hits) ? hits : [];
-          if (list.length === 1 && list[0].id !== profile_id) { invitees.push({ kind: 'member', id: list[0].id, name: list[0].full_name }); placed = true; }
+          const f = await findMember(sb, profile_id, gname);
+          if (f.kind === 'match') { invitees.push({ kind: 'member', id: f.member.id, name: f.member.name }); placed = true; if (!f.exact) notes.push(`"${gname}" read as ${f.member.name}`); }
+          else if (f.kind === 'several') notes.push(`"${gname}" could be ${f.candidates.map((c) => c.name).join(' or ')} — ask which`);
         }
         if (!placed && gname) unplaced.push(gname);
       }
@@ -3699,6 +3703,7 @@ Deno.serve(async (req) => {
   for (const d of mailDrafts) replyAttachments.push(d);
   for (const d of gdriveImports) replyAttachments.push(d);
   for (const d of calInvites) replyAttachments.push(d);
+  for (const d of chatDrafts) replyAttachments.push(d);
   for (const d of calShares) replyAttachments.push(d);
   // SAFETY NET (founder 2026-11-14 — asked for "the reconnect card" and the
   // model apologised that it had none, then called draft_mail instead): a

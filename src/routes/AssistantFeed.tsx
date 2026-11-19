@@ -35,6 +35,7 @@ import GDriveImportCard from '../components/GDriveImportCard';
 import CalFeedCard from '../components/CalFeedCard';
 import CalShareCard from '../components/CalShareCard';
 import CalInviteCard from '../components/CalInviteCard';
+import ChatDraftCard from '../components/ChatDraftCard';
 import './AssistantFeed.css';
 
 function timeAgo(iso: string): string {
@@ -1571,6 +1572,14 @@ export default function AssistantFeed() {
                     <div className="afeed__pubrow" key={`${p.id}:mdraft:${a.message_id}`}>
                       <MailDraftCard accountId={a.account_id} account={a.account} threadId={a.thread_id} messageId={a.message_id}
                         to={a.to} cc={a.cc} subject={a.subject} body={a.body} />
+                    </div>
+                  ))}
+                {/* MESSAGES, DRAFTED (founder 2026-11-19) — the person taps Send. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'chat_draft' ? [a] : []))
+                  .map((a, i) => (
+                    <div className="afeed__pubrow" key={`${p.id}:cdraft:${i}`}>
+                      <ChatDraftCard profileId={a.profile_id} name={a.name} body={a.body} />
                     </div>
                   ))}
                 {/* INVITATIONS, DRAFTED (founder 2026-11-13) — the person taps Send. */}
