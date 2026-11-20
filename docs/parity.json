@@ -900,5 +900,20 @@
  },
  "budgetApi:saveNeedProvider": {
   "gap": "1"
+ },
+ "lineageApi:nominateLineage": {
+  "gap": "2"
+ },
+ "lineageApi:nominateHolder": {
+  "gap": "2"
+ },
+ "lineageApi:approveNomination": {
+  "exempt": "platform-admin desk — Lichen stewards decide which lineages exist"
+ },
+ "lineageApi:declineNomination": {
+  "exempt": "platform-admin desk — Lichen stewards decide which lineages exist"
+ },
+ "lineageApi:answerStewardship": {
+  "exempt": "a person's own yes to stewarding a lineage — never the assistant's to give"
  }
 }

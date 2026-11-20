@@ -304,8 +304,8 @@ export default function RoutingDesk() {
             ))}
           </>)}
           {beings.length > 0 && (<>
-            <h3 className="adminc__h2 curc__routing-needs-h">Beings owed restoration</h3>
-            <p className="adminc__sub">Where members recorded that a plant, animal, place or element gave more than it received. Totals only — never anyone&rsquo;s note.</p>
+            <h3 className="adminc__h2 curc__routing-needs-h">Beings &amp; lineages owed restoration</h3>
+            <p className="adminc__sub">Where members recorded that a plant, animal, place, element or wisdom lineage gave more than it received. A lineage&rsquo;s value is held in trust until its own holders step in. Totals only — never anyone&rsquo;s note.</p>
             {beings.map((b) => (
               <div className="curc__routing-match" key={b.being_id}>
                 <div className="curc__routing-match-head">

@@ -44,7 +44,7 @@ const BEING_COLS = 'id, full_name, avatar_url, headline, kind, aspect, jurisdict
 export async function listMyBeings(me: string): Promise<Being[]> {
   if (!me) return [];
   const mine = await supabase.from('profiles').select(BEING_COLS)
-    .eq('steward_profile_id', me);
+    .eq('steward_profile_id', me).neq('kind', 'lineage');
   if (mine.error) return [];   // pre-migration: the columns aren't there yet
 
   const { data: admined } = await supabase.from('space_members')
@@ -54,7 +54,7 @@ export async function listMyBeings(me: string): Promise<Being[]> {
   let viaSpaces: Being[] = [];
   if (spaceIds.length) {
     const { data } = await supabase.from('profiles').select(BEING_COLS)
-      .in('steward_space_id', spaceIds);
+      .in('steward_space_id', spaceIds).neq('kind', 'lineage');
     viaSpaces = (data as Being[] | null) ?? [];
   }
   const all = [...((mine.data as Being[] | null) ?? []), ...viaSpaces];

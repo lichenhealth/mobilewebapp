@@ -140,3 +140,6 @@ a.adminc__btn { text-decoration: none; display: inline-flex; align-items: center
 .adminc__vocablist { list-style: none; padding: 0; margin: var(--s-2) 0 0; columns: 2 200px; column-gap: var(--s-5); }
 .adminc__vocabitem { padding: 5px 0; break-inside: avoid; font-size: 15px; color: var(--ink); }
 .adminc__vocabitem.is-child { padding-left: var(--s-4); color: var(--ink-soft); font-size: 14px; }
+
+/* Lineage nominations desk (2026-11-20). */
+.adminc__input { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--bone-edge); border-radius: 10px; font: inherit; background: #fff; }

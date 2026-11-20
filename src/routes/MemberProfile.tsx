@@ -26,6 +26,7 @@ import PublicPage, { type PageMeta, type FeedRenderCtx } from '../components/Pub
 import { type ContactInfo } from '../components/ContactFields';
 import { readDraft, type PageDraft } from '../lib/pageDrafts';
 import GrabPen from '../components/GrabPen';
+import LineagePanel from '../components/LineagePanel';
 import { AvatarEditBadge } from '../components/AvatarEditBadge';
 import { uploadAvatar } from '../lib/avatarApi';
 import { useSearchParams } from 'react-router-dom';
@@ -319,6 +320,9 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
           and founder under it") — see memberFeed's trailing door. */}
       {/* A distributed being names its scope (founder 2026-08-14): the
           jurisdiction is part of who they are, not settings small-print. */}
+      {member.kind === 'lineage' && (
+        <LineagePanel lineageId={id} name={member.full_name ?? 'this lineage'} me={me} />
+      )}
       {isBeing && member.jurisdiction && (
         <p className="mprof__jurisdiction">
           <Icon name="location" size={13} /> Tended within {member.jurisdiction}
@@ -570,8 +574,8 @@ export default function MemberProfile({ memberId, forcePublic }: { memberId?: st
         <h1 className="prof__name">{name}</h1>
         {isBeing && (
           <p className="mprof__being">
-            <span className="mprof__being-kind">{member.kind}</span>
-            {steward && (
+            <span className="mprof__being-kind">{member.kind === 'lineage' ? 'wisdom lineage' : member.kind}</span>
+            {steward && member.kind !== 'lineage' && (
               <>
                 {' · Stewarded by '}
                 <Link className="mprof__being-steward" to={steward.to}>{steward.name}</Link>

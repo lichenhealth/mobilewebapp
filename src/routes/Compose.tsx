@@ -45,6 +45,7 @@ import { todayISO } from '../lib/conciergeApi';
 import { useTopBackFor } from '../lib/topBack';
 import './Compose.css';
 import ProofreadBar from '../components/ProofreadBar';
+import { listLineages, nominateLineage, readRootedIn, type Lineage, type RootedIn } from '../lib/lineageApi';
 
 
 type MediaType = 'photo' | 'video' | 'audio';
@@ -184,6 +185,19 @@ export default function Compose() {
     void supabase.from('categories').select('id, name').eq('domain', 'identity').order('name')
       .then(({ data }) => setIdentCats((data as { id: string; name: string }[] | null) ?? []));
   }, [identOpen, identCats]);
+  // ROOTED IN A LINEAGE (founder 2026-11-20: "reparations or value
+  // attribution to the original wisdom holders"). An offering names the
+  // wisdom tradition it draws from; the lineage's page lists it, and true
+  // value recorded for it can be attributed back. details.rootedIn = [{id,name}].
+  const [rootedIn, setRootedIn] = useState<RootedIn[]>([]);
+  const [rootOpen, setRootOpen] = useState(false);
+  const [lineages, setLineages] = useState<Lineage[] | null>(null);
+  const [rootAsk, setRootAsk] = useState('');
+  const [rootAsked, setRootAsked] = useState('');
+  useEffect(() => {
+    if (!rootOpen || lineages !== null) return;
+    void listLineages().then(setLineages);
+  }, [rootOpen, lineages]);
   // Lend/rent/borrow/ISO each keep their own terms line (they used to fight
   // over one shared field). details.modeNotes carries the map.
   const [modeNotes, setModeNotes] = useState<Record<string, string>>({});
@@ -792,7 +806,7 @@ export default function Compose() {
       contentType, title, body, linkName, invitees, genLink, evLichen, evAnyone, postPeople,
       areas: [...areas], isPublic, toMycelium, audienceSpaces: [...audienceSpaces],
       evCategory, evMode, modes: [...modes], setTerms: [...setTerms],
-      giftTo, forIdents, modeNotes, tradeFor,
+      giftTo, forIdents, rootedIn, modeNotes, tradeFor,
       condition: [...condition], availFrom, availTo, fulfillment: [...fulfillment],
       deliverRadius, paymentPlan, currentcyOnly, catTags, inviteDesign, invSendAt, evTz, evZoom, evHold, evShare, evPoll, pollOpts, pollDeadline, pollWaitAll, pollAuto, pollRules,
       travelKind, routeFrom, routeTo, vehicle, seats, sleeps,
@@ -884,6 +898,7 @@ export default function Compose() {
       if (Array.isArray(d.setTerms)) setSetTerms(new Set(d.setTerms));
       s(d.giftTo, setGiftTo);
       if (Array.isArray(d.forIdents)) setForIdents(d.forIdents);
+      { const ri = readRootedIn(d); if (ri.length) { setRootedIn(ri); setRootOpen(true); } }
       s(d.modeNotes, setModeNotes); s(d.tradeFor, setTradeFor);
       if (Array.isArray(d.condition)) setCondition(new Set(d.condition));
       s(d.availFrom, setAvailFrom); s(d.availTo, setAvailTo);
@@ -1030,6 +1045,7 @@ export default function Compose() {
           : Array.isArray(d.giftToIdentities) ? d.giftToIdentities : null;   // pre-rename posts
         if (fi) { setForIdents((fi as unknown[]).filter((x): x is string => typeof x === 'string')); setIdentOpen(true); }
       }
+      { const ri = readRootedIn(d); if (ri.length) { setRootedIn(ri); setRootOpen(true); } }
       if (d.modeNotes && typeof d.modeNotes === 'object') setModeNotes(d.modeNotes as Record<string, string>);
       if (Array.isArray(d.condition)) setCondition(new Set(d.condition as string[]));
       if (typeof d.availFrom === 'string') setAvailFrom(d.availFrom);
@@ -1419,6 +1435,7 @@ export default function Compose() {
       if (quiet) details.quiet = true;
       if (!downloadable) details.noDownload = true;
       if (!weaveable) details.noWeave = true;
+      if (rootedIn.length) details.rootedIn = rootedIn;
       // Publishing a collection into a room: the post CARRIES the collection
       // (founder 2026-08-14) — the card opens the whole thing.
       if (publishingCollection) details.collectionId = publishingCollection.id;
@@ -3022,6 +3039,51 @@ export default function Compose() {
               })}
             </div>
           ))}
+
+          {/* ROOTED IN (founder 2026-11-20): naming the wisdom an offering
+              draws from is how value finds its way back to the original
+              holders. Lichen holds a lineage's value in trust until its own
+              holders step in; a missing lineage is NOMINATED, never created. */}
+          <button className="cmp__tags-toggle" onClick={() => setRootOpen((o) => !o)} aria-expanded={rootOpen}>
+            Rooted in a tradition {rootedIn.length > 0 && `· ${rootedIn.length}`}{' '}
+            <span className="cmp__label-soft">— the lineage this wisdom comes from</span>
+            <Icon name="chevron-right" size={12} />
+          </button>
+          {rootOpen && (lineages === null ? (
+            <p className="cmp__hint-ev">Loading lineages…</p>
+          ) : (<>
+            <div className="cmp__gift-idents">
+              {lineages.map((l) => {
+                const on = rootedIn.some((r) => r.id === l.id);
+                return (
+                  <button key={l.id} type="button"
+                    className={'cmp__gift-ident' + (on ? ' is-on' : '')}
+                    onClick={() => setRootedIn((cur) =>
+                      on ? cur.filter((r) => r.id !== l.id) : [...cur, { id: l.id, name: l.full_name }])}>
+                    {on ? '✓ ' : ''}{l.full_name}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="cmp__hint-ev">
+              Lichen holds value attributed to a lineage in trust until its own recognized holders step in.
+            </p>
+            {rootAsked ? (
+              <p className="cmp__hint-ev">Nominated «{rootAsked}» ✓ — a Lichen steward will review it, and you&rsquo;ll get a bell.</p>
+            ) : (
+              <div className="cmp__rootask">
+                <input className="cmp__input" value={rootAsk} onChange={(e) => setRootAsk(e.target.value)}
+                  placeholder="Not listed? Nominate a lineage…" />
+                <button type="button" className="btn btn-ghost" disabled={rootAsk.trim().length < 2}
+                  onClick={() => {
+                    const n = rootAsk.trim();
+                    void nominateLineage(n, '', 'Nominated from a post in Compose')
+                      .then(() => { setRootAsked(n); setRootAsk(''); })
+                      .catch((e: Error) => alert(e.message));
+                  }}>Nominate</button>
+              </div>
+            )}
+          </>))}
 
           <label className="cmp__label">Where it happens</label>
           <div className="cmp__attend">
