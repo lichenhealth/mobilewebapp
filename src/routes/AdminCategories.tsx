@@ -1,3 +1,4 @@
+import LineageDesk from '../components/LineageDesk';
 import { useEffect, useState, useCallback } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import FilterRow from '../components/FilterRow';
@@ -329,6 +330,8 @@ export default function AdminCategories() {
           {vocab.length === 0 && <li className="adminc__muted">Nothing matches.</li>}
         </ul>
       </section>
+
+      <LineageDesk />
     </div>
   );
 }

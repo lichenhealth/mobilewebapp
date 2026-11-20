@@ -1,3 +1,4 @@
+import { readRootedIn } from './lineageApi';
 import type { FeedCardProps } from '../components/FeedCard';
 import { serviceAreaIcon, postAreas, SERVICE_AREAS, type FeedPost } from './postsApi';
 import { setInWeb } from './myceliumApi';
@@ -187,11 +188,18 @@ export function postToCard(
   const offerLine = [travelBits.join(' · '), baseOffer].filter(Boolean).join(' · ') || undefined;
   // The structured twin of offerLine — FeedCard renders these so each manner
   // shows its glyph; travel facts and the price ride along unmarked.
-  const eyebrowBits = offerLine
+  // ROOTED IN A LINEAGE (founder 2026-11-20): the card names the wisdom
+  // tradition an offering draws from, so its source travels with it.
+  const rooted = readRootedIn(p.details).map((r) => r.name);
+  const rootedText = rooted.length ? `Rooted in ${rooted.join(', ')}` : undefined;
+  const eyebrowBits = offerLine || rootedText
     ? [
-        ...travelBits.map((t) => ({ text: t })),
-        ...modeBits,
-        ...(mode && price ? [{ text: price }] : mode && entrusted ? [{ text: 'Lichen routes' }] : []),
+        ...(offerLine ? [
+          ...travelBits.map((t) => ({ text: t })),
+          ...modeBits,
+          ...(mode && price ? [{ text: price }] : mode && entrusted ? [{ text: 'Lichen routes' }] : []),
+        ] : []),
+        ...(rootedText ? [{ icon: 'leaf' as IconName, text: rootedText }] : []),
       ]
     : undefined;
   const previews = Array.isArray(p.details?.previews)
@@ -247,7 +255,7 @@ export function postToCard(
     // instead of going to it (founder 2026-08-07: "I guess I'm in my own
     // Mycelium, but it feels wonky"). Offer lines still show — what you're
     // asking for something is worth seeing on your own listing.
-    eyebrow: offerLine ?? (!isMine && (p.to_mycelium || p.visibility === 'mycelium')
+    eyebrow: [offerLine, rootedText].filter(Boolean).join(' · ') || (!isMine && (p.to_mycelium || p.visibility === 'mycelium')
       ? 'Mycelium' : undefined),
     eyebrowBits,
     media,

@@ -548,3 +548,7 @@
 /* SEND TO PEOPLE + the contacts door (2026-11-16). */
 .cmp__people { display: flex; flex-direction: column; gap: 6px; margin-top: var(--s-3); }
 .cmp__invpick { margin: 6px 0 4px; }
+
+/* Nominate a missing lineage from the Rooted-in picker (2026-11-20). */
+.cmp__rootask { display: flex; gap: var(--s-2); align-items: center; flex-wrap: wrap; margin-top: var(--s-2); }
+.cmp__rootask .cmp__input { flex: 1; min-width: 180px; }
