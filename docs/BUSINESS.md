@@ -56,6 +56,19 @@ the WeavePitch template.
   alpha. Ending alpha = flipping that one switch off (the $29/$99 gate
   resumes untouched) + sweeping the copy back; decks may claim "free during
   alpha", never a fixed free period.
+- **PAID ADD-ONS — PENDING, founder 2026-11-24** ("let there be ad ons that
+  are voluntary, like the cost of a twilio number... some of them are paid
+  for by the user - so lichen isn't absorbing those optional costs"): the
+  base stays Community $29 / Concierge $99; optional Connect services that
+  cost Lichen real money per member (a Lichen-provided phone number via
+  Twilio sub-accounts, texting, voicemail transcription, any future paid
+  API) become voluntary add-ons the member pays for, at cost or a small
+  pass-through margin — never bundled into the base. Bring-your-own-account
+  (the member's own Twilio, own Gmail) stays free: their bill, not ours.
+  NOT BUILT: needs Stripe subscription items per add-on, a Twilio
+  sub-account per member, and US texting (A2P) registration per brand.
+  Founder to set the add-on prices before it ships; decks may say "optional
+  paid add-ons are planned", never a price.
 - **Donations**: min-5% operating share per gift, donor may direct a larger
   share to operations or give generally (founder 2026-08-28/09-01); the
   remainder funds subsidies. Historical code: `translate_donation` minted

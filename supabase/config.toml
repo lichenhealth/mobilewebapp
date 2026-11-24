@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.assistant-watch]
 verify_jwt = false
+
+[functions.twilio-inbound]
+verify_jwt = false

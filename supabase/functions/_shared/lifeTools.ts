@@ -52,6 +52,27 @@ export const LIFE_TOOLS = [
     },
   },
   {
+    // SUBSCRIPTIONS (founder 2026-11-24: "manage subscriptions better… a lot
+    // of wasted money with auto renews"). Each is an expense line on their
+    // Budget that also knows when it renews and where to manage it; a bell
+    // rings 3 days before each renewal.
+    name: 'subscriptions',
+    description: 'Their paid SUBSCRIPTIONS, kept as monthly/yearly expense lines on their private Budget (Current-cy page) that also know the next renewal date and where to manage or cancel — Lichen bells them 3 days before each renewal. list: what they have, the monthly total, what renews in the next 30 days. add: service (the name), amount (the price per renewal, in dollars), cadence (monthly|yearly), renews_on (YYYY-MM-DD, the NEXT charge date — from the latest receipt plus one period), manage_url (an https link from the receipt, or leave empty and Lichen fills Apple\'s or Google Play\'s own page when billed_via says Apple / Google Play), billed_via (who charges them: "Apple", "Google Play", "PayPal", the card, or the inbox it bills). A same-named subscription is updated, never doubled. update: by service, any of those fields. cancelled: by service — removes the line once THEY say they cancelled (offer a watch_for mail watch on that sender\'s receipts so you notice if it charges again). TO AUDIT: search every inbox with my_mail for receipts and renewals from the last ~13 months (e.g. "subscription OR renews OR renewal OR receipt OR \'your plan\' newer_than:400d", plus from:no_reply@email.apple.com for App Store), read_mail when the price or date isn\'t in the preview, then add each real recurring charge — never a one-time purchase, never invented numbers; say which you couldn\'t price. You can\'t cancel for them (their login); give the manage link and offer to draft a cancellation email when a company takes those.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'add', 'update', 'cancelled'] },
+        service: { type: 'string' },
+        amount: { type: 'number' },
+        cadence: { type: 'string', enum: ['monthly', 'yearly'] },
+        renews_on: { type: 'string', description: 'YYYY-MM-DD' },
+        manage_url: { type: 'string' },
+        billed_via: { type: 'string' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'drive_folder',
     description: 'Their private Drive folders, which NEST (a folder can sit inside another, like Google Drive). Name a folder by its name, or by its path ("Photos / Lisa\'s Farm") when names repeat. create (name; inside = an existing folder to put it in), rename (new_name), move (folder into another folder named by into, or into "" for the top of Drive), add a post (by its exact title — one of their own posts, a post they saved, or the post shared into this conversation), or remove a post. Folders hold posts by reference — to put a document, spreadsheet or presentation in a folder use drive_doc op add_to_folder. my_lists folders shows each folder with its path.',
     input_schema: {
@@ -303,7 +324,7 @@ export const LIFE_TOOLS = [
 ];
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
-  my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy',
+  my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy', subscriptions: 'currentcy',
   drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', delete_calendar_event: 'calendar', my_calendar_drafts: 'calendar', my_imported_calendar: 'calendar', invite_to_event: 'calendar', draft_message: 'chat', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', drive_time: 'maps', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
@@ -440,6 +461,57 @@ export async function runLifeTool(
     return { ok: true, change: `task "${rem.title}": ${changes.join('; ')}` };
   }
 
+  if (name === 'subscriptions') {
+    const action = String(input.action ?? 'list');
+    const rows = await (await sb(`budget_items?profile_id=eq.${me}&is_subscription=eq.true&select=id,label,amount_cents,cadence,renews_on,manage_url,billed_via&order=renews_on.asc.nullslast`)).json();
+    const subs = (Array.isArray(rows) ? rows : []) as { id: string; label: string; amount_cents: number | null; cadence: string; renews_on: string | null; manage_url: string | null; billed_via: string | null }[];
+    const door = { path: '/currentcy#subscriptions', label: 'Open your subscriptions' };
+    const usd = (c: number | null) => (c == null ? null : Math.round(c) / 100);
+    if (action === 'list') {
+      const monthly = subs.reduce((t, r) => t + (r.amount_cents ?? 0) / (r.cadence === 'yearly' ? 12 : 1), 0);
+      const soon = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+      return {
+        ok: true, door,
+        subscriptions: subs.map((r) => ({ service: r.label, amount: usd(r.amount_cents), cadence: r.cadence, renews_on: r.renews_on, billed_via: r.billed_via, manage_url: r.manage_url })),
+        monthly_total: Math.round(monthly) / 100,
+        renewing_in_30_days: subs.filter((r) => r.renews_on && r.renews_on <= soon).map((r) => r.label),
+      };
+    }
+    const service = String(input.service ?? '').trim().slice(0, 120);
+    if (!service) return { ok: false, error: 'Name the subscription (service).' };
+    const hit = subs.filter((r) => r.label.toLowerCase() === service.toLowerCase());
+    if (action === 'cancelled') {
+      if (!hit.length) return { ok: false, error: `No subscription is named "${service}" — list them first.`, subscriptions: subs.map((r) => r.label) };
+      await sb(`budget_items?id=eq.${hit[0].id}&profile_id=eq.${me}`, { method: 'DELETE' });
+      return { ok: true, change: `took ${service} off their subscriptions`, door, note: 'Offer a watch_for mail watch on this sender\'s receipts, so you notice if it charges again.' };
+    }
+    const patch: Record<string, unknown> = {};
+    if (input.amount != null && Number.isFinite(Number(input.amount))) patch.amount_cents = Math.max(0, Math.round(Number(input.amount) * 100));
+    if (['monthly', 'yearly'].includes(String(input.cadence))) patch.cadence = String(input.cadence);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(input.renews_on ?? ''))) { patch.renews_on = String(input.renews_on); patch.renew_nudged_for = null; }
+    const billed = String(input.billed_via ?? '').trim().slice(0, 120);
+    if (billed) patch.billed_via = billed;
+    let url = String(input.manage_url ?? '').trim();
+    if (url && !/^https:\/\/\S+$/.test(url)) return { ok: false, error: 'manage_url has to be an https link.' };
+    if (!url && billed) {
+      if (/apple|app store|itunes/i.test(billed)) url = 'https://apps.apple.com/account/subscriptions';
+      else if (/google play/i.test(billed)) url = 'https://play.google.com/store/account/subscriptions';
+    }
+    if (url) patch.manage_url = url.slice(0, 600);
+    if (hit.length) {
+      if (!Object.keys(patch).length) return { ok: true, unchanged: service, door };
+      await sb(`budget_items?id=eq.${hit[0].id}&profile_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+      return { ok: true, change: `updated ${service}`, saved: patch, door };
+    }
+    if (action === 'update') return { ok: false, error: `No subscription is named "${service}" yet — add it.` };
+    const res = await sb('budget_items', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+      profile_id: me, label: service, bucket: 'expense', direction: 'out', is_subscription: true,
+      cadence: patch.cadence ?? 'monthly', amount_cents: patch.amount_cents ?? null, renews_on: patch.renews_on ?? null,
+      manage_url: patch.manage_url ?? null, billed_via: patch.billed_via ?? null,
+    }) });
+    if (!res.ok) return { ok: false, error: 'Couldn’t add it — try again.' };
+    return { ok: true, change: `added ${service} to their subscriptions`, saved: { ...patch, cadence: patch.cadence ?? 'monthly' }, door };
+  }
   if (name === 'budget_line') {
     const label = String(input.label ?? '').trim().slice(0, 120);
     if (!label) return { ok: false, error: 'A budget line needs a label.' };

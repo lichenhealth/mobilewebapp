@@ -15,7 +15,7 @@
 // verify_jwt = false; gated by x-webhook-secret == PUSH_HOOK_SECRET.
 
 import { mailAccountsOf, mailTester, listThreads } from '../_shared/gmail.ts';
-import { twilioCreds, twilioHasNumber } from '../_shared/twilio.ts';
+import { twilioCreds, twilioHasNumber, wireNumber } from '../_shared/twilio.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -69,7 +69,14 @@ Deno.serve(async (req) => {
         const c = await twilioCreds(w.profile_id);
         if (c) {
           const n = await twilioHasNumber(c, w.query);
-          if (n) detail = `${n.number} now lives on your Twilio account${n.sms ? ' and can send texts' : ''}${n.voice ? (n.sms ? ' and take calls' : ' and can take calls') : ''}.`;
+          if (n) {
+            // The moment it lands, it answers through Lichen — no dead air.
+            let wired = false;
+            try { wired = (await wireNumber(c, w.profile_id, n.number)).wired; } catch (e) { console.error('watch-wire', e instanceof Error ? e.message : e); }
+            detail = `${n.number} now lives on your Twilio account. ${wired
+              ? 'I connected it to Lichen: calls ring your cell for 20 seconds, then go to voicemail, and texts wait for me to read. Give it one test call and one test text before you cancel the old service.'
+              : 'I couldn’t connect it to Lichen automatically — ask me to "connect my Twilio number" and I’ll try again.'}`;
+          }
         }
       }
     } catch (e) {
