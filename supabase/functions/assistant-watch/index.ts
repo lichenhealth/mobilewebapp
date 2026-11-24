@@ -32,7 +32,7 @@ type Watch = { id: string; profile_id: string; kind: 'mail' | 'twilio_number'; l
 
 function noteFor(w: Watch, detail: string): string {
   const lines = [`Your watch came true: **${w.label}**.`, detail];
-  if (w.then_note) lines.push(`You asked me to help with this next: ${w.then_note}`, 'Want me to start on that now?');
+  if (w.then_note) lines.push(`You asked me to help with this next: ${w.then_note}`, 'I’m doing the legwork now — reading it, finding what the next step needs, drafting what has to go out. Give me a minute.');
   else lines.push('Want me to do anything with it?');
   return lines.join('\n\n');
 }
@@ -83,8 +83,23 @@ Deno.serve(async (req) => {
       console.error('watch-check', w.id, e instanceof Error ? e.message : e);
     }
     if (detail) {
-      await svc('rpc/_assistant_watch_fire', { method: 'POST', body: JSON.stringify({ p_watch: w.id, p_detail: detail, p_body: noteFor(w, detail) }) });
+      const fr = await svc('rpc/_assistant_watch_fire', { method: 'POST', body: JSON.stringify({ p_watch: w.id, p_detail: detail, p_body: noteFor(w, detail) }) });
       fired++;
+      // THE LEGWORK (founder 2026-11-24): a watch with a follow-up runs a
+      // real brain turn on its own note — read, dig, draft, then name only
+      // the steps that need them. assistant-feed re-reads the watch row.
+      const convo = fr.ok ? await fr.json().catch(() => null) : null;
+      if (w.then_note && typeof convo === 'string') {
+        const np = await (await svc(`assistant_feed_posts?profile_id=eq.${w.profile_id}&convo_id=eq.${convo}&author=eq.claude&select=id&order=created_at&limit=1`)).json();
+        const noteId = Array.isArray(np) ? np[0]?.id : null;
+        if (noteId) {
+          await fetch(`${SUPABASE_URL}/functions/v1/assistant-feed`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-webhook-secret': WEBHOOK_SECRET!, Authorization: `Bearer ${SERVICE_KEY}` },
+            body: JSON.stringify({ feed_post_id: noteId, profile_id: w.profile_id, watch_id: w.id }),
+          }).catch((e) => console.error('watch-prep', e instanceof Error ? e.message : e));
+        }
+      }
     } else {
       await svc(`assistant_watches?id=eq.${w.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ last_checked_at: new Date().toISOString() }) });
     }
