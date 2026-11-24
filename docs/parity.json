@@ -930,5 +930,8 @@
  },
  "connectionsApi:decideConnectionSuggestion": {
   "exempt": "platform-admin desk — not a member act"
+ },
+ "budgetApi:saveSubscription": {
+  "tool": "subscriptions (add/update)"
  }
 }

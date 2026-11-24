@@ -9,7 +9,7 @@ import { connectMail, listMailAccounts, mailEnabled, type MailAccount } from '..
 import {
   connectTwilio, disconnectService, listConnections, listWatches, stopWatch, twilioStatus,
   suggestConnection, listConnectionSuggestions, decideConnectionSuggestion,
-  type AssistantWatch, type ServiceConnection, type TwilioNumber, type ConnectionSuggestion,
+  wireTwilioNumber, type AssistantWatch, type ServiceConnection, type TwilioNumber, type ConnectionSuggestion,
 } from '../lib/connectionsApi';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from './Icon';
@@ -56,6 +56,13 @@ export default function Connections() {
     }
   };
   useEffect(() => { void load(); }, []);
+
+  async function wire(number: string) {
+    setBusy(true); setErr('');
+    try { await wireTwilioNumber(number); await load(); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  }
   useEffect(() => { mailEnabled(user?.id).then(setCanMail).catch(() => setCanMail(false)); }, [user?.id]);
 
   async function suggest() {
@@ -164,10 +171,21 @@ export default function Connections() {
         {twilio ? (
           <>
             <p className="conn__fine">{twilio.label}{twilio.last_error ? ` — ${twilio.last_error}` : ''}</p>
-            {numbers && (
-              <p className="conn__fine">
-                {numbers.length ? `Numbers on this account: ${numbers.map((n) => n.number).join(', ')}` : 'No phone numbers on this account yet.'}
-              </p>
+            {numbers && !numbers.length && <p className="conn__fine">No phone numbers on this account yet.</p>}
+            {numbers && numbers.length > 0 && (
+              <ul className="conn__nums">
+                {numbers.map((n) => (
+                  <li key={n.number} className="conn__num">
+                    <span>{n.number}{n.name && n.name !== n.number ? ` · ${n.name}` : ''}</span>
+                    {n.wired
+                      ? <span className="conn__status is-on">Answers through Lichen ✓</span>
+                      : <button className="conn__btn" disabled={busy} onClick={() => void wire(n.number)}>Connect to Lichen</button>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {numbers && numbers.length > 0 && (
+              <p className="conn__fine">Connected numbers ring your own cell (the phone on your Lichen profile) for 20 seconds, then go to voicemail. Your Brain reads texts and voicemails there, and a bell rings for each new one.</p>
             )}
             <div className="conn__acts">
               <button className={'conn__btn conn__btn--quiet' + (arm ? ' is-armed' : '')} disabled={busy} onClick={() => void disconnect()}>

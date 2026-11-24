@@ -212,3 +212,35 @@ export async function ledgerFlows(me: string, fromISO: string): Promise<LedgerFl
   }
   return { inAmt, outAmt };
 }
+
+// ─── Subscriptions (founder 2026-11-24: "manage subscriptions better… a lot
+// of wasted money with auto renews") — expense lines that also know when they
+// renew and where to manage them. A bell rings 3 days before each renewal.
+export interface Subscription {
+  id: string; label: string; amount_cents: number | null; cadence: 'monthly' | 'yearly';
+  renews_on: string | null; manage_url: string | null; billed_via: string | null;
+}
+export async function listSubscriptions(me: string): Promise<Subscription[]> {
+  const { data } = await supabase.from('budget_items')
+    .select('id, label, amount_cents, cadence, renews_on, manage_url, billed_via')
+    .eq('profile_id', me).eq('is_subscription', true).order('renews_on', { ascending: true, nullsFirst: false });
+  return ((data ?? []) as Subscription[]);
+}
+/** Apple's and Google Play's own manage pages when that's who bills it. */
+export function defaultManageUrl(billedVia: string): string | null {
+  if (/apple|app store|itunes/i.test(billedVia)) return 'https://apps.apple.com/account/subscriptions';
+  if (/google play/i.test(billedVia)) return 'https://play.google.com/store/account/subscriptions';
+  return null;
+}
+export async function saveSubscription(me: string, s: Omit<Subscription, 'id'> & { id?: string }): Promise<void> {
+  const url = s.manage_url?.trim() || (s.billed_via ? defaultManageUrl(s.billed_via) : null);
+  if (url && !/^https:\/\/\S+$/.test(url)) throw new Error('The manage link has to start with https://');
+  const row = {
+    label: s.label.trim(), amount_cents: s.amount_cents, cadence: s.cadence, renews_on: s.renews_on || null,
+    manage_url: url, billed_via: s.billed_via?.trim() || null, renew_nudged_for: null,
+  };
+  const { error } = s.id
+    ? await supabase.from('budget_items').update(row).eq('id', s.id).eq('profile_id', me)
+    : await supabase.from('budget_items').insert({ ...row, profile_id: me, bucket: 'expense', direction: 'out', is_subscription: true });
+  if (error) throw new Error(error.message);
+}

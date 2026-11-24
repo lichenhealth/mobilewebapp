@@ -6,7 +6,7 @@ import { call } from './mailApi';
  *  checked with the service by service-connect, and never shown again. */
 
 export type ServiceConnection = { id: string; service: 'twilio'; label: string | null; status: 'connected' | 'error'; last_error: string | null; connected_at: string };
-export type TwilioNumber = { number: string; name: string; sms: boolean; voice: boolean; added: string };
+export type TwilioNumber = { number: string; name: string; sms: boolean; voice: boolean; added: string; wired?: boolean };
 export type AssistantWatch = {
   id: string; kind: 'mail' | 'twilio_number'; label: string; query: string; then_note: string | null;
   status: 'active' | 'fired' | 'cancelled' | 'expired'; created_at: string; expires_at: string;
@@ -24,6 +24,11 @@ export async function connectTwilio(accountSid: string, keySid: string, keySecre
 
 export async function twilioStatus(): Promise<{ connected: boolean; numbers?: TwilioNumber[] }> {
   return call('service-connect', { action: 'status', service: 'twilio' });
+}
+
+/** Point a number's calls (ring your cell, then voicemail) and texts at Lichen. */
+export async function wireTwilioNumber(number: string): Promise<void> {
+  await call('service-connect', { action: 'wire', service: 'twilio', number });
 }
 
 export async function disconnectService(service: 'twilio'): Promise<void> {

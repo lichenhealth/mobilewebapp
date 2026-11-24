@@ -3,6 +3,7 @@ import AssistantDoor from '../components/AssistantDoor';
 import MoneyInDoors from '../components/MoneyInDoors';
 import ValueFlowCard from '../components/ValueFlowCard';
 import BudgetCard from '../components/BudgetCard';
+import SubscriptionsCard from '../components/SubscriptionsCard';
 import CashOutCard from '../components/CashOutCard';
 import MoneySafeguards from '../components/MoneySafeguards';
 import './Concierge.css';
@@ -51,6 +52,7 @@ export default function Currentcy() {
           drawer stays the compact card, deliberately. */}
       <MoneySafeguards />
       <BudgetCard />
+      <SubscriptionsCard />
       <ValueFlowCard />
     </div>
   );

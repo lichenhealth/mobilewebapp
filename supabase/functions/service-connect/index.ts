@@ -10,10 +10,11 @@
 // POST { action: 'connect', service: 'twilio', account_sid, key_sid, key_secret }
 //      { action: 'disconnect', service }
 //      { action: 'status', service }   → numbers on the account (live)
+//      { action: 'wire', service, number } → that number answers through Lichen
 //
 // verify_jwt = true. The caller is the member; there is no target parameter.
 
-import { TWILIO_SHAPES, twilioCreds, twilioGet, twilioNumbers, type TwilioCreds } from '../_shared/twilio.ts';
+import { TWILIO_SHAPES, twilioCreds, twilioGet, twilioNumbers, wireNumber, numberWired, type TwilioCreds } from '../_shared/twilio.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -55,12 +56,24 @@ Deno.serve(async (req) => {
     const c = await twilioCreds(me);
     if (!c) return json({ ok: true, connected: false });
     try {
-      return json({ ok: true, connected: true, numbers: await twilioNumbers(c) });
+      const nums = await twilioNumbers(c);
+      const out = [];
+      for (const n of nums) out.push({ ...n, wired: await numberWired(c, n.number).catch(() => false) });
+      return json({ ok: true, connected: true, numbers: out });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await svc(`service_connections?profile_id=eq.${me}&service=eq.twilio`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'error', last_error: msg }) });
       return json({ ok: false, connected: true, error: msg });
     }
+  }
+
+  if (action === 'wire') {
+    const c = await twilioCreds(me);
+    if (!c) return json({ error: 'Connect Twilio first.' }, 400);
+    try {
+      const w = await wireNumber(c, me, String(body.number ?? ''));
+      return w.wired ? json({ ok: true, wired: w.number }) : json({ error: 'That number isn’t on your Twilio account yet.' }, 400);
+    } catch (e) { return json({ error: e instanceof Error ? e.message : String(e) }, 400); }
   }
 
   if (action !== 'connect') return json({ error: 'Unknown action.' }, 400);
