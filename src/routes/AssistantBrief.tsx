@@ -620,7 +620,7 @@ export default function AssistantBrief() {
           // non-admins; zeroes are stated so "all clear" is sayable.
           const [sugg, knocks] = await Promise.all([
             supabase.from('category_suggestions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-            supabase.from('join_requests').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+            supabase.from('join_requests').select('id', { count: 'exact', head: true }).eq('status', 'new').is('replied_at', null),
           ]);
           if (sugg.count !== null || knocks.count !== null) {
             extras.admin_desks_right_now = {

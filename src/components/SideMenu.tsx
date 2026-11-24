@@ -180,7 +180,9 @@ export default function SideMenu({ open, onClose }: SideMenuProps) {
     let live = true;
     const refresh = () => {
       void supabase.from('join_requests').select('id', { count: 'exact', head: true })
-        .eq('status', 'new').then(({ count }) => { if (live) setKnockCount(count ?? 0); });
+        // A knock you've replied to is answered for now — it stays at the door but
+        // stops asking (founder 2026-11-24).
+        .eq('status', 'new').is('replied_at', null).then(({ count }) => { if (live) setKnockCount(count ?? 0); });
     };
     refresh();
     const channel = supabase.channel('join_requests:desk')

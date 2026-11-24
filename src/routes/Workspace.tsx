@@ -32,7 +32,7 @@ export default function Workspace() {
     void listMailAccounts().then(setAccounts).catch(() => setAccounts([]));
     void supabase.from('spaces').select('id, name, avatar_url').eq('handle', 'lichen').maybeSingle()
       .then(({ data }) => setOrg((data as typeof org) ?? null));
-    void supabase.from('join_requests').select('id', { count: 'exact', head: true }).eq('status', 'new')
+    void supabase.from('join_requests').select('id', { count: 'exact', head: true }).eq('status', 'new').is('replied_at', null)
       .then(({ count }) => setKnocks(count ?? 0));
     void supabase.from('payout_requests').select('id', { count: 'exact', head: true }).eq('status', 'requested')
       .then(({ count, error }) => setPayouts(error ? null : count ?? 0));

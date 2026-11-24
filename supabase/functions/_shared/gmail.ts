@@ -87,6 +87,9 @@ export type ThreadSummary = {
   from: string; subject: string; snippet: string; date: string; unread: boolean; starred: boolean; count: number;
   /** Lichen's own sorting (founder 2026-11-15) — see classifyMail. */
   kind: MailKind;
+  /** A reply the member sent to a knock at the door through Lichen (its BCC
+   *  copy lands in their own inbox) — Mail labels it "You → «name»". */
+  lichen?: { kind: 'knock_reply'; to: string; last_is_copy: boolean };
 };
 
 /** LICHEN'S MAIL SORTING (founder 2026-11-15: "the gmail filters… are not very
@@ -156,7 +159,7 @@ export async function listThreads(profileId: string, acct: MailAccount, q: strin
   const list = await gm(token, `threads?maxResults=${max}&q=${encodeURIComponent(q || 'in:inbox')}`) as { threads?: { id: string }[] };
   const ids = (list?.threads ?? []).map((t) => t.id);
   const threads = await Promise.all(ids.map((id) =>
-    gm(token, `threads/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Id&metadataHeaders=Precedence`).catch(() => null)));
+    gm(token, `threads/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Id&metadataHeaders=Precedence&metadataHeaders=To&metadataHeaders=X-Lichen-Kind`).catch(() => null)));
   const out: ThreadSummary[] = [];
   for (const t of threads as ({ id: string; messages?: GMsg[] } | null)[]) {
     const msgs = t?.messages ?? [];
@@ -173,9 +176,22 @@ export async function listThreads(profileId: string, acct: MailAccount, q: strin
         snippet: last.snippet ?? '',
         listUnsub: hdr(last, 'List-Unsubscribe'), listId: hdr(last, 'List-Id'), precedence: hdr(last, 'Precedence'),
       }, rules),
+      ...knockReplyTag(first, last),
     });
   }
   return out;
+}
+
+/** Knock replies sent through Lichen: tagged by header since 2026-11-24, and
+ *  recognized by their older subject before that. */
+function knockReplyTag(first: GMsg, last: GMsg): Pick<ThreadSummary, 'lichen'> {
+  const viaLichen = (m: GMsg) => /hello@lichen\.health/i.test(hdr(m, 'From'));
+  const tagged = hdr(first, 'X-Lichen-Kind').toLowerCase() === 'knock-reply'
+    || (viaLichen(first) && /wrote back about your note to /i.test(hdr(first, 'Subject')));
+  if (!tagged) return {};
+  const to = hdr(first, 'To');
+  const name = (to.match(/^\s*"?([^"<]+?)"?\s*</)?.[1] ?? to).trim();
+  return { lichen: { kind: 'knock_reply', to: name, last_is_copy: viaLichen(last) } };
 }
 
 function decodeEntities(s: string) {
