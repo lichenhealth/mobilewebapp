@@ -924,5 +924,11 @@
  },
  "connectionsApi:disconnectService": {
   "exempt": "removing a service connection is the person's own tap, beside where they pasted the key"
+ },
+ "connectionsApi:suggestConnection": {
+  "tool": "suggest_connection"
+ },
+ "connectionsApi:decideConnectionSuggestion": {
+  "exempt": "platform-admin desk — not a member act"
  }
 }

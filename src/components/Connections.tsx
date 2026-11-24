@@ -5,11 +5,14 @@
 // supplies the CollapsibleSection chrome.
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listMailAccounts, type MailAccount } from '../lib/mailApi';
+import { connectMail, listMailAccounts, mailEnabled, type MailAccount } from '../lib/mailApi';
 import {
   connectTwilio, disconnectService, listConnections, listWatches, stopWatch, twilioStatus,
-  type AssistantWatch, type ServiceConnection, type TwilioNumber,
+  suggestConnection, listConnectionSuggestions, decideConnectionSuggestion,
+  type AssistantWatch, type ServiceConnection, type TwilioNumber, type ConnectionSuggestion,
 } from '../lib/connectionsApi';
+import { useAuth } from '../auth/AuthProvider';
+import { Icon } from './Icon';
 import './Connections.css';
 
 const idField = { autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false } as const;
@@ -18,7 +21,18 @@ function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+const SUGG_WORD: Record<ConnectionSuggestion['status'], string> = {
+  new: 'Waiting for an answer', planned: 'Planned ✓', built: 'Ready to connect ✓', declined: 'Not for now',
+};
+
 export default function Connections() {
+  const { user, isAdmin } = useAuth();
+  const [adding, setAdding] = useState(false);
+  const [canMail, setCanMail] = useState(false);
+  const [sugName, setSugName] = useState('');
+  const [sugWhy, setSugWhy] = useState('');
+  const [sugSent, setSugSent] = useState('');
+  const [suggs, setSuggs] = useState<ConnectionSuggestion[]>([]);
   const [conns, setConns] = useState<ServiceConnection[] | null>(null);
   const [inboxes, setInboxes] = useState<MailAccount[]>([]);
   const [numbers, setNumbers] = useState<TwilioNumber[] | null>(null);
@@ -36,11 +50,31 @@ export default function Connections() {
   const load = async () => {
     const [c, w, m] = await Promise.all([listConnections(), listWatches(), listMailAccounts().catch(() => [])]);
     setConns(c); setWatches(w); setInboxes(m);
+    listConnectionSuggestions().then(setSuggs).catch(() => {});
     if (c.some((x) => x.service === 'twilio')) {
       twilioStatus().then((s) => setNumbers(s.numbers ?? [])).catch(() => setNumbers(null));
     }
   };
   useEffect(() => { void load(); }, []);
+  useEffect(() => { mailEnabled(user?.id).then(setCanMail).catch(() => setCanMail(false)); }, [user?.id]);
+
+  async function suggest() {
+    setBusy(true); setErr('');
+    try {
+      await suggestConnection(sugName, sugWhy);
+      setSugSent(sugName.trim()); setSugName(''); setSugWhy('');
+      listConnectionSuggestions().then(setSuggs).catch(() => {});
+    } catch (e) { setErr((e as Error).message); }
+    setBusy(false);
+  }
+
+  async function decide(id: string, status: ConnectionSuggestion['status']) {
+    try { await decideConnectionSuggestion(id, status); setSuggs((xs) => xs.map((x) => x.id === id ? { ...x, status } : x)); }
+    catch (e) { setErr((e as Error).message); }
+  }
+
+  const mine = suggs.filter((x) => x.profile_id === user?.id);
+  const others = isAdmin ? suggs.filter((x) => true) : [];
 
   async function connect() {
     setBusy(true); setErr('');
@@ -62,9 +96,52 @@ export default function Connections() {
 
   return (
     <div className="conn">
-      <p className="prof__care-lead">
-        Services your Brain can work with for you. Connect one here once, then just ask in any conversation.
-      </p>
+      <div className="conn__top">
+        <p className="prof__care-lead">
+          Services your Brain can work with for you. Connect one here once, then just ask in any conversation.
+        </p>
+        <button className={'conn__plus' + (adding ? ' is-on' : '')} data-tip="Connect a service" aria-label="Connect a service"
+          aria-pressed={adding} onClick={() => { setAdding((v) => !v); setSugSent(''); }}>
+          <Icon name="plus" size={16} />
+        </button>
+      </div>
+
+      {adding && (
+        <div className="conn__card conn__add">
+          <strong>Connect a service</strong>
+          <div className="conn__choices">
+            {canMail && (
+              <button className="conn__choice" onClick={() => { void connectMail(undefined, '/profile#connections').catch((e) => setErr(e.message)); }}>
+                <Icon name="mail" size={16} /> A Google email inbox
+              </button>
+            )}
+            {!twilio && (
+              <button className="conn__choice" onClick={() => { setOpen(true); setAdding(false); }}>
+                <Icon name="phone" size={16} /> Twilio — phone numbers &amp; texting
+              </button>
+            )}
+          </div>
+          <div className="conn__suggest">
+            <strong>Don't see yours?</strong>
+            <p className="conn__fine">Ask Lichen to connect it. Each new service is built and checked by Lichen's team before anyone's keys go into it, so it isn't instant — you'll get a bell with the answer.</p>
+            {sugSent ? (
+              <p className="conn__fine conn__ok">Sent ✓ — Lichen will let you know about {sugSent}.</p>
+            ) : (
+              <>
+                <label className="conn__label">Which service?
+                  <input className="conn__input" value={sugName} onChange={(e) => setSugName(e.target.value)} placeholder="e.g. QuickBooks, Square, Zoom" maxLength={80} />
+                </label>
+                <label className="conn__label">What would you want your Brain to do with it? (optional)
+                  <textarea className="conn__input" rows={2} value={sugWhy} onChange={(e) => setSugWhy(e.target.value)} maxLength={1000} />
+                </label>
+                <div className="conn__acts">
+                  <button className="conn__btn" disabled={busy || sugName.trim().length < 2} onClick={() => void suggest()}>Send to Lichen</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="conn__card">
         <div className="conn__head">
@@ -151,6 +228,41 @@ export default function Connections() {
           ))}
         </ul>
       )}
+      {mine.length > 0 && !isAdmin && (
+        <>
+          <h3 className="conn__h">Services you've asked for</h3>
+          <ul className="conn__watches">
+            {mine.map((x) => (
+              <li key={x.id} className={'conn__watch' + (x.status === 'built' ? ' is-fired' : '')}>
+                <div className="conn__watch-main"><strong>{x.service}</strong><span className="conn__fine">{SUGG_WORD[x.status]}</span></div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {isAdmin && others.length > 0 && (
+        <>
+          <h3 className="conn__h">Services members asked for</h3>
+          <ul className="conn__watches">
+            {others.map((x) => (
+              <li key={x.id} className={'conn__watch' + (x.status === 'built' ? ' is-fired' : '')}>
+                <div className="conn__watch-main">
+                  <strong>{x.service}</strong>
+                  <span className="conn__fine">{x.who ?? 'A member'} · {shortDate(x.created_at)} · {SUGG_WORD[x.status]}</span>
+                  {x.why && <span className="conn__fine">“{x.why}”</span>}
+                </div>
+                <div className="conn__acts">
+                  {x.status !== 'planned' && <button className="conn__btn conn__btn--quiet" onClick={() => void decide(x.id, 'planned')}>Planned</button>}
+                  {x.status !== 'built' && <button className="conn__btn conn__btn--quiet" onClick={() => void decide(x.id, 'built')}>Built</button>}
+                  {x.status !== 'declined' && <button className="conn__btn conn__btn--quiet" onClick={() => void decide(x.id, 'declined')}>Not now</button>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       {err && <p className="conn__err">{err}</p>}
     </div>
   );

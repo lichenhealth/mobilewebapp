@@ -44,6 +44,11 @@ export const WATCH_TOOLS = [
     description: 'Read the member\'s OWN connected Twilio account (Profile → Connections). action "numbers" lists the phone numbers on it; action "check_number" + number says whether that number lives there yet (a number transfer/port shows up the moment it finishes). Read-only. If Twilio isn\'t connected, an Open Connections button rides your reply — say they paste their Twilio key there once.',
     input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['numbers', 'check_number'] }, number: { type: 'string' } }, required: ['action'] },
   },
+  {
+    name: 'suggest_connection',
+    description: 'When the member wants their Brain to work with an outside service Lichen can\'t connect to yet (anything other than their Google inbox or Twilio), ask Lichen\'s team to connect it for them — only when they asked, in their own words. service = the service\'s name; why = what they want done with it, in their words. Lichen\'s stewards are belled and the member hears the answer by bell. Say plainly it isn\'t instant: each new service is built and checked by Lichen\'s team before anyone\'s keys go into it.',
+    input_schema: { type: 'object', properties: { service: { type: 'string' }, why: { type: 'string' } }, required: ['service'] },
+  },
 ];
 export const WATCH_TOOL_NAMES = new Set(WATCH_TOOLS.map((t) => t.name));
 
@@ -84,6 +89,19 @@ export async function runWatchTool(profileId: string, name: string, input: Recor
       const row = (await r.json().catch(() => []))?.[0];
       if (!row?.id) return { ok: false, error: 'Couldn’t set the watch — try again.' };
       return { ok: true, watching: { label, kind, query, expires: row.expires_at }, note: 'Checks every 10 minutes for 30 days. It only notices and tells them — nothing happens on its own. They can see or stop it in Profile → Connections.' };
+    }
+
+    if (name === 'suggest_connection') {
+      const service = s('service').slice(0, 80);
+      if (service.length < 2) return { ok: false, error: 'Which service should Lichen connect?' };
+      const dup = await (await svc(`connection_suggestions?profile_id=eq.${profileId}&service=ilike.${encodeURIComponent(service)}&select=id,status`)).json();
+      if (Array.isArray(dup) && dup.length) return { ok: true, already: true, status: dup[0].status, note: 'They already asked for this one — tell them where it stands.', door: CONNECTIONS_DOOR };
+      const r = await svc('connection_suggestions', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ profile_id: profileId, service, why: s('why').slice(0, 1000) || null }),
+      });
+      if (!r.ok) return { ok: false, error: 'Couldn’t send that to Lichen — try again.' };
+      return { ok: true, suggested: service, note: 'Sent to Lichen\'s stewards; the member gets a bell with the answer. Their asks are listed in Profile → Connections.', door: CONNECTIONS_DOOR };
     }
 
     if (name === 'my_watches') {

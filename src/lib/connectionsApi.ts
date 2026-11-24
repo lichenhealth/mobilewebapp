@@ -41,3 +41,33 @@ export async function stopWatch(id: string): Promise<void> {
   const { error } = await supabase.from('assistant_watches').update({ status: 'cancelled' }).eq('id', id);
   if (error) throw new Error(error.message);
 }
+
+/** SUGGEST A SERVICE (founder 2026-11-24): a member asks Lichen to connect a
+ *  service it doesn't yet; the platform stewards are belled and answer. */
+export type ConnectionSuggestion = {
+  id: string; profile_id: string; service: string; why: string | null;
+  status: 'new' | 'planned' | 'built' | 'declined'; created_at: string; decided_at: string | null;
+  who?: string | null;
+};
+
+export async function suggestConnection(service: string, why: string): Promise<void> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error('Sign in first.');
+  const { error } = await supabase.from('connection_suggestions')
+    .insert({ profile_id: u.user.id, service: service.trim(), why: why.trim() || null });
+  if (error) throw new Error(error.message);
+}
+
+/** Own suggestions — or, for platform admins, everyone's (RLS decides). */
+export async function listConnectionSuggestions(): Promise<ConnectionSuggestion[]> {
+  const { data } = await supabase.from('connection_suggestions')
+    .select('id, profile_id, service, why, status, created_at, decided_at, who:profiles!connection_suggestions_profile_id_fkey(full_name)')
+    .order('created_at', { ascending: false }).limit(60);
+  return ((data ?? []) as unknown as (ConnectionSuggestion & { who: { full_name: string | null } | null })[])
+    .map((r) => ({ ...r, who: r.who?.full_name ?? null }));
+}
+
+export async function decideConnectionSuggestion(id: string, status: ConnectionSuggestion['status']): Promise<void> {
+  const { error } = await supabase.rpc('decide_connection_suggestion', { p_id: id, p_status: status });
+  if (error) throw new Error(error.message);
+}
