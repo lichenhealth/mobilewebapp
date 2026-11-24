@@ -369,11 +369,19 @@ export async function trashThread(profileId: string, accountId: string, threadId
 
 /** UNSUBSCRIBE, THE WAY GMAIL'S OWN BUTTON DOES (founder 2026-11-14: "give
  *  brain the ability to click thru and unsubscribe for me across accounts").
- *  Reads the sender's List-Unsubscribe headers (RFC 2369 / RFC 8058) — never a
- *  link from the email's body, which is a stranger's markup:
+ *  Reads the sender's List-Unsubscribe headers (RFC 2369 / RFC 8058) first:
  *  · https + List-Unsubscribe-Post: One-Click → one POST, done (no page);
  *  · mailto: → an "unsubscribe" email from THAT inbox to THAT address only;
  *  · https without one-click → a page a person must confirm: handed back.
+ *  THE BODY LINK (founder 2026-11-24: "open promotional emails that don't have
+ *  an unsub in a browser to get full text, so you can find the unsub" —
+ *  rewards mail like Dutch Bros/Michaels carries no header): with no usable
+ *  header, the newest message's FULL HTML is read and a link LABELED
+ *  unsubscribe/opt out/email preferences is opened — only on the sender's own
+ *  domain or a known mailing service, public https only, every redirect hop
+ *  re-checked, nothing typed. A confirmation page that says you're out =
+ *  unsubscribed; one simple confirm form (hidden fields / your own email
+ *  prefilled) is pressed once; anything asking more is handed back.
  *  Mail already in Trash still carries its headers, so this works after a
  *  clear-out too. */
 export type UnsubResult = { thread_id: string; from: string; status: 'unsubscribed' | 'emailed' | 'needs_you' | 'no_option' | 'failed'; how?: string; url?: string; error?: string };
@@ -393,7 +401,7 @@ export async function unsubscribeThread(profileId: string, acct: MailAccount, th
   const m = msgs.find((x) => hdr(x, 'List-Unsubscribe')) ?? msgs[0];
   const from = m ? hdr(m, 'From') : '';
   const lu = m ? hdr(m, 'List-Unsubscribe') : '';
-  if (!lu) return { thread_id: threadId, from, status: 'no_option' };
+  if (!lu) return await unsubscribeByBodyLink(token, threadId, from);
   const links = [...lu.matchAll(/<([^>]+)>/g)].map((x) => x[1].trim());
   const https = links.find((l) => l.toLowerCase().startsWith('https:') && publicHttps(l));
   const mailto = links.find((l) => l.toLowerCase().startsWith('mailto:'));
@@ -421,8 +429,136 @@ export async function unsubscribeThread(profileId: string, acct: MailAccount, th
       if (!https) return { thread_id: threadId, from, status: 'failed', error: e instanceof Error ? e.message : String(e) };
     }
   }
-  if (https) return { thread_id: threadId, from, status: 'needs_you', url: https };
-  return { thread_id: threadId, from, status: 'no_option' };
+  if (https) {
+    // A header page that needs a person — the body link may still be one-step.
+    const viaBody = await unsubscribeByBodyLink(token, threadId, from).catch(() => null);
+    if (viaBody && viaBody.status === 'unsubscribed') return viaBody;
+    return { thread_id: threadId, from, status: 'needs_you', url: https };
+  }
+  return await unsubscribeByBodyLink(token, threadId, from);
+}
+
+/** Mailing services senders really use for their unsubscribe pages. A body
+ *  link is opened only on the sender's own domain or one of these. */
+const MAIL_SERVICES = [
+  'list-manage.com', 'mailchimp.com', 'mcusercontent.com', 'klaviyo.com', 'klaviyomail.com', 'sendgrid.net', 'sendgrid.com',
+  'hubspot.com', 'hubspotemail.net', 'hs-sites.com', 'hubspotlinks.com', 'exacttarget.com', 'exct.net', 'salesforce.com',
+  'marketingcloudapps.com', 'braze.com', 'braze.eu', 'iterable.com', 'constantcontact.com', 'ctctcdn.com', 'mailgun.org',
+  'createsend.com', 'cmail19.com', 'cmail20.com', 'substack.com', 'beehiiv.com', 'convertkit.com', 'ck.page', 'kit.com',
+  'attn.tv', 'attentivemobile.com', 'omnisend.com', 'emarsys.net', 'responsys.net', 'bronto.com', 'cheetahmail.com',
+  'sailthru.com', 'mailjet.com', 'sparkpostmail.com', 'postmarkapp.com', 'activehosted.com', 'acemlna.com', 'mandrillapp.com',
+  'campaign-archive.com', 'e2ma.net', 'myemma.com', 'shopify.com', 'shopifyemail.com', 'getresponse.com', 'aweber.com',
+  'drip.com', 'customer.io', 'customeriomail.com', 'cordial.io', 'listrak.com', 'zetaglobal.net', 'epsilon.com',
+];
+const rootOf = (h: string) => h.toLowerCase().replace(/\.$/, '').split('.').slice(-2).join('.');
+const UNSUB_WORDS = /unsubscri|opt[\s-]?out|email preferences|manage (your )?(email |communication |subscription )?preferences|stop (receiving|these|getting)|remove me|update (your )?preferences|preference cent(er|re)/i;
+const DONE_WORDS = /(you('ve| have| are| were)? (been |now |successfully )?(unsubscribed|removed|opted out))|(successfully (unsubscribed|removed|opted out))|unsubscribe(d)? (successful|complete|confirmed)|removed from (our|the|this|all) (mailing |email )?lists?|you('re| are) (now )?unsubscribed/i;
+const decodeHref = (h: string) => h.replace(/&amp;/g, '&').replace(/&#x3D;/gi, '=').replace(/&#61;/g, '=').trim();
+
+/** Unsubscribe links in an email's HTML, best first (anchor text says
+ *  unsubscribe beats a URL that merely contains it). Exported for read_mail. */
+export function unsubscribeLinks(html: string): { url: string; text: string }[] {
+  const out: { url: string; text: string; score: number }[] = [];
+  for (const m of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const href = m[1].match(/href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    const url = href ? decodeHref(href[2] ?? href[3] ?? href[4] ?? '') : '';
+    if (!/^https:\/\//i.test(url)) continue;
+    const text = htmlToText(m[2]).replace(/\s+/g, ' ').trim().slice(0, 80);
+    const score = (/unsubscri/i.test(text) ? 4 : UNSUB_WORDS.test(text) ? 3 : 0) + (/unsubscri|opt-?out|optout/i.test(url) ? 1 : 0);
+    if (score > 0 && !out.some((o) => o.url === url)) out.push({ url, text, score });
+  }
+  return out.sort((a, b) => b.score - a.score).map(({ url, text }) => ({ url, text }));
+}
+
+async function readCapped(r: Response, cap = 400_000): Promise<string> {
+  const reader = r.body?.getReader(); if (!reader) return '';
+  const chunks: Uint8Array[] = []; let n = 0;
+  while (n < cap) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); n += value.length; }
+  try { await reader.cancel(); } catch { /* done */ }
+  const all = new Uint8Array(n); let o = 0; for (const c of chunks) { all.set(c.subarray(0, Math.min(c.length, n - o)), o); o += c.length; if (o >= n) break; }
+  return new TextDecoder().decode(all);
+}
+
+/** One guarded browser-like visit: GET (or a form POST), following up to five
+ *  redirects, each hop public https on an allowed host. */
+async function visit(url: string, allowed: (h: string) => boolean, init?: { method: string; body?: string }): Promise<{ url: string; html: string; status: number } | null> {
+  let cur = url; let method = init?.method ?? 'GET'; let body = init?.body;
+  for (let hop = 0; hop < 6; hop++) {
+    if (!publicHttps(cur) || !allowed(new URL(cur).hostname)) return null;
+    const r = await fetch(cur, {
+      method, redirect: 'manual', signal: AbortSignal.timeout(10000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LichenMail/1.0)', Accept: 'text/html,*/*', ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) },
+      ...(body ? { body } : {}),
+    });
+    if (r.status >= 300 && r.status < 400 && r.headers.get('location')) {
+      cur = new URL(r.headers.get('location')!, cur).toString();
+      if (r.status !== 307 && r.status !== 308) { method = 'GET'; body = undefined; }
+      try { await r.body?.cancel(); } catch { /* fine */ }
+      continue;
+    }
+    return { url: cur, html: await readCapped(r), status: r.status };
+  }
+  return null;
+}
+
+/** A single confirm form on the page: only hidden fields, checkboxes/radios
+ *  and an email field the sender already filled in. Anything that wants the
+ *  person to type is left for them. */
+function confirmForm(html: string, pageUrl: string): { action: string; method: string; body: string } | null {
+  const forms = [...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/gi)].filter((f) => UNSUB_WORDS.test(htmlToText(f[2])) || /unsubscri|confirm|opt.?out/i.test(f[2]));
+  if (forms.length !== 1) return null;
+  const [, attrs, inner] = forms[0];
+  const attr = (a: string, n: string) => a.match(new RegExp(`${n}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'));
+  const am = attr(attrs, 'action'); const mm = attr(attrs, 'method');
+  const action = new URL(decodeHref(am ? (am[2] ?? am[3] ?? am[4] ?? '') : '') || pageUrl, pageUrl).toString();
+  const method = ((mm ? (mm[2] ?? mm[3] ?? mm[4]) : 'GET') || 'GET').toUpperCase();
+  const params = new URLSearchParams();
+  for (const i of inner.matchAll(/<input\b([^>]*)>/gi)) {
+    const a = i[1];
+    const type = ((attr(a, 'type')?.slice(2).find(Boolean)) ?? 'text').toLowerCase();
+    const name = attr(a, 'name')?.slice(2).find(Boolean); const val = decodeHref(attr(a, 'value')?.slice(2).find((x) => x !== undefined) ?? '');
+    if (['submit', 'button', 'image', 'reset'].includes(type)) { if (name) params.append(name, val); continue; }
+    if (!name) continue;
+    if (type === 'hidden') { params.append(name, val); continue; }
+    if (type === 'checkbox' || type === 'radio') {
+      const label = a + ' ' + val;
+      if (/all|unsubscri|opt.?out|none/i.test(label) || /\bchecked\b/i.test(a)) params.append(name, val || 'on');
+      continue;
+    }
+    if (type === 'email' && val) { params.append(name, val); continue; }
+    return null; // a field the person would have to fill in
+  }
+  if (/<textarea\b/i.test(inner)) return null;
+  for (const b of inner.matchAll(/<button\b([^>]*)>/gi)) { const n = attr(b[1], 'name')?.slice(2).find(Boolean); if (n) params.append(n, decodeHref(attr(b[1], 'value')?.slice(2).find((x) => x !== undefined) ?? '')); break; }
+  return { action, method, body: params.toString() };
+}
+
+async function unsubscribeByBodyLink(token: string, threadId: string, from: string): Promise<UnsubResult> {
+  const t = await gm(token, `threads/${encodeURIComponent(threadId)}?format=full`) as { messages?: GMsg[] };
+  const msgs = (t?.messages ?? []).filter((x) => !x.labelIds?.includes('DRAFT')).reverse();
+  let links: { url: string; text: string }[] = [];
+  for (const m of msgs) { const h = findPart(m.payload, 'text/html'); if (h) { links = unsubscribeLinks(h); if (links.length) break; } }
+  if (!links.length) return { thread_id: threadId, from, status: 'no_option' };
+  const senderRoot = rootOf((from.match(/@([^>\s]+)/)?.[1] ?? '').trim());
+  const okHost = (h: string) => { const r = rootOf(h); return (!!senderRoot && r === senderRoot) || MAIL_SERVICES.some((s) => r === rootOf(s) || h.toLowerCase().endsWith('.' + s) || h.toLowerCase() === s); };
+  const link = links.find((l) => publicHttps(l.url) && okHost(new URL(l.url).hostname));
+  if (!link) return { thread_id: threadId, from, status: 'needs_you', url: links[0].url, how: 'link in the email', error: 'the link goes to a site that isn\'t the sender\'s own, so it\'s yours to open' };
+  try {
+    const page = await visit(link.url, okHost);
+    if (!page) return { thread_id: threadId, from, status: 'needs_you', url: link.url, how: 'link in the email', error: 'their link sends you somewhere else first' };
+    const text = htmlToText(page.html);
+    const stillAsking = /<(button|input)\b[^>]*(unsubscri|confirm)/i.test(page.html);
+    if (page.status < 400 && DONE_WORDS.test(text) && !stillAsking) return { thread_id: threadId, from, status: 'unsubscribed', how: 'opened the unsubscribe link in their email' };
+    const form = page.status < 400 ? confirmForm(page.html, page.url) : null;
+    if (form && publicHttps(form.action) && okHost(new URL(form.action).hostname)) {
+      const target = form.method === 'GET' ? `${form.action.split('?')[0]}?${form.body}` : form.action;
+      const after = await visit(target, okHost, form.method === 'GET' ? undefined : { method: 'POST', body: form.body });
+      if (after && after.status < 400 && DONE_WORDS.test(htmlToText(after.html))) return { thread_id: threadId, from, status: 'unsubscribed', how: 'opened their unsubscribe link and confirmed' };
+    }
+    return { thread_id: threadId, from, status: 'needs_you', url: page.url, how: 'link in the email', error: 'their page asks you to choose or sign in before it lets you go' };
+  } catch (e) {
+    return { thread_id: threadId, from, status: 'needs_you', url: link.url, how: 'link in the email', error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 /** Encode an RFC 2822 message (UTF-8 headers via RFC 2047). */
