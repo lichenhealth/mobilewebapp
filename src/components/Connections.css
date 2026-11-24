@@ -1,0 +1,35 @@
+.conn { display: flex; flex-direction: column; gap: var(--s-3); }
+.conn__card {
+  background: var(--white, #fff); border: 1px solid var(--bone-edge); border-radius: 14px;
+  padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2);
+}
+.conn__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+.conn__status { font-size: var(--t-xs); color: var(--ink-faint); }
+.conn__status.is-on { color: var(--moss); }
+.conn__status.is-err { color: var(--red-deep); }
+.conn__fine { font-size: var(--t-xs); color: var(--ink-muted); line-height: 1.5; margin: 0; overflow-wrap: anywhere; text-wrap: pretty; }
+.conn__door { font-size: var(--t-sm); align-self: flex-start; }
+.conn__form { display: flex; flex-direction: column; gap: var(--s-2); }
+.conn__label { display: flex; flex-direction: column; gap: 4px; font-size: var(--t-xs); color: var(--ink-soft); }
+.conn__input {
+  border: 1px solid var(--bone-edge); border-radius: 10px; padding: 9px 12px;
+  font: inherit; font-size: var(--t-sm); background: var(--bone-warm, #fff); min-width: 0;
+}
+.conn__acts { display: flex; gap: var(--s-2); flex-wrap: wrap; justify-content: flex-end; }
+.conn__btn {
+  align-self: flex-start; border: 1px solid var(--peach); background: var(--peach-tint); color: var(--peach-deep);
+  border-radius: 999px; padding: 7px 16px; font: inherit; font-size: var(--t-sm); cursor: pointer; white-space: nowrap;
+}
+.conn__btn:disabled { opacity: .5; cursor: default; }
+.conn__btn--quiet { background: transparent; border-color: var(--bone-edge); color: var(--ink-soft); }
+.conn__btn--quiet.is-armed { color: var(--red-deep); border-color: var(--red-deep); }
+.conn__h { font-size: var(--t-sm); font-weight: 500; margin: var(--s-3) 0 0; }
+.conn__watches { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.conn__watch {
+  display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-3);
+  border: 1px solid var(--bone-edge); border-left: 3px solid var(--peach); border-radius: 10px;
+}
+.conn__watch.is-fired { border-left-color: var(--moss); }
+.conn__watch-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.conn__watch .conn__btn { align-self: flex-end; }
+.conn__err { color: var(--red-deep); font-size: var(--t-xs); margin: 0; }

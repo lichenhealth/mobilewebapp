@@ -37,6 +37,7 @@ import { FILE_DEV_REPORT_TOOL, fileDevReport } from '../_shared/devReport.ts';
 import { LIFE_TOOLS, LIFE_TOOL_SECTION, runLifeTool } from '../_shared/lifeTools.ts';
 import { MAIL_TOOLS, MAIL_TOOL_NAMES, runMailTool } from '../_shared/mailTools.ts';
 import { GDRIVE_TOOLS, GDRIVE_TOOL_NAMES, runGDriveTool } from '../_shared/gdriveTools.ts';
+import { WATCH_TOOLS, WATCH_TOOL_NAMES, runWatchTool } from '../_shared/watchTools.ts';
 import { mailAccountsOf } from '../_shared/gmail.ts';
 import { mailTester } from '../_shared/gmail.ts';
 import { KNOCK_TOOLS, KNOCK_TOOL_NAMES, runKnockTool, type KnockDraft } from '../_shared/knockTools.ts';
@@ -1443,6 +1444,10 @@ Deno.serve(async (req) => {
       + ' RECONNECTING: whenever an inbox needs reconnecting (expired, or a new permission like filters) or they ask for a reconnect card, CALL mail_reconnect — it puts one-tap Reconnect buttons in this conversation that bring them straight back here. Never send them to the Mail screen for it, and never call another tool in its place.'
       + ' These abilities are newer than some earlier replies in this conversation: if you said before that you could not unsubscribe or hand a reconnect card, that was true then and is not now — use the tool.'
     : '';
+  // THE EA (founder 2026-11-24): standing watches + connected services.
+  const watchRule = canLife
+    ? '\n\nWATCHES & CONNECTED SERVICES (you are their executive assistant): when they say "tell me when…", "once X happens, help me do Y", or are waiting on something from a company (a confirmation, a shipment, a number transfer, a refund), call watch_for — a mail watch with a Gmail search for the email that would mean it happened, or a twilio_number watch for a number arriving on their Twilio account — with then = what they want done next in their words. Say plainly that Lichen checks every 10 minutes and will bell them with a note; a watch only notices and tells, it never acts on its own. my_watches lists or stops them. twilio reads their own connected Twilio account (numbers, whether a number has arrived). Services that need signing in on the company\'s own site (cancelling an account, billing pages) stay their tap: when the moment comes, say exactly what is left and give the link if you have it; draft the email when the company accepts requests by email. Never claim you can log in to an outside service.'
+    : '';
   const gdriveRule = canGDrive
     ? '\n\nTHEIR GOOGLE DRIVES (the same Google accounts as their mail): google_drive lists, searches, shows recent/shared, and helps them clean up — "trash" moves files to that account\'s Google Trash (recoverable 30 days) only when they ask in their own words; "import" puts a card under your reply whose button re-creates each file as a Lichen doc, spreadsheet, presentation or Drive file (then_trash=true trashes the Google copy after). Help them sort: list, group what looks keep-worthy vs. clutter, and ask before trashing anything they did not name. Say an import is waiting for their tap — never that it already happened. The screen for this is Drive → + → From Google Drive (/drive/import). If an account needs a Reconnect for Drive, call mail_reconnect.'
     : '';
@@ -1585,6 +1590,13 @@ Deno.serve(async (req) => {
       for (const e of (mr.reconnect as string[] | undefined) ?? []) if (!mailReconnect.includes(e)) mailReconnect.push(e);
       if (mr.mailDraft) { mailDrafts.push({ type: 'mail_draft', ...(mr.mailDraft as Record<string, unknown>) }); delete mr.mailDraft; }
       return mr;
+    }
+    if (WATCH_TOOL_NAMES.has(name)) {
+      if (!canLife) return { ok: false, error: 'This needs their hand-that-writes switch on.' };
+      const wr = await runWatchTool(profile_id, name, input as Record<string, unknown>, canMail);
+      if (wr.door && !appDoors.some((d) => d.path === wr.door!.path)) appDoors.push(wr.door);
+      delete wr.door;
+      return wr;
     }
     if (GDRIVE_TOOL_NAMES.has(name)) {
       if (!canGDrive) return { ok: false, error: 'Google Drive isn\u2019t switched on for the assistant here.' };
@@ -3541,7 +3553,7 @@ Deno.serve(async (req) => {
         // inside the cached block it would bust the doctrine's prompt cache
         // on every exchange.
         system: [
-          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${identityRule}${doRule}${webRule}${searchRule}${digRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${postsRule}${lifeRule}${mailRule}${gdriveRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: `${ident.persona}\n\n${BASE_RULES}${identityRule}${doRule}${webRule}${searchRule}${digRule}${bugRule}${standing}${spaceFrame}${threadRule}${editRule}${spaceEditRule}${calendarRule}${coursesRule}${postsRule}${lifeRule}${mailRule}${watchRule}${gdriveRule}${coachFrame}${actRule}${imageRule}${featureRule}${elsewhere}\n\n${LICHEN_DOCTRINE}`, cache_control: { type: 'ephemeral' } },
           ...(pulse ? [{ type: 'text', text: pulse }] : []),
         ],
         messages,
@@ -3569,6 +3581,7 @@ Deno.serve(async (req) => {
                      ...(canPosts ? POST_TOOLS : []),
                      ...(canLife ? [...LIFE_TOOLS, ...CONFIRM_TOOLS, ...KNOCK_TOOLS] : []),
                      ...(canMail ? MAIL_TOOLS : []),
+                     ...(canLife ? WATCH_TOOLS : []),
                      ...(canGDrive ? GDRIVE_TOOLS : []),
                      ...(canReadPostDrafts ? [READ_POST_DRAFTS_TOOL] : []),
                      ...(canReadIntake ? [READ_INTAKE_DRAFT_TOOL] : []),

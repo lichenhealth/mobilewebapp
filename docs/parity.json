@@ -915,5 +915,14 @@
  },
  "lineageApi:answerStewardship": {
   "exempt": "a person's own yes to stewarding a lineage — never the assistant's to give"
+ },
+ "connectionsApi:stopWatch": {
+  "tool": "my_watches (stop)"
+ },
+ "connectionsApi:connectTwilio": {
+  "exempt": "the person pastes their own service keys; the brain never handles secrets"
+ },
+ "connectionsApi:disconnectService": {
+  "exempt": "removing a service connection is the person's own tap, beside where they pasted the key"
  }
 }
