@@ -620,7 +620,7 @@ export async function listMyAdminDeskCounts(me: string): Promise<AdminDesk> {
     // Knocks from the public page (founder 2026-08-17) — someone waiting to be
     // let into Lichen through this door. A steward's move.
     supabase.from('join_requests').select('space_id')
-      .eq('status', 'new').in('space_id', ids),
+      .eq('status', 'new').is('replied_at', null).in('space_id', ids),
   ]);
   for (const r of (knocks.data as { space_id: string }[] | null) ?? []) {
     if (has(r.space_id, 'members')) bump(r.space_id);

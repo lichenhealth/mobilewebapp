@@ -11,7 +11,16 @@ export type ThreadSummary = {
   from: string; subject: string; snippet: string; date: string; unread: boolean; starred?: boolean; count: number;
   /** Lichen's own sorting — primary · subscriptions · promotions · updates. */
   kind?: 'primary' | 'subscriptions' | 'promotions' | 'updates';
+  /** A reply YOU sent to a knock at the door (its copy in your inbox). */
+  lichen?: { kind: 'knock_reply'; to: string; last_is_copy: boolean };
 };
+
+/** Who a row names: your own knock-reply copy reads "You → Safourah", never
+ *  as mail from "Galyn Burke via Lichen". */
+export function rowSender(t: ThreadSummary): string {
+  if (t.lichen?.kind === 'knock_reply' && t.lichen.last_is_copy) return `You → ${t.lichen.to.split('@')[0]}`;
+  return senderName(t.from);
+}
 export type MailFile = { name: string; mime: string; size: number; attachment_id: string; cid: string | null; inline: boolean };
 export type MailMessage = {
   id: string; from: string; to: string; cc: string; date: string; subject: string;

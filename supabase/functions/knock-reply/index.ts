@@ -78,7 +78,10 @@ Deno.serve(async (req) => {
   }
   const first = String(k.name ?? '').trim().split(/\s+/)[0] || '';
   const where = spaceName ? `${spaceName} on Lichen` : 'Lichen';
-  const subject = `${sender} wrote back about your note to ${where}`;
+  // Reads right on BOTH sides (founder 2026-11-24): the knocker sees a reply to
+  // their request; the steward's BCC copy reads as their own reply, not as mail
+  // from someone else. Lichen Mail also reads the X-Lichen-* headers below.
+  const subject = `Re: your request to join ${where}`;
   const stamp = new Date().toLocaleString('en-US', { timeZone: 'America/Denver', dateStyle: 'medium', timeStyle: 'short' });
   const paras = message.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px;line-height:1.55;">${linkify(p).replace(/\n/g, '<br/>')}</p>`).join('');
   const html = `<!doctype html><html><body style="margin:0;background:#F4EFE6;font-family:Georgia,'Times New Roman',serif;color:#1F2A2E;">
@@ -106,6 +109,7 @@ Deno.serve(async (req) => {
       // inbox thread (founder 2026-11-10) — the knocker never sees it.
       ...(user.email ? { bcc: [user.email] } : {}),
       subject, html, text,
+      headers: { 'X-Lichen-Kind': 'knock-reply', 'X-Lichen-Knock': String(k.id) },
     }),
   });
   if (!r.ok) return json({ error: `The email didn’t go out (${r.status}). Try again in a moment.` }, 502);

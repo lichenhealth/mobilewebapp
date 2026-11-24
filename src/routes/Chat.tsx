@@ -15,7 +15,7 @@ import './Chat.css';
 import { searchMessages, type MessageHit } from '../lib/chatApi';
 import AssistantDoor from '../components/AssistantDoor';
 import ChatConversation from '../components/ChatConversation';
-import { mailEnabled, listMailAccounts, loadInbox, senderName as mailSender, type ThreadSummary } from '../lib/mailApi';
+import { mailEnabled, listMailAccounts, loadInbox, senderName as mailSender, rowSender, type ThreadSummary } from '../lib/mailApi';
 import '../components/IconRow.css';
 
 export default function Chat() {
@@ -508,7 +508,7 @@ function MediumBadge({ m }: { m: Medium }) {
 
 /** An email thread in the Inbox, read live from the member's own Gmail. */
 function MailRow({ m, highlight, onClick, active = false }: { m: ThreadSummary; highlight?: string; onClick: () => void; active?: boolean }) {
-  const name = mailSender(m.from) || m.from;
+  const name = rowSender(m) || mailSender(m.from) || m.from;
   return (
     <button className={'conv-row' + (m.unread ? ' has-unread' : '') + (active ? ' is-active' : '')} onClick={onClick}>
       <div className="conv-row__avatar-stack">
@@ -519,7 +519,7 @@ function MailRow({ m, highlight, onClick, active = false }: { m: ThreadSummary; 
         <div className="conv-row__top">
           <span className="conv-row__name">
             {highlightText(name, highlight)}
-            <span className="conv-row__muted"> · {m.account}</span>
+            <span className="conv-row__muted"> · {m.lichen?.kind === 'knock_reply' ? 'reply to a knock' : m.account}</span>
           </span>
           <span className="conv-row__time">
             {m.date ? formatRelative(new Date(m.date).toISOString()) : ''}

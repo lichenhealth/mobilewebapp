@@ -9,7 +9,7 @@ import { ActingGate } from '../components/ActingGate';
 import { useTopBackFor } from '../lib/topBack';
 import {
   mailEnabled, listMailAccounts, connectMail, disconnectMail, loadInbox, loadMailThread,
-  modifyMailThread, trashMailThread, unsubscribeMailThread, sendMail, saveMailDraft, senderName, senderAddress,
+  modifyMailThread, trashMailThread, unsubscribeMailThread, sendMail, saveMailDraft, senderName, senderAddress, rowSender,
   sendMailDraft, updateMailDraft, discardMailDraft, saveMailSort, type MailMessage, type MailKind,
   type MailAccount, type ThreadSummary, type MailThread,
 } from '../lib/mailApi';
@@ -353,7 +353,7 @@ export default function Mail() {
                 <li key={t.account_id + t.thread_id}>
                   <button className={'mail__row' + (t.unread ? ' is-unread' : '')} onClick={() => openThreadRow(t)}>
                     <span className="mail__row-top">
-                      <span className="mail__row-from">{senderName(t.from)}{t.count > 1 && <em> {t.count}</em>}</span>
+                      <span className="mail__row-from">{rowSender(t)}{t.count > 1 && <em> {t.count}</em>}{t.lichen?.kind === 'knock_reply' && <span className="mail__row-knock">reply to a knock</span>}</span>
                       <span className="mail__row-when">{t.starred && <span className="mail__row-star" aria-label="Starred"><Icon name="star" size={12} /></span>}{when(t.date)}</span>
                     </span>
                     <span className="mail__row-subj">{t.subject}</span>

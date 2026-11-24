@@ -771,7 +771,7 @@ export default function Invite() {
                 unsent invitations hide in plain sight (founder 2026-08-06). */}
             <h2 className="invite__h2" id="door">
               At the door
-              {waitingKnocks.length > 0 && <span className="invite__tally">{waitingKnocks.length} waiting</span>}
+              {waitingKnocks.length > 0 && <span className="invite__tally">{(() => { const un = waitingKnocks.filter((k) => !k.replied_at).length; const rep = waitingKnocks.length - un; return [un ? `${un} waiting` : '', rep ? `${rep} replied` : ''].filter(Boolean).join(' · '); })()}</span>}
             </h2>
             {waitingKnocks.length === 0 && <p className="invite__muted">Nobody knocking right now.</p>}
             {spamCount > 0 && (

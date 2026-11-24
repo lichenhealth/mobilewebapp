@@ -21,6 +21,7 @@
 .mail__row-top { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
 .mail__row-from { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
 .mail__row-from em { font-style: normal; color: var(--ink-muted); font-size: 12px; }
+.mail__row-knock { margin-left: 8px; font-size: 11px; font-weight: 400; color: var(--peach-deep); letter-spacing: .02em; }
 .mail__row-when { font-size: 12px; color: var(--ink-muted); white-space: nowrap; flex-shrink: 0; }
 .mail__row-subj { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mail__row-snip { font-size: 13px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
