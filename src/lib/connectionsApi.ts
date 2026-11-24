@@ -8,7 +8,7 @@ import { call } from './mailApi';
 export type ServiceConnection = { id: string; service: 'twilio'; label: string | null; status: 'connected' | 'error'; last_error: string | null; connected_at: string };
 export type TwilioNumber = { number: string; name: string; sms: boolean; voice: boolean; added: string; wired?: boolean };
 export type AssistantWatch = {
-  id: string; kind: 'mail' | 'twilio_number'; label: string; query: string; then_note: string | null;
+  id: string; kind: 'mail' | 'twilio_number' | 'important'; label: string; query: string; then_note: string | null;
   status: 'active' | 'fired' | 'cancelled' | 'expired'; created_at: string; expires_at: string;
   fired_at: string | null; fired_detail: string | null; convo_id: string | null;
 };
@@ -40,6 +40,13 @@ export async function listWatches(): Promise<AssistantWatch[]> {
     .select('id, kind, label, query, then_note, status, created_at, expires_at, fired_at, fired_detail, convo_id')
     .in('status', ['active', 'fired']).order('created_at', { ascending: false }).limit(30);
   return (data as AssistantWatch[] | null) ?? [];
+}
+
+/** THE IMPORTANT-MAIL WATCH (founder 2026-11-24) — the manual switch; the
+ *  Brain's watch_for kind "important" is the same row. One per member. */
+export async function startImportantWatch(): Promise<void> {
+  const { error } = await supabase.rpc('start_important_watch');
+  if (error) throw new Error(error.message);
 }
 
 export async function stopWatch(id: string): Promise<void> {

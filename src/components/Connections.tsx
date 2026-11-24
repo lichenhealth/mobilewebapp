@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { connectMail, listMailAccounts, mailEnabled, type MailAccount } from '../lib/mailApi';
 import {
-  connectTwilio, disconnectService, listConnections, listWatches, stopWatch, twilioStatus,
+  connectTwilio, disconnectService, listConnections, listWatches, stopWatch, twilioStatus, startImportantWatch,
   suggestConnection, listConnectionSuggestions, decideConnectionSuggestion,
   wireTwilioNumber, type AssistantWatch, type ServiceConnection, type TwilioNumber, type ConnectionSuggestion,
 } from '../lib/connectionsApi';
@@ -224,11 +224,28 @@ export default function Connections() {
       </div>
 
       <h3 className="conn__h">What your Brain is watching for</h3>
-      {watches.length === 0 ? (
+      {canMail && inboxes.length > 0 && (() => {
+        const imp = watches.find((w) => w.kind === 'important' && w.status === 'active');
+        return (
+          <div className="conn__imp">
+            <div className="conn__watch-main">
+              <strong>Important mail {imp ? '· on' : ''}</strong>
+              <span className="conn__fine">
+                Your Brain reads new mail in your inboxes every 10 minutes (sender, subject and preview only, promotions and newsletters set aside) and sends a pop-up to your phone only for what truly needs you. Most apps email what they show, so switch on email notifications in Spruce, Etsy and the rest.
+                {imp?.query && imp.query !== 'anything important' && <> Listening especially for: {imp.query}.</>}
+              </span>
+            </div>
+            {imp
+              ? <button className="conn__btn conn__btn--quiet" onClick={() => void stopWatch(imp.id).then(load)}>Turn off</button>
+              : <button className="conn__btn" onClick={() => void startImportantWatch().then(load).catch((e) => setErr(e instanceof Error ? e.message : String(e)))}>Turn on</button>}
+          </div>
+        );
+      })()}
+      {watches.filter((w) => w.kind !== 'important').length === 0 ? (
         <p className="conn__fine">Nothing yet. Tell your Brain something like “let me know when Twilio confirms my number transfer” and it will keep watch, checking every 10 minutes.</p>
       ) : (
         <ul className="conn__watches">
-          {watches.map((w) => (
+          {watches.filter((w) => w.kind !== 'important').map((w) => (
             <li key={w.id} className={'conn__watch' + (w.status === 'fired' ? ' is-fired' : '')}>
               <div className="conn__watch-main">
                 <strong>{w.label}</strong>

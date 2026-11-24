@@ -24,11 +24,11 @@ const CONNECTIONS_DOOR = { path: '/profile#connections', label: 'Open Connection
 export const WATCH_TOOLS = [
   {
     name: 'watch_for',
-    description: 'Set a STANDING WATCH from the member\'s words — "tell me when X happens" / "once X, help me do Y". Lichen checks every 10 minutes for up to 30 days; when it comes true they get a bell and a note from you in a new conversation, naming what they asked to have done next. kind "mail": query = a Gmail search for the email that would mean it happened (e.g. from:twilio.com subject:port, from:spruce subject:cancel) — only mail arriving AFTER the watch counts. kind "twilio_number": query = the phone number that will appear on their connected Twilio account (a port finishing). label = a short plain name ("Twilio number transfer done"). then = what they want done once it happens, in their words ("cancel Spruce for the prorated refund"). A watch only notices and tells — it never acts by itself; say so.',
+    description: 'Set a STANDING WATCH from the member\'s words — "tell me when X happens" / "once X, help me do Y". Lichen checks every 10 minutes for up to 30 days; when it comes true they get a bell and a note from you in a new conversation, naming what they asked to have done next. kind "mail": query = a Gmail search for the email that would mean it happened (e.g. from:twilio.com subject:port, from:spruce subject:cancel) — only mail arriving AFTER the watch counts. kind "twilio_number": query = the phone number that will appear on their connected Twilio account (a port finishing). label = a short plain name ("Twilio number transfer done"). then = what they want done once it happens, in their words ("cancel Spruce for the prorated refund") — when a watch with a "then" comes true, you do the legwork right away (read, dig, draft) and hand them only the steps that need them; you never sign in, send or cancel by yourself. kind "important": the STANDING important-mail watch — no end date, one per member; you read their new inbox mail (sender, subject, preview) every 10 minutes and push only what truly needs them to their phone, collected in one "Important mail" conversation. query = what matters most to them in their own words ("Spruce, Etsy orders, anything about money") or "anything important"; setting it again updates what matters. Use it when they ask to be told when anything important arrives. The phone pop-up needs notifications allowed in Profile → Notifications on that device.',
     input_schema: {
       type: 'object',
       properties: {
-        kind: { type: 'string', enum: ['mail', 'twilio_number'] },
+        kind: { type: 'string', enum: ['mail', 'twilio_number', 'important'] },
         label: { type: 'string' }, query: { type: 'string' }, then: { type: 'string' },
       },
       required: ['kind', 'label', 'query'],
@@ -110,6 +110,22 @@ export async function runWatchTool(profileId: string, name: string, input: Recor
       const kind = s('kind');
       const label = s('label').slice(0, 200);
       let query = s('query').slice(0, 500);
+      if (kind === 'important') {
+        if (!canMail) return { ok: false, error: 'The important-mail watch needs their connected inbox and Lichen Mail switched on for the assistant.' };
+        const what = query.length >= 2 ? query : 'anything important';
+        const cur = await (await svc(`assistant_watches?profile_id=eq.${profileId}&kind=eq.important&status=eq.active&select=id`)).json();
+        if (Array.isArray(cur) && cur[0]?.id) {
+          await svc(`assistant_watches?id=eq.${cur[0].id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ query: what }) });
+          return { ok: true, updated: true, watching: { kind, what }, note: 'Their important-mail watch was already on — it now listens for what they just said.' };
+        }
+        const far = new Date(Date.now() + 3650 * 86400000).toISOString();
+        const r = await svc('assistant_watches', {
+          method: 'POST', headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({ profile_id: profileId, kind, label: 'Important mail', query: what, expires_at: far, last_checked_at: new Date().toISOString() }),
+        });
+        if (!(await r.json().catch(() => []))?.[0]?.id) return { ok: false, error: 'Couldn’t turn it on — try again.' };
+        return { ok: true, watching: { kind, what }, note: 'On from now (older mail isn’t re-read). Every 10 minutes you read new inbox mail — sender, subject and preview only, promotions and newsletters set aside — and push only what truly needs them, each one also landing in the "Important mail" conversation. It runs until they stop it (my_watches). Their phone shows the pop-up when notifications are allowed for Lichen on it (Profile → Notifications).' };
+      }
       if (label.length < 2 || query.length < 2) return { ok: false, error: 'A watch needs a short label and what to look for.' };
       if (kind === 'mail') {
         if (!canMail) return { ok: false, error: 'A mail watch needs their connected inbox and Lichen Mail switched on for the assistant.' };

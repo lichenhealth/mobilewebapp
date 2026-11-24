@@ -933,5 +933,8 @@
  },
  "budgetApi:saveSubscription": {
   "tool": "subscriptions (add/update)"
+ },
+ "connectionsApi:startImportantWatch": {
+  "tool": "watch_for (kind important)"
  }
 }
