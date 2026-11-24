@@ -4,7 +4,7 @@
 // account itself (Gmail and Lichen Mail both show it) and the person sends.
 // Every account resolves against the SENDER's own mail_accounts rows; a
 // thread id only ever reaches their own mailbox through their own token.
-import { mailAccountsOf, listThreads, mailSortRules, saveMailSortRule, readThread, draftMail, trashThread, modifyThread, unsubscribeThread, type UnsubResult, listFilters, createFilter, deleteFilter, labelIdFor, labelNames, type MailAccount } from './gmail.ts';
+import { mailAccountsOf, listThreads, mailSortRules, saveMailSortRule, readThread, draftMail, trashThread, modifyThread, unsubscribeThread, unsubscribeLinks, type UnsubResult, listFilters, createFilter, deleteFilter, labelIdFor, labelNames, type MailAccount } from './gmail.ts';
 
 type Out = { ok: boolean; [k: string]: unknown };
 
@@ -50,7 +50,7 @@ export const MAIL_TOOLS = [
   },
   {
     name: 'unsubscribe_mail',
-    description: 'Unsubscribe the member from mailing lists, the way Gmail\'s own Unsubscribe button does: it uses each sender\'s List-Unsubscribe header (never a link inside the email body). One-click senders are unsubscribed on the spot; mailto-only senders get a short "unsubscribe" email sent FROM that inbox to the address the header names (that is the sender\'s official way); senders that only offer a web page come back as needs_you with the link for the member to open and confirm. Use ONLY when the member asked to unsubscribe in their own words, ONLY thread_ids from my_mail in this conversation (trashed mail works too — search with in:trash). Pass ONE thread per sender. account = the inbox; thread_ids = up to 25. Report per sender: unsubscribed, emailed, needs you (give the link), or no unsubscribe option (offer a filter instead). Senders can take a few days to stop.',
+    description: 'Unsubscribe the member from mailing lists, the way Gmail\'s own Unsubscribe button does: it uses each sender\'s List-Unsubscribe header first. One-click senders are unsubscribed on the spot; mailto-only senders get a short "unsubscribe" email sent FROM that inbox to the address the header names. When there is NO header (rewards and loyalty mail often has none), it reads the whole email and opens the unsubscribe link in its footer itself — only a link labeled unsubscribe/opt out/preferences, only on the sender\'s own domain or a known mailing service, never typing anything — and presses a simple confirm button if the page has one. Pages that want the member to choose options or sign in come back as needs_you with the link. Never tell the member you won\'t open body links: this tool does. Use ONLY when the member asked to unsubscribe in their own words, ONLY thread_ids from my_mail in this conversation (trashed mail works too — search with in:trash). Pass ONE thread per sender. account = the inbox; thread_ids = up to 25. Report per sender: unsubscribed, emailed, needs you (give the link), or no unsubscribe option (offer a filter instead). Senders can take a few days to stop.',
     input_schema: {
       type: 'object',
       properties: { account: { type: 'string' }, thread_ids: { type: 'array', items: { type: 'string' } } },
@@ -126,7 +126,13 @@ export async function runMailTool(profileId: string, name: string, input: Record
       const t = await readThread(profileId, acct.id, s('thread_id'));
       return {
         ok: true, subject: t.subject,
-        messages: t.messages.map((m) => ({ from: m.from, to: m.to, cc: m.cc, date: m.date, body: m.body.slice(0, 6000), attachments: m.attachments })),
+        messages: t.messages.map((m) => ({
+          from: m.from, to: m.to, cc: m.cc, date: m.date,
+          // Head AND footer: a long promo's unsubscribe/address block sits at the very end.
+          body: m.body.length > 7000 ? `${m.body.slice(0, 4500)}\n…[middle of the email skipped]…\n${m.body.slice(-2500)}` : m.body,
+          attachments: m.attachments,
+          ...(m.html ? (() => { const u = unsubscribeLinks(m.html).slice(0, 3); return u.length ? { unsubscribe_links: u } : {}; })() : {}),
+        })),
         door: { path: `/mail?thread=${acct.id}:${encodeURIComponent(s('thread_id'))}`, label: `Open “${t.subject.slice(0, 40)}” in Mail` },
       };
     }
