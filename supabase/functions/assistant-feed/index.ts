@@ -529,6 +529,20 @@ const READ_INTAKE_DRAFT_TOOL = {
 
 // Reply shapes that send a member off to do by hand what a tool could do.
 const TRAVEL_CLAIM_RE = /\b\d+\s*(-|to)?\s*\d*\s*(min|mins|minutes|hr|hrs|hours?)\s+(drive|driving|away|walk|by car|in traffic|with traffic)\b|\b\d+(\.\d+)?\s*(mi|miles)\s+(away|from|to)\b|\b(leave|head out) by \d/i;
+// PREP MODE'S HANDS (2026-11-24): a fired watch's legwork turn may READ
+// anything and DRAFT mail, never change anything — every write waits for
+// the member. Read actions of mixed tools pass by their action name.
+const PREP_TOOLS = new Set(['read_mail', 'draft_mail', 'search_my_lichen', 'search_my_history', 'read_website', 'drive_time', 'watch_for']);
+function prepAllowed(name: string, input: Record<string, unknown>): boolean {
+  if (name.startsWith('my_') || PREP_TOOLS.has(name)) return true;
+  const action = String(input?.action ?? '');
+  if (name === 'twilio') return ['numbers', 'check_number', 'texts', 'voicemails'].includes(action);
+  if (name === 'contacts' || name === 'subscriptions') return action === 'list' || action === 'read';
+  if (name === 'google_drive') return ['list', 'search', 'recent', 'shared', 'trash_view'].includes(action);
+  if (name === 'drive_doc') return action === 'list' || action === 'read';
+  return false;
+}
+
 const ROUTE_ASK_RE = /\b(directions?|navigat\w*|drive time|driving time|travel time|commute|eta|traffic|how (long|far)\b[^?]*\b(to|from|get|drive|take|is|away)|how far|route to|take me (to|there)|get me (to|there)|get there|when (should|do|must) (i|we) (leave|head out|go)|leave (by|at) what time|what time (should|do) (i|we) leave)\b/i;
 const DEFLECT_RE = /\b(manually|by hand)\b|\b(tap|press|hit|use) (the )?(\+|plus\b)|\bwhere you(?:'d|’d| would| can) (create|make|set|add|fill)|\b(head|go) (over )?to [^.\n]{0,40}\b(and|to) (create|fill|make|set up|add)\b|\byou(?:'ll|’ll| will) (need|have) to (create|make|set|add|fill)|(?:^|\n)\s*(?:\d+[.)]|step \d+:?)\s*(?:open|go|tap|click|select|navigate|choose|head)\b|\b(?:open|go to|navigate to|head to) (?:your |the )?[^.\n]{0,30}\b(?:settings|tab|menu|screen|page)\b[^.\n]{0,40}\b(?:and|then) (?:tap|click|select|choose|turn|toggle|press)\b/i;
 
@@ -797,7 +811,7 @@ Deno.serve(async (req) => {
   if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) return json({ error: 'Unauthorized' }, 401);
   if (!ANTHROPIC_API_KEY || !SUPABASE_URL || !SERVICE_KEY) return json({ error: 'Not configured' }, 500);
 
-  let body: { feed_post_id?: string; profile_id?: string };
+  let body: { feed_post_id?: string; profile_id?: string; watch_id?: string };
   try { body = await req.json(); } catch { return json({ error: 'Invalid body' }, 400); }
   const { feed_post_id, profile_id } = body;
   if (!feed_post_id || !profile_id) return json({ error: 'Missing fields' }, 400);
@@ -828,6 +842,19 @@ Deno.serve(async (req) => {
     .map((a: { url: string }) => a.url)
     .slice(0, 6);
   if (!trigger?.body?.trim() && triggerImages.length === 0) return json({ ok: true, skipped: 'empty-post' });
+  // A WATCH THAT DOES THE LEGWORK (founder 2026-11-24: "do the legwork
+  // necessary to get to the steps gated by me"): assistant-watch calls here
+  // with the watch's own fired note as the trigger. The watch row is read
+  // server-side and must belong to this member, have fired, and own this
+  // conversation — the follow-up words are THEIRS (typed when they set the
+  // watch), never caller input. Prep mode reads and drafts only.
+  let watchPrep: { label: string; then_note: string; fired_detail: string | null } | null = null;
+  if (typeof body.watch_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.watch_id)) {
+    const wr = await (await sb(`assistant_watches?id=eq.${body.watch_id}&profile_id=eq.${profile_id}&status=eq.fired&select=label,then_note,fired_detail,convo_id`)).json();
+    const w = Array.isArray(wr) ? wr[0] : null;
+    if (!w?.then_note || w.convo_id !== trigger.convo_id) return json({ ok: true, skipped: 'watch-mismatch' });
+    watchPrep = { label: w.label, then_note: w.then_note, fired_detail: w.fired_detail };
+  }
   // THE BRIEFING THEY WERE READING (founder 2026-11-02, the Mexico bug): a
   // brief-composer send carries the narration that was on their screen —
   // without it, "how long is the trip?" lands in a conversation where no
@@ -1574,6 +1601,9 @@ Deno.serve(async (req) => {
   // Every write is scoped to profile_id from the trigger — no tool takes a
   // target, so the model has no way to name someone else.
   async function runTool(name: string, input: Record<string, string & string[]>): Promise<ToolOutcome> {
+    if (watchPrep && !prepAllowed(name, input)) {
+      return { ok: false, error: 'Prep mode only reads and drafts — this change waits for the member. List it under "What only you can do" instead.' } as ToolOutcome;
+    }
     // ── Read a website the member linked (2026-08-24). The guard IS the
     // feature: the host must appear in the member's own words in this
     // thread, so the model can only ever read what it was handed.
@@ -3423,6 +3453,10 @@ Deno.serve(async (req) => {
     return { role: 'user', content: p.id === feed_post_id ? `${marker}${p.body}${sharedPostContext}${briefContext}` : `${marker}${p.body}` };
   });
 
+  if (watchPrep) {
+    messages.push({ role: 'user', content: `[Lichen's watch system, not the member — their watch "${watchPrep.label}" just came true${watchPrep.fired_detail ? ` (${watchPrep.fired_detail})` : ''}. When they set it, they asked: "${watchPrep.then_note}". Do the legwork now, before they arrive: read the email that triggered it (my_mail → read_mail), dig out what the next step needs from their own mail, calendar, contacts and Drive (account numbers, plan details, cancellation or refund rules, the right page to go to), check the web for the company's official steps if their mail doesn't say, and DRAFT anything that needs sending (draft_mail — it never sends). You may only read and draft in this turn; nothing else changes. If something they asked for depends on a condition that isn't true yet (e.g. "only once my number has landed"), check it if you can and say plainly whether it holds — never act past it. Then reply to them in this shape: one or two sentences on what happened, a short "Ready for you:" list of what you prepared (drafts, links, details found — with where you found them), and a "What only you can do:" list naming ONLY the steps that truly need them (signing in, passwords or PINs, a signature, pressing send or cancel, paying), each one line, in order. Never claim you logged in anywhere or sent anything.]` });
+  }
+
   // Tool rounds run INSIDE one exchange: a multi-turn edit costs one entry in
   // the daily cap, the same as a conversation, and the usage is summed.
   const MAX_TOOL_ROUNDS = 4;
@@ -3522,7 +3556,7 @@ Deno.serve(async (req) => {
   let parityFiled = false;
   const anyToolsArmed = !spaceRoom && (canEdit || canCalendar || canCourses || canPosts || canLife || canSpaceEdit);
   // They ASKED to do it themselves — pointing at the screen is then the answer.
-  const askedForManual = /\b(manually|myself|by hand|how do i|where do i|show me where)\b/i.test(String(trigger.body ?? ''));
+  const askedForManual = !!watchPrep || /\b(manually|myself|by hand|how do i|where do i|show me where)\b/i.test(String(trigger.body ?? ''));
   // THINKING ATE THE WHOLE CEILING (2026-11-08, the Countryman markup ask:
   // 4096 output tokens spent, zero text, zero tool calls): the model thinks
   // by default, and thinking draws from max_tokens. A starved answer gets ONE
