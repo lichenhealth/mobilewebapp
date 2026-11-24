@@ -42,6 +42,7 @@ import AssistantConsentList from '../components/AssistantConsentList';
 import AssistantAllowances from '../components/AssistantAllowances';
 import { ContactSharesList } from '../components/ContactShares';
 import DownloadMyLichen from '../components/DownloadMyLichen';
+import Connections from '../components/Connections';
 import ContactActionsPicker from '../components/ContactActionsPicker';
 import BuildModeSplit, { FillWithClaude } from '../components/BuildModeSplit';
 import type { PageTab } from '../lib/pageTabs';
@@ -1385,6 +1386,10 @@ export default function Profile() {
           <HomeLocationSection me={user.id} />
         </CollapsibleSection>
       )}
+
+      <CollapsibleSection id="connections" title="Connections" meta="services your Brain can work with" open={openSections.has('connections')} onToggle={() => toggleSection('connections')}>
+        <Connections />
+      </CollapsibleSection>
 
       <CollapsibleSection id="notifications" title="Notifications" open={openSections.has('notifications')} onToggle={() => toggleSection('notifications')}>
         <p className="prof__care-lead">How would you like to get notified?</p>
