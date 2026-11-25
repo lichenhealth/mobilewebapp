@@ -23,12 +23,22 @@ const CONNECTIONS_DOOR = { path: '/profile#connections', label: 'Open Connection
 
 export const WATCH_TOOLS = [
   {
+    name: 'remember',
+    description: 'Write one thing into your NOTEBOOK about this member — what matters to them (kind "matters": something they are waiting on or eager about, a person who matters, a goal, a worry, a deadline) or what they do NOT want to be pinged about (kind "quiet"). The notebook is how you get to know their life: it rides into every conversation and decides when you take a chance and reach out unasked. Write when they tell you something like that (even in passing — "I applied to Anthropic and I\'m dying to hear back"), in their spirit and in plain words, one fact per note. Never write health detail they marked private, passwords, or anything about other people they wouldn\'t want kept. Say so lightly when you remember something ("I\'ll keep that in mind"). They can read and forget every note in Profile → Connections.',
+    input_schema: { type: 'object', properties: { kind: { type: 'string', enum: ['matters', 'quiet'] }, note: { type: 'string' } }, required: ['note'] },
+  },
+  {
+    name: 'my_notebook',
+    description: 'Read your notebook about this member (what matters to them, what they don\'t want pings about). action "forget" + words removes the notes containing those words — only when they ask you to forget something.',
+    input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['list', 'forget'] }, words: { type: 'string' } } },
+  },
+  {
     name: 'watch_for',
-    description: 'Set a STANDING WATCH from the member\'s words — "tell me when X happens" / "once X, help me do Y". Lichen checks every 10 minutes for up to 30 days; when it comes true they get a bell and a note from you in a new conversation, naming what they asked to have done next. kind "mail": query = a Gmail search for the email that would mean it happened (e.g. from:twilio.com subject:port, from:spruce subject:cancel) — only mail arriving AFTER the watch counts. kind "twilio_number": query = the phone number that will appear on their connected Twilio account (a port finishing). label = a short plain name ("Twilio number transfer done"). then = what they want done once it happens, in their words ("cancel Spruce for the prorated refund") — when a watch with a "then" comes true, you do the legwork right away (read, dig, draft) and hand them only the steps that need them; you never sign in, send or cancel by yourself. kind "important": the STANDING important-mail watch — no end date, one per member; you read their new inbox mail (sender, subject, preview) every 10 minutes and push only what truly needs them to their phone, collected in one "Important mail" conversation. query = what matters most to them in their own words ("Spruce, Etsy orders, anything about money") or "anything important"; setting it again updates what matters. Use it when they ask to be told when anything important arrives. The phone pop-up needs notifications allowed in Profile → Notifications on that device.',
+    description: 'Set a STANDING WATCH from the member\'s words — "tell me when X happens" / "once X, help me do Y". Lichen checks every 10 minutes for up to 30 days; when it comes true they get a bell and a note from you in a new conversation, naming what they asked to have done next. kind "mail": query = a Gmail search for the email that would mean it happened (e.g. from:twilio.com subject:port, from:spruce subject:cancel) — only mail arriving AFTER the watch counts. kind "twilio_number": query = the phone number that will appear on their connected Twilio account (a port finishing). label = a short plain name ("Twilio number transfer done"). then = what they want done once it happens, in their words ("cancel Spruce for the prorated refund") — when a watch with a "then" comes true, you do the legwork right away (read, dig, draft) and hand them only the steps that need them; you never sign in, send or cancel by yourself. kind "important": the STANDING important-mail watch — no end date, one per member; you read their new inbox mail (sender, subject, preview) every 10 minutes and push only what truly needs them to their phone, collected in one "Important mail" conversation. query = what matters most to them in their own words ("Spruce, Etsy orders, anything about money") or "anything important"; setting it again updates what matters. Use it when they ask to be told when anything important arrives. kind "wish": something they wish for (a wish-list item) — query = the item in their own words, as specific as they said it ("a used road bike, 54cm, under $400"); label = a short name. It stands for a year: every new Marketplace listing is read against it and, when one matches or comes close, you work out the details and ping them. One watch per item; several wishes are fine. The phone pop-up needs notifications allowed in Profile → Notifications on that device.',
     input_schema: {
       type: 'object',
       properties: {
-        kind: { type: 'string', enum: ['mail', 'twilio_number', 'important'] },
+        kind: { type: 'string', enum: ['mail', 'twilio_number', 'important', 'wish'] },
         label: { type: 'string' }, query: { type: 'string' }, then: { type: 'string' },
       },
       required: ['kind', 'label', 'query'],
@@ -134,15 +144,17 @@ export async function runWatchTool(profileId: string, name: string, input: Recor
         if (!n) return { ok: false, error: 'That doesn’t read as a phone number.' };
         query = n;
         if (!(await twilioCreds(profileId))) return { ok: false, error: 'Twilio isn’t connected yet — a mail watch for Twilio’s confirmation email works meanwhile, or they connect Twilio in Profile → Connections (button attached).', door: CONNECTIONS_DOOR };
-      } else return { ok: false, error: 'kind is mail or twilio_number.' };
+      } else if (kind !== 'wish') return { ok: false, error: 'kind is mail, twilio_number, important or wish.' };
       const live = await (await svc(`assistant_watches?profile_id=eq.${profileId}&status=eq.active&select=id`)).json();
-      if (Array.isArray(live) && live.length >= 20) return { ok: false, error: 'They already have 20 watches running — stop one first (my_watches).' };
+      if (Array.isArray(live) && live.length >= 40) return { ok: false, error: 'They already have 40 watches running — stop one first (my_watches).' };
       const r = await svc('assistant_watches', {
         method: 'POST', headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({ profile_id: profileId, kind, label, query, then_note: s('then').slice(0, 1000) || null }),
+        body: JSON.stringify({ profile_id: profileId, kind, label, query, then_note: s('then').slice(0, 1000) || null,
+          ...(kind === 'wish' ? { expires_at: new Date(Date.now() + 365 * 86400000).toISOString(), last_checked_at: new Date().toISOString() } : {}) }),
       });
       const row = (await r.json().catch(() => []))?.[0];
       if (!row?.id) return { ok: false, error: 'Couldn’t set the watch — try again.' };
+      if (kind === 'wish') return { ok: true, wish: { label, query }, note: 'On their wish list for a year. Every new Marketplace listing is read against it; when one matches or comes close you work out the details and ping them. They can see or stop it in Profile → Connections.' };
       return { ok: true, watching: { label, kind, query, expires: row.expires_at }, note: 'Checks every 10 minutes for 30 days. It only notices and tells them — nothing happens on its own. They can see or stop it in Profile → Connections.' };
     }
 
@@ -159,6 +171,29 @@ export async function runWatchTool(profileId: string, name: string, input: Recor
       return { ok: true, suggested: service, note: 'Sent to Lichen\'s stewards; the member gets a bell with the answer. Their asks are listed in Profile → Connections.', door: CONNECTIONS_DOOR };
     }
 
+    if (name === 'remember') {
+      const note = s('note').slice(0, 400);
+      const kind = s('kind') === 'quiet' ? 'quiet' : 'matters';
+      if (note.length < 2) return { ok: false, error: 'Nothing to remember.' };
+      const dup = await (await svc(`assistant_memory?profile_id=eq.${profileId}&note=ilike.${encodeURIComponent(note.replace(/[%*,()]/g, ' '))}&select=id`)).json();
+      if (Array.isArray(dup) && dup.length) return { ok: true, already: true };
+      const r = await svc('assistant_memory', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ profile_id: profileId, kind, note, source: 'told' }) });
+      if (!r.ok) return { ok: false, error: 'Couldn\u2019t write that down — try again.' };
+      return { ok: true, remembered: { kind, note }, note: 'Kept. Mention it lightly, never as a ceremony.' };
+    }
+    if (name === 'my_notebook') {
+      const rows = await (await svc(`assistant_memory?profile_id=eq.${profileId}&select=id,kind,note,created_at&order=created_at.desc&limit=80`)).json();
+      const list = Array.isArray(rows) ? rows as { id: string; kind: string; note: string; created_at: string }[] : [];
+      if (s('action') === 'forget') {
+        const words = s('words').toLowerCase();
+        if (words.length < 2) return { ok: false, error: 'Name what to forget.' };
+        const hit = list.filter((m) => m.note.toLowerCase().includes(words));
+        if (!hit.length) return { ok: false, error: 'No note mentions that.', notebook: list };
+        await svc(`assistant_memory?profile_id=eq.${profileId}&id=in.(${hit.map((m) => m.id).join(',')})`, { method: 'DELETE' });
+        return { ok: true, forgot: hit.map((m) => m.note) };
+      }
+      return { ok: true, notebook: list.map((m) => ({ kind: m.kind, note: m.note, since: m.created_at.slice(0, 10) })) };
+    }
     if (name === 'my_watches') {
       const rows = await (await svc(`assistant_watches?profile_id=eq.${profileId}&status=in.(active,fired)&select=id,kind,label,query,then_note,status,created_at,fired_at,fired_detail&order=created_at.desc&limit=30`)).json();
       const list = Array.isArray(rows) ? rows as Record<string, string | null>[] : [];

@@ -8,7 +8,7 @@ import { call } from './mailApi';
 export type ServiceConnection = { id: string; service: 'twilio'; label: string | null; status: 'connected' | 'error'; last_error: string | null; connected_at: string };
 export type TwilioNumber = { number: string; name: string; sms: boolean; voice: boolean; added: string; wired?: boolean };
 export type AssistantWatch = {
-  id: string; kind: 'mail' | 'twilio_number' | 'important'; label: string; query: string; then_note: string | null;
+  id: string; kind: 'mail' | 'twilio_number' | 'important' | 'wish'; label: string; query: string; then_note: string | null;
   status: 'active' | 'fired' | 'cancelled' | 'expired'; created_at: string; expires_at: string;
   fired_at: string | null; fired_detail: string | null; convo_id: string | null;
 };

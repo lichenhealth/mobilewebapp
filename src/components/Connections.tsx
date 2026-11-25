@@ -12,6 +12,7 @@ import {
   wireTwilioNumber, type AssistantWatch, type ServiceConnection, type TwilioNumber, type ConnectionSuggestion,
 } from '../lib/connectionsApi';
 import { useAuth } from '../auth/AuthProvider';
+import { addNote, forgetNote, listNotebook, type NotebookNote } from '../lib/notebookApi';
 import { Icon } from './Icon';
 import './Connections.css';
 
@@ -44,12 +45,16 @@ export default function Connections() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [arm, setArm] = useState(false);
+  const [notes, setNotes] = useState<NotebookNote[]>([]);
+  const [noteText, setNoteText] = useState('');
+  const [noteKind, setNoteKind] = useState<'matters' | 'quiet'>('matters');
 
   const twilio = conns?.find((c) => c.service === 'twilio') ?? null;
 
   const load = async () => {
     const [c, w, m] = await Promise.all([listConnections(), listWatches(), listMailAccounts().catch(() => [])]);
     setConns(c); setWatches(w); setInboxes(m);
+    listNotebook().then(setNotes).catch(() => {});
     listConnectionSuggestions().then(setSuggs).catch(() => {});
     if (c.some((x) => x.service === 'twilio')) {
       twilioStatus().then((s) => setNumbers(s.numbers ?? [])).catch(() => setNumbers(null));
@@ -229,9 +234,9 @@ export default function Connections() {
         return (
           <div className="conn__imp">
             <div className="conn__watch-main">
-              <strong>Important mail {imp ? '· on' : ''}</strong>
+              <strong>Let your Brain take a chance {imp ? '· on' : ''}</strong>
               <span className="conn__fine">
-                Your Brain reads new mail in your inboxes every 10 minutes (sender, subject and preview only, promotions and newsletters set aside) and sends a pop-up to your phone only for what truly needs you. Most apps email what they show, so switch on email notifications in Spruce, Etsy and the rest.
+                Your Brain tells you about what you asked it to watch for. With this on, it may also take a chance on new mail it knows matters to you from your notebook below (a reply you’ve been waiting on, good news) — at most a few times a day, and each ping asks whether it was right.
                 {imp?.query && imp.query !== 'anything important' && <> Listening especially for: {imp.query}.</>}
               </span>
             </div>
@@ -252,7 +257,7 @@ export default function Connections() {
                 <span className="conn__fine">
                   {w.status === 'fired'
                     ? <>Came true {w.fired_at ? shortDate(w.fired_at) : ''}{w.convo_id && <> · <Link className="link-cue" to={`/assistant/feed?thread=general&convo=${w.convo_id}`}>See the note</Link></>}</>
-                    : <>{w.kind === 'mail' ? 'Watching your email' : 'Watching your Twilio numbers'} · until {shortDate(w.expires_at)}</>}
+                    : <>{w.kind === 'mail' ? 'Watching your email' : w.kind === 'wish' ? 'Wish list · watching Marketplace' : 'Watching your Twilio numbers'} · until {shortDate(w.expires_at)}</>}
                 </span>
                 {w.then_note && <span className="conn__fine">Then: {w.then_note}</span>}
               </div>
@@ -263,6 +268,34 @@ export default function Connections() {
           ))}
         </ul>
       )}
+
+      <h3 className="conn__h">What your Brain has learned about you</h3>
+      <p className="conn__fine">Your Brain keeps this notebook as it gets to know you — from what you tell it, and from your answers when it takes a chance. Only you and your Brain read it. Add to it, or forget anything.</p>
+      {notes.length > 0 && (
+        <ul className="conn__watches">
+          {notes.map((n) => (
+            <li key={n.id} className="conn__watch">
+              <div className="conn__watch-main">
+                <strong>{n.note}</strong>
+                <span className="conn__fine">{n.kind === 'quiet' ? 'Stay quiet about this' : 'Matters to you'} · {shortDate(n.created_at)}</span>
+              </div>
+              <button className="conn__btn conn__btn--quiet" onClick={() => void forgetNote(n.id).then(load)}>Forget</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="conn__noteadd">
+        <select className="input" value={noteKind} onChange={(e) => setNoteKind(e.target.value as 'matters' | 'quiet')} aria-label="Kind of note">
+          <option value="matters">Matters to me</option>
+          <option value="quiet">Don’t ping me about</option>
+        </select>
+        <input className="input" value={noteText} onChange={(e) => setNoteText(e.target.value)} maxLength={400}
+          placeholder={noteKind === 'matters' ? 'e.g. any reply about my Anthropic application' : 'e.g. shipping updates'} />
+        <button className="conn__btn" disabled={!noteText.trim() || !user} onClick={() => {
+          if (!user) return;
+          void addNote(user.id, noteKind, noteText).then(() => { setNoteText(''); return load(); }).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+        }}>Add</button>
+      </div>
       {mine.length > 0 && !isAdmin && (
         <>
           <h3 className="conn__h">Services you've asked for</h3>

@@ -36,6 +36,7 @@ import CalFeedCard from '../components/CalFeedCard';
 import CalShareCard from '../components/CalShareCard';
 import CalInviteCard from '../components/CalInviteCard';
 import ChatDraftCard from '../components/ChatDraftCard';
+import PingFeedback from '../components/PingFeedback';
 import './AssistantFeed.css';
 
 function timeAgo(iso: string): string {
@@ -1644,6 +1645,16 @@ export default function AssistantFeed() {
                       </div>
                     );
                   })}
+                {/* TEACH ME (founder 2026-11-25): a ping the brain sent
+                    unasked carries two buttons; each answer is a note in
+                    the member's notebook the brain reads next time. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'ping_feedback' ? [a] : []))
+                  .map((a, i) => (
+                    <div className="afeed__pubrow" key={`${p.id}:ping:${i}`}>
+                      <PingFeedback about={a.about} wish={a.wish} />
+                    </div>
+                  ))}
                 {p.author === 'claude' && (p.attachments ?? [])
                   .flatMap((a) => (a.type === 'space_thread' || a.type === 'space_consent' ? [a] : []))
                   .map((a) => (

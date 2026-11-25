@@ -532,7 +532,7 @@ const TRAVEL_CLAIM_RE = /\b\d+\s*(-|to)?\s*\d*\s*(min|mins|minutes|hr|hrs|hours?
 // PREP MODE'S HANDS (2026-11-24): a fired watch's legwork turn may READ
 // anything and DRAFT mail, never change anything — every write waits for
 // the member. Read actions of mixed tools pass by their action name.
-const PREP_TOOLS = new Set(['read_mail', 'draft_mail', 'search_my_lichen', 'search_my_history', 'read_website', 'drive_time', 'watch_for']);
+const PREP_TOOLS = new Set(['read_mail', 'draft_mail', 'search_my_lichen', 'search_my_history', 'read_website', 'drive_time', 'watch_for', 'remember']);
 function prepAllowed(name: string, input: Record<string, unknown>): boolean {
   if (name.startsWith('my_') || PREP_TOOLS.has(name)) return true;
   const action = String(input?.action ?? '');
@@ -1037,12 +1037,13 @@ Deno.serve(async (req) => {
     try {
       const today = new Date().toISOString().slice(0, 10);
       const week = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
-      const [offRes, bellRes, attRes, hostRes, remRes] = await Promise.all([
+      const [offRes, bellRes, attRes, hostRes, remRes, memRes] = await Promise.all([
         sb(`assistant_consent?profile_id=eq.${profile_id}&scope_type=eq.section&enabled=eq.false&select=scope_id`),
         sb(`notifications?recipient_id=eq.${profile_id}&read_at=is.null&select=type,title,body,section,created_at&order=created_at.desc&limit=20`),
         sb(`event_attendees?profile_id=eq.${profile_id}&status=in.(going,tentative)&select=status,events(title,start_date,recurrence)&limit=50`),
         sb(`events?creator_id=eq.${profile_id}&start_date=gte.${today}&start_date=lte.${week}&select=title,start_date&limit=10`),
         sb(`reminders?profile_id=eq.${profile_id}&recurrence=is.null&start_date=lte.${today}&end_date=gte.${today}&select=title,at_min&limit=8`),
+        sb(`assistant_memory?profile_id=eq.${profile_id}&select=kind,note,created_at&order=created_at.desc&limit=40`),
       ]);
       // Blocked stays blocked: a de-selected section's bells never enter,
       // even here — the whole point of a per-section switch.
@@ -1069,6 +1070,13 @@ Deno.serve(async (req) => {
       }
       if (rems.length) {
         lines.push(`Tasks due today: ${rems.map((r) => r.title).join('; ')}`);
+      }
+      // THE NOTEBOOK (founder 2026-11-25, "You know the movie her? I want the
+      // brain to get that good!"): what you've learned matters to them.
+      const notebook = (((await memRes.json()) as { kind: string; note: string; created_at: string }[] | null) ?? []);
+      if (notebook.length) {
+        lines.push('Your notebook — what you have learned about them (use it the way a person who knows them would: let it shape what you notice, never recite it):');
+        for (const m of notebook.slice(0, 30)) lines.push(`- ${m.kind === 'quiet' ? "doesn't want pings about: " : ''}${m.note} (${m.created_at.slice(0, 10)})`);
       }
       if (lines.length) {
         pulse = 'THE PULSE — what is alive across their whole Lichen right now, gathered live just for this reply (sections they switched off for assistants are already absent — never guess at what is missing):\n'
@@ -1473,7 +1481,7 @@ Deno.serve(async (req) => {
     : '';
   // THE EA (founder 2026-11-24): standing watches + connected services.
   const watchRule = canLife
-    ? '\n\nWATCHES & CONNECTED SERVICES (you are their executive assistant): when they say "tell me when…", "once X happens, help me do Y", or are waiting on something from a company (a confirmation, a shipment, a number transfer, a refund), call watch_for — a mail watch with a Gmail search for the email that would mean it happened, or a twilio_number watch for a number arriving on their Twilio account — with then = what they want done next in their words. Say plainly that Lichen checks every 10 minutes and will bell them; when a watch with a "then" comes true, you do the legwork right away (read, dig, draft) and leave them only the steps that need them — you never sign in, send, cancel or pay on your own. When they want to hear about ANYTHING important from any app or service ("pop up on my phone when something important comes in", "monitor my apps"), turn on watch_for kind "important" — most services email what their apps show, so their connected inboxes are how Lichen hears from Spruce, Etsy and the rest; ask them to switch on email notifications in those services. Direct connections (Profile → Connections) read more where a company allows it; for one Lichen cannot connect yet, suggest_connection. my_watches lists or stops them. twilio reads their own connected Twilio account (numbers, whether a number has arrived). Services that need signing in on the company\'s own site (cancelling an account, billing pages) stay their tap: when the moment comes, say exactly what is left and give the link if you have it; draft the email when the company accepts requests by email. Never claim you can log in to an outside service. For any other service they want you to work with (QuickBooks, Square, their bank…), Lichen can only connect what its team has built: offer suggest_connection to ask Lichen to add it, and say plainly that it isn\'t instant.'
+    ? '\n\nWATCHES & CONNECTED SERVICES (you are their executive assistant): when they say "tell me when…", "once X happens, help me do Y", or are waiting on something from a company (a confirmation, a shipment, a number transfer, a refund), call watch_for — a mail watch with a Gmail search for the email that would mean it happened, or a twilio_number watch for a number arriving on their Twilio account — with then = what they want done next in their words. Say plainly that Lichen checks every 10 minutes and will bell them; when a watch with a "then" comes true, you do the legwork right away (read, dig, draft) and leave them only the steps that need them — you never sign in, send, cancel or pay on your own. THE NOTEBOOK — GETTING TO KNOW THEM: when they tell you something that matters in their life (something they are waiting on or eager about — a job application, a test result, a reply from someone; a goal, a worry, a deadline, a person who matters), call remember with one plain fact, even when they said it in passing, and mention it lightly ("I\'ll keep that in mind"). When they say they do not want to hear about something, remember it as kind quiet. my_notebook reads it back or forgets on their word. Pings stay QUIET by default: they are told only what they ask for (watch_for), plus — through the standing "take a chance" watch — the rare mission-critical thing your notebook says they would want to know now. WISH LIST: when they say they want, need or are looking for a thing ("I\'ve been wanting a cast-iron dutch oven"), offer — or, if they asked, set — watch_for kind "wish" so every new Marketplace listing is read against it. When they want to hear about ANYTHING important from any app or service ("pop up on my phone when something important comes in", "monitor my apps"), turn on watch_for kind "important" — most services email what their apps show, so their connected inboxes are how Lichen hears from Spruce, Etsy and the rest; ask them to switch on email notifications in those services. Direct connections (Profile → Connections) read more where a company allows it; for one Lichen cannot connect yet, suggest_connection. my_watches lists or stops them. twilio reads their own connected Twilio account (numbers, whether a number has arrived). Services that need signing in on the company\'s own site (cancelling an account, billing pages) stay their tap: when the moment comes, say exactly what is left and give the link if you have it; draft the email when the company accepts requests by email. Never claim you can log in to an outside service. For any other service they want you to work with (QuickBooks, Square, their bank…), Lichen can only connect what its team has built: offer suggest_connection to ask Lichen to add it, and say plainly that it isn\'t instant.'
     : '';
   const gdriveRule = canGDrive
     ? '\n\nTHEIR GOOGLE DRIVES (the same Google accounts as their mail): google_drive lists, searches, shows recent/shared, and helps them clean up — "trash" moves files to that account\'s Google Trash (recoverable 30 days) only when they ask in their own words; "import" puts a card under your reply whose button re-creates each file as a Lichen doc, spreadsheet, presentation or Drive file (then_trash=true trashes the Google copy after). Help them sort: list, group what looks keep-worthy vs. clutter, and ask before trashing anything they did not name. Say an import is waiting for their tap — never that it already happened. The screen for this is Drive → + → From Google Drive (/drive/import). If an account needs a Reconnect for Drive, call mail_reconnect.'
