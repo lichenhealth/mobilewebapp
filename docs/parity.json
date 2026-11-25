@@ -934,6 +934,12 @@
  "budgetApi:saveSubscription": {
   "tool": "subscriptions (add/update)"
  },
+ "notebookApi:addNote": {
+  "tool": "remember"
+ },
+ "notebookApi:forgetNote": {
+  "tool": "my_notebook (forget)"
+ },
  "connectionsApi:startImportantWatch": {
   "tool": "watch_for (kind important)"
  }

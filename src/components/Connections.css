@@ -62,3 +62,8 @@
 }
 .conn__imp .conn__watch-main { flex: 1 1 240px; min-width: 0; }
 .conn__imp .conn__btn { margin-left: auto; }
+
+/* The notebook's add row: kind · words · Add, wrapping whole on phones. */
+.conn__noteadd { display: flex; gap: var(--s-2); flex-wrap: wrap; align-items: center; margin-top: var(--s-2); }
+.conn__noteadd .input { flex: 1 1 200px; min-width: 0; }
+.conn__noteadd select.input { flex: 0 0 auto; }
