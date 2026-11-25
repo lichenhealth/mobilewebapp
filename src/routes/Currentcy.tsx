@@ -4,6 +4,7 @@ import MoneyInDoors from '../components/MoneyInDoors';
 import ValueFlowCard from '../components/ValueFlowCard';
 import BudgetCard from '../components/BudgetCard';
 import SubscriptionsCard from '../components/SubscriptionsCard';
+import CouponsCard from '../components/CouponsCard';
 import CashOutCard from '../components/CashOutCard';
 import MoneySafeguards from '../components/MoneySafeguards';
 import './Concierge.css';
@@ -53,6 +54,7 @@ export default function Currentcy() {
       <MoneySafeguards />
       <BudgetCard />
       <SubscriptionsCard />
+      <CouponsCard />
       <ValueFlowCard />
     </div>
   );

@@ -73,6 +73,26 @@ export const LIFE_TOOLS = [
     },
   },
   {
+    name: 'coupons',
+    description: 'Their saved COUPONS (Current-cy page → Coupons): store, the deal, the code, minimum spend, expiry, where it works, the fine print. Lichen bells 3 days before one expires and deletes it once it has. list: everything saved, soonest to expire first. add: from a coupon photo they shared in THIS message (read it yourself — copy the code character for character and say so when a character is unclear) or from their words; merchant + offer required; expires_on YYYY-MM-DD (a two-digit year 12/31/26 means 2026). A photo shared here is not kept with the coupon — say they can snap it on the Coupons card to keep the picture. update: by merchant (add offer words when they hold several from one store). remove: once they used it or no longer want it. WHEN THEY MENTION SHOPPING, ordering from or visiting a store, check list first and tell them about any coupon for that store (code, minimum, expiry) — that is the point of keeping them.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'add', 'update', 'remove'] },
+        merchant: { type: 'string' },
+        offer: { type: 'string', description: 'The deal in a short line; on update/remove, words from it pick between several coupons from one store.' },
+        code: { type: 'string' },
+        min_spend: { type: 'number', description: 'Minimum purchase in dollars.' },
+        expires_on: { type: 'string', description: 'YYYY-MM-DD' },
+        where_valid: { type: 'string', enum: ['online', 'in_store', 'both'] },
+        url: { type: 'string', description: 'https link to use it at.' },
+        category: { type: 'string' },
+        terms: { type: 'string', description: 'The fine print, condensed.' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'drive_folder',
     description: 'Their private Drive folders, which NEST (a folder can sit inside another, like Google Drive). Name a folder by its name, or by its path ("Photos / Lisa\'s Farm") when names repeat. create (name; inside = an existing folder to put it in), rename (new_name), move (folder into another folder named by into, or into "" for the top of Drive), add a post (by its exact title — one of their own posts, a post they saved, or the post shared into this conversation), or remove a post. Folders hold posts by reference — to put a document, spreadsheet or presentation in a folder use drive_doc op add_to_folder. my_lists folders shows each folder with its path.',
     input_schema: {
@@ -324,7 +344,7 @@ export const LIFE_TOOLS = [
 ];
 
 export const LIFE_TOOL_SECTION: Record<string, string> = {
-  my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy', subscriptions: 'currentcy',
+  my_lists: 'calendar', change_task: 'calendar', budget_line: 'currentcy', subscriptions: 'currentcy', coupons: 'currentcy',
   drive_folder: 'saved', drive_doc: 'saved', contacts: 'saved', save_or_hide_post: 'saved', rsvp: 'events', set_candle: 'home', my_event: 'events', add_calendar_event: 'calendar', delete_calendar_event: 'calendar', my_calendar_drafts: 'calendar', my_imported_calendar: 'calendar', invite_to_event: 'calendar', draft_message: 'chat', share_calendar: 'calendar', calendars_shared_with_me: 'calendar', remove_duplicate_messages: 'chat', set_clinical_home: 'profile', drive_time: 'maps', set_care_funding: 'concierge', revenue_streams: 'concierge',
 };
 
@@ -461,6 +481,48 @@ export async function runLifeTool(
     return { ok: true, change: `task "${rem.title}": ${changes.join('; ')}` };
   }
 
+  if (name === 'coupons') {
+    const action = String(input.action ?? 'list');
+    const door = { path: '/currentcy#coupons', label: 'Open your coupons' };
+    const rows = await (await sb(`coupons?profile_id=eq.${me}&select=id,merchant,offer,code,min_spend_cents,expires_on,where_valid,url,terms,photo_path&order=expires_on.asc.nullslast`)).json();
+    const list = (Array.isArray(rows) ? rows : []) as { id: string; merchant: string; offer: string; code: string | null; min_spend_cents: number | null; expires_on: string | null; where_valid: string | null; url: string | null; terms: string | null; photo_path: string | null }[];
+    const view = (c: typeof list[number]) => ({ merchant: c.merchant, offer: c.offer, code: c.code, minimum: c.min_spend_cents == null ? null : c.min_spend_cents / 100, expires_on: c.expires_on, where: c.where_valid, url: c.url, fine_print: c.terms });
+    if (action === 'list') return { ok: true, door, today: today(), coupons: list.map(view) };
+    const merchant = String(input.merchant ?? '').trim().slice(0, 120);
+    if (!merchant) return { ok: false, error: 'Name the store (merchant).' };
+    const offerIn = String(input.offer ?? '').trim();
+    const patch: Record<string, unknown> = {};
+    if (input.code != null && String(input.code).trim()) patch.code = String(input.code).trim().slice(0, 80);
+    if (input.min_spend != null && Number.isFinite(Number(input.min_spend))) patch.min_spend_cents = Math.max(0, Math.round(Number(input.min_spend) * 100));
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(input.expires_on ?? ''))) patch.expires_on = String(input.expires_on);
+    if (['online', 'in_store', 'both'].includes(String(input.where_valid))) patch.where_valid = String(input.where_valid);
+    const url = String(input.url ?? '').trim();
+    if (url) { if (!/^https:\/\/\S+$/.test(url)) return { ok: false, error: 'url has to be an https link.' }; patch.url = url.slice(0, 600); }
+    if (String(input.category ?? '').trim()) patch.category = String(input.category).trim().slice(0, 40);
+    if (String(input.terms ?? '').trim()) patch.terms = String(input.terms).trim().slice(0, 2000);
+    if (action === 'add') {
+      if (!offerIn) return { ok: false, error: 'Say what the deal is (offer).' };
+      const res = await sb('coupons', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ profile_id: me, merchant, offer: offerIn.slice(0, 240), ...patch }) });
+      if (!res.ok) return { ok: false, error: `The coupon would not save: ${(await res.text()).slice(0, 120)}` };
+      return { ok: true, change: `saved a ${merchant} coupon`, saved: { offer: offerIn, ...patch }, door };
+    }
+    let hits = list.filter((c) => c.merchant.toLowerCase() === merchant.toLowerCase());
+    if (hits.length > 1 && offerIn) hits = hits.filter((c) => c.offer.toLowerCase().includes(offerIn.toLowerCase()));
+    if (!hits.length) return { ok: false, error: `No saved coupon from "${merchant}" — list them first.`, coupons: list.map((c) => `${c.merchant}: ${c.offer}`) };
+    if (hits.length > 1) return { ok: false, error: `They have ${hits.length} coupons from ${merchant} — add words from the offer to pick one.`, coupons: hits.map((c) => c.offer) };
+    const hit = hits[0];
+    if (action === 'remove') {
+      await sb(`coupons?id=eq.${hit.id}&profile_id=eq.${me}`, { method: 'DELETE' });
+      if (hit.photo_path) {
+        await fetch(`${Deno.env.get('SUPABASE_URL')}/storage/v1/object/drive`, { method: 'DELETE', headers: { apikey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [hit.photo_path] }) }).catch(() => {});
+      }
+      return { ok: true, change: `removed the ${merchant} coupon (${hit.offer})`, door };
+    }
+    if (offerIn && hits.length === 1 && !hit.offer.toLowerCase().includes(offerIn.toLowerCase())) patch.offer = offerIn.slice(0, 240);
+    if (!Object.keys(patch).length) return { ok: true, unchanged: merchant, door };
+    await sb(`coupons?id=eq.${hit.id}&profile_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+    return { ok: true, change: `updated the ${merchant} coupon`, saved: patch, door };
+  }
   if (name === 'subscriptions') {
     const action = String(input.action ?? 'list');
     const rows = await (await sb(`budget_items?profile_id=eq.${me}&is_subscription=eq.true&select=id,label,amount_cents,cadence,renews_on,manage_url,billed_via&order=renews_on.asc.nullslast`)).json();

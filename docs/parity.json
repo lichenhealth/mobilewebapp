@@ -934,6 +934,15 @@
  "budgetApi:saveSubscription": {
   "tool": "subscriptions (add/update)"
  },
+ "couponsApi:saveCoupon": {
+  "tool": "coupons (add/update)"
+ },
+ "couponsApi:deleteCoupon": {
+  "tool": "coupons (remove)"
+ },
+ "couponsApi:scanCouponPhoto": {
+  "tool": "coupons (add — the brain reads a shared photo itself)"
+ },
  "notebookApi:addNote": {
   "tool": "remember"
  },

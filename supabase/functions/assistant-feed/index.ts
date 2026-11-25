@@ -537,7 +537,7 @@ function prepAllowed(name: string, input: Record<string, unknown>): boolean {
   if (name.startsWith('my_') || PREP_TOOLS.has(name)) return true;
   const action = String(input?.action ?? '');
   if (name === 'twilio') return ['numbers', 'check_number', 'texts', 'voicemails'].includes(action);
-  if (name === 'contacts' || name === 'subscriptions') return action === 'list' || action === 'read';
+  if (name === 'contacts' || name === 'subscriptions' || name === 'coupons') return action === 'list' || action === 'read';
   if (name === 'google_drive') return ['list', 'search', 'recent', 'shared', 'trash_view'].includes(action);
   if (name === 'drive_doc') return action === 'list' || action === 'read';
   return false;
@@ -1037,13 +1037,14 @@ Deno.serve(async (req) => {
     try {
       const today = new Date().toISOString().slice(0, 10);
       const week = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
-      const [offRes, bellRes, attRes, hostRes, remRes, memRes] = await Promise.all([
+      const [offRes, bellRes, attRes, hostRes, remRes, memRes, coupRes] = await Promise.all([
         sb(`assistant_consent?profile_id=eq.${profile_id}&scope_type=eq.section&enabled=eq.false&select=scope_id`),
         sb(`notifications?recipient_id=eq.${profile_id}&read_at=is.null&select=type,title,body,section,created_at&order=created_at.desc&limit=20`),
         sb(`event_attendees?profile_id=eq.${profile_id}&status=in.(going,tentative)&select=status,events(title,start_date,recurrence)&limit=50`),
         sb(`events?creator_id=eq.${profile_id}&start_date=gte.${today}&start_date=lte.${week}&select=title,start_date&limit=10`),
         sb(`reminders?profile_id=eq.${profile_id}&recurrence=is.null&start_date=lte.${today}&end_date=gte.${today}&select=title,at_min&limit=8`),
         sb(`assistant_memory?profile_id=eq.${profile_id}&select=kind,note,created_at&order=created_at.desc&limit=40`),
+        sb(`coupons?profile_id=eq.${profile_id}&select=merchant,offer,code,expires_on&order=expires_on.asc.nullslast&limit=25`),
       ]);
       // Blocked stays blocked: a de-selected section's bells never enter,
       // even here — the whole point of a per-section switch.
@@ -1077,6 +1078,14 @@ Deno.serve(async (req) => {
       if (notebook.length) {
         lines.push('Your notebook — what you have learned about them (use it the way a person who knows them would: let it shape what you notice, never recite it):');
         for (const m of notebook.slice(0, 30)) lines.push(`- ${m.kind === 'quiet' ? "doesn't want pings about: " : ''}${m.note} (${m.created_at.slice(0, 10)})`);
+      }
+      // COUPONS (founder 2026-11-25: "if someone is purchasing something at a
+      // store and you have a coupon, alert them"): the stores they hold one
+      // for, so a mention of shopping there gets the code without asking.
+      const coups = off.has('currentcy') ? [] : (((await coupRes.json()) as { merchant: string; offer: string; code: string | null; expires_on: string | null }[] | null) ?? []);
+      if (coups.length) {
+        lines.push('Coupons they hold (if they mention shopping at, ordering from or visiting one of these stores, tell them about it):');
+        for (const c of coups) lines.push(`- ${c.merchant}: ${c.offer}${c.code ? ` · code ${c.code}` : ''}${c.expires_on ? ` · expires ${c.expires_on}` : ''}`);
       }
       if (lines.length) {
         pulse = 'THE PULSE — what is alive across their whole Lichen right now, gathered live just for this reply (sections they switched off for assistants are already absent — never guess at what is missing):\n'
@@ -1464,7 +1473,7 @@ Deno.serve(async (req) => {
   }
 
   const lifeRule = canLife
-    ? '\n\nTHEIR LIFE, BY WORD (the parity rule — anything they can do by hand on a screen, you do from their words): my_lists then change_task (done, move, rename, delete), budget_line, subscriptions (their paid subscriptions — list, add, update, cancelled; to audit, search their mail receipts first), drive_folder (create, add/remove a post), save_or_hide_post, rsvp, set_candle. Do these directly when asked and report exactly what changed — they are the member\'s own, private, and undoable. Never answer "go do it on the X screen" when one of these fits.'
+    ? '\n\nTHEIR LIFE, BY WORD (the parity rule — anything they can do by hand on a screen, you do from their words): my_lists then change_task (done, move, rename, delete), budget_line, subscriptions (their paid subscriptions — list, add, update, cancelled; to audit, search their mail receipts first), coupons (their saved coupons — list, add from a photo they share or their words, update, remove; when they mention shopping at or ordering from a store, check coupons first and tell them about one that fits), drive_folder (create, add/remove a post), save_or_hide_post, rsvp, set_candle. Do these directly when asked and report exactly what changed — they are the member\'s own, private, and undoable. Never answer "go do it on the X screen" when one of these fits.'
       + '\n\nACTS THAT NEED THEIR YES (confirm card + Always allow): send_currentcy (money to another member), network_signal (trust / recommend / weave), space_membership (ask to join / leave), set_money_floor (their Current-cy floor — never Always allow). Use the names and figures exactly as they wrote them. Each one PROPOSES — the card under your reply is where THEY decide; never say it happened unless the tool says done. They can tap Always allow to skip the card next time (money stays capped at ⚡100 a send, ⚡300 a day; anything over ⚡500 waits 24 hours, cancellable). You can never grant that allowance yourself.'
       + '\n\nMESSAGES: draft_message writes a Lichen chat message to one person for the member to send with one tap — use it whenever they ask you to message someone; names are matched forgiving spelling.'
       + '\n\nINVITATIONS & LINKS: add_calendar_event puts an event on their own calendar — a repeating one is ONE event with repeat (weekly on Wednesdays, no end = forever), never one event per date; invite_to_event invites people to an event they host by name or email (members get it in Lichen and, with calendar=true, as a real Google/Apple/Outlook invitation at their signup email — never say you can see that address; saved contacts on their own lists supply outside emails) — it never sends, the card under your reply is their Send; my_event with make_link=true makes the event\'s invite link and link_access sets who it lets in (anyone / invited [others ask, they approve] / members / circles with exact group names). OUTSIDE CALENDARS: my_imported_calendar reads the events imported from their Google/ICS calendars (titles, dates, times, which calendar, and repeating patterns) — use it before asking them when or how long an outside event runs, never say you can\'t see it. DRAFTS: my_calendar_drafts lists their draft calendar events (with Open doors) and block=true/false makes a draft hold its time or stop holding it — an unblocked draft is a dotted outline that never reads as busy. Never tell them to go do it by hand.'
@@ -1664,6 +1673,10 @@ Deno.serve(async (req) => {
         // The file it just built or touched rides as a real Open button.
         const door = lr.door as { path: string; label: string } | undefined;
         if (door && /^\/docs\/[0-9a-f-]{36}$/.test(door.path) && !appDoors.some((d) => d.path === door.path)) appDoors.push(door);
+        delete lr.door;
+      }
+      if (name === 'coupons') {
+        if (lr.door && !appDoors.some((d) => d.path === '/currentcy#coupons')) appDoors.push({ path: '/currentcy#coupons', label: 'Open your coupons' });
         delete lr.door;
       }
       if (name === 'subscriptions') {
