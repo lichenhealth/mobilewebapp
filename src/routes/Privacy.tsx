@@ -62,6 +62,25 @@ export default function Privacy() {
         </p>
       </section>
 
+      <section className="privacy__sec" id="extension">
+        <h2>The Lichen browser extension</h2>
+        <p>
+          The optional Lichen extension for Chrome, Edge and Brave shows you a coupon
+          code when you shop on the website of a store you hold a Lichen coupon for.
+          It downloads only your own coupon list, using a key that can read nothing
+          else in your account. To know when you&rsquo;re on a store&rsquo;s site it
+          looks at the address of the tab you&rsquo;re on — and that comparison
+          happens entirely inside your browser. The sites you visit are never sent
+          to Lichen or to anyone else, never stored by us, and never used for
+          advertising.
+        </p>
+        <p>
+          The extension keeps your coupon list and its key in your browser&rsquo;s
+          own storage. Disconnect it from Profile &rarr; Connections (or remove the
+          extension) and the key stops working at once.
+        </p>
+      </section>
+
       <section className="privacy__sec">
         <h2>Care information</h2>
         <p>
