@@ -951,5 +951,11 @@
  },
  "connectionsApi:startImportantWatch": {
   "tool": "watch_for (kind important)"
+ },
+ "extensionApi:connectExtension": {
+  "exempt": "pairing hands a key to an extension installed in THIS browser — only the person at that browser can do it"
+ },
+ "extensionApi:revokeExtensionToken": {
+  "exempt": "disconnecting a browser is a security act the person takes on the screen; the brain never removes a sign-in"
  }
 }

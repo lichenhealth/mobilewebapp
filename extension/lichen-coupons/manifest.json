@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Lichen — your coupons",
+  "short_name": "Lichen",
+  "version": "1.0.0",
+  "description": "When you shop at a store you hold a Lichen coupon for, Lichen shows you the code. The sites you visit never leave your browser.",
+  "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+  "action": { "default_popup": "popup.html", "default_title": "Lichen coupons", "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png" } },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["tabs", "storage", "notifications", "alarms"],
+  "host_permissions": ["https://mjqnaevertyzgjlpwynr.supabase.co/*"],
+  "content_scripts": [
+    { "matches": ["https://lichen.health/*", "https://www.lichen.health/*"], "js": ["pair.js"], "run_at": "document_start" }
+  ]
+}
