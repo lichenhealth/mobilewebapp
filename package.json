@@ -10,7 +10,8 @@
     "lint": "tsc --noEmit",
     "check:icons": "node scripts/check-icons.mjs",
     "check:sections": "node scripts/check-sections.mjs",
-    "check:parity": "node scripts/check-parity.mjs"
+    "check:parity": "node scripts/check-parity.mjs",
+    "build:extension": "node scripts/build-extension.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",

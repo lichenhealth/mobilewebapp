@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../auth/AuthProvider';
 import { addNote, forgetNote, listNotebook, type NotebookNote } from '../lib/notebookApi';
 import { Icon } from './Icon';
+import BrowserExtension from './BrowserExtension';
 import './Connections.css';
 
 const idField = { autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false } as const;
@@ -227,6 +228,8 @@ export default function Connections() {
           </div>
         )}
       </div>
+
+      <BrowserExtension />
 
       <h3 className="conn__h">What your Brain is watching for</h3>
       {canMail && inboxes.length > 0 && (() => {

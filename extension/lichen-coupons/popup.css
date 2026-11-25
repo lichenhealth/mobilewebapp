@@ -1,0 +1,21 @@
+:root { --ink:#1c2326; --soft:#4a555a; --muted:#7a8488; --bone:#f6f1e8; --edge:#e4dccd; --peach:#e9926b; --peach-deep:#c8643c; --tint:#fbe9df; }
+* { box-sizing: border-box; }
+body { margin: 0; width: 340px; font: 14px/1.45 Archivo, system-ui, sans-serif; color: var(--ink); background: var(--bone); }
+header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--edge); }
+header img { width: 22px; height: 22px; border-radius: 6px; }
+header span { margin-left: auto; font-size: 12px; color: var(--muted); }
+main { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow-y: auto; }
+h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 6px 0 0; font-weight: 500; }
+.c { background: #fff; border: 1px solid var(--edge); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.c.here { border-color: var(--peach); border-left: 3px solid var(--peach); }
+.m { font-weight: 600; }
+.o { color: var(--soft); font-size: 13px; }
+.code { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 1px dashed var(--peach); background: var(--tint); border-radius: 9px; padding: 7px 10px; font: inherit; cursor: pointer; text-align: left; }
+.code span:first-child { font-family: ui-monospace, Menlo, monospace; letter-spacing: .06em; overflow-wrap: anywhere; }
+.code span:last-child { font-size: 12px; color: var(--peach-deep); white-space: nowrap; }
+.t { font-size: 12px; color: var(--muted); }
+p { margin: 0; color: var(--soft); }
+button.go, a.go { align-self: flex-start; border: 1px solid var(--peach); background: var(--tint); color: var(--peach-deep); border-radius: 999px; padding: 7px 16px; font: inherit; cursor: pointer; text-decoration: none; }
+footer { padding: 8px 14px 12px; font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+footer a, footer button { color: var(--peach-deep); background: none; border: none; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: var(--peach); }
+.err { color: #a2453a; font-size: 12px; }
