@@ -24,7 +24,10 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
   const listen = canListen();
   const local = usesLocalSpeech();
   const browserCanToo = !!speechRecognition() && localSpeechSupported();
-  const iosApp = !listen && isIosHomeScreenApp();
+  // The iPhone home-screen app recommends the browser hand-off even though
+  // the on-phone listener could run here — Apple's recognition is far faster
+  // and more accurate (founder 2026-11-26).
+  const iosApp = isIosHomeScreenApp();
   if (!canSpeak()) return compact ? null : <p className="vset__fine">This browser can’t speak or listen — try Safari or Chrome.</p>;
   return (
     <div className={'vset' + (compact ? ' vset--compact' : '')}>
@@ -39,10 +42,10 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
           onChange={(e) => { const v = e.target.checked; if (!v) { setWakeAlways(false); return; } void ensureLocalSpeech('talk').then((ok) => { if (ok) setWakeAlways(true); }); }} />
         <span>
           <strong>Always listen for “Hey Brain”</strong> (or “Hey Claude”) — then just say what you need, from any screen.
-          {listen
+          {listen && !iosApp
             ? ' Listens only while Lichen is open on your screen; nothing that doesn’t start with “Hey Brain” is ever sent.'
             : iosApp
-              ? ' This phone can’t run the listener here — open Lichen in your browser instead.'
+              ? ' Best in your browser — Lichen opens there signed in with Hey Brain on, using Apple’s speech recognition. (It also works here with Lichen’s slower on-phone listener.)'
               : ' This browser can’t listen — try Chrome or Safari.'}
           {local && listen && ' Uses more battery while on.'}
         </span>

@@ -184,15 +184,16 @@ export default function DocVoice({ doc, html, body, onClose }: {
             </div>
           )}
           {err && <p className="dvoice__note">{err}</p>}
+          {isIosHomeScreenApp() && (
+            <OpenInBrowser to={`/docs/${doc.id}?claude=1&hands=1`} flags={{ voice: "1" }}
+              lead="For hands-free (“Hey Brain, next”), open this doc in your browser — signed in, panel open, already listening with Apple’s fast speech recognition." />
+          )}
           {canListen() ? (
             <label className="dvoice__hands">
               <input type="checkbox" checked={handsFree} onChange={(e) => { const v = e.target.checked; if (!v) { setHandsFree(false); return; } void ensureLocalSpeech('talk').then((ok) => { if (ok) setHandsFree(true); }); }} />
               <span><strong>Hands-free</strong> — say “Hey Brain” (or “Hey Claude”), then a question, or “next”, “back”, “repeat”. Listens only while this panel is open and your screen is on; {usesLocalSpeech() ? 'this device turns what you say into words itself — the audio never leaves it.' : 'your browser’s speech service turns what you say into words.'}</span>
             </label>
-          ) : isIosHomeScreenApp() ? (
-            <OpenInBrowser to={`/docs/${doc.id}?claude=1&hands=1`} flags={{ voice: "1" }}
-              lead="To talk hands-free (“Hey Brain, next”), open this doc in your browser — signed in, panel open, already listening. Apple doesn’t let home-screen apps listen." />
-          ) : (
+          ) : isIosHomeScreenApp() ? null : (
             <p className="dvoice__fine">To talk instead of type here, use your keyboard’s mic — or open Lichen in Safari or Chrome for hands-free “Hey Brain”.</p>
           )}
           {convo && <button className="dvoice__open" onClick={() => navigate(`/assistant/feed?thread=general&convo=${convo}&sec=saved`)}>Open this conversation with Claude ›</button>}
