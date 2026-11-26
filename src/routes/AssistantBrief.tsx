@@ -1008,7 +1008,9 @@ export default function AssistantBrief() {
     // build thread stays one continuous stream (convo null). Photos ride
     // along (founder 2026-10-06: "just like with you").
     let convo: string | null | undefined = spaceParam ? null : undefined;
-    if (!spaceParam) {
+    if (!spaceParam && lastConvo && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(lastConvo.id)) {
+      convo = lastConvo.id;
+    } else if (!spaceParam && !freshConvo) {
       // A tagged section's send continues the latest conversation TAGGED
       // with it — never whatever unrelated exchange is freshest in general.
       const latest = await latestConvoIn(feedThread, sectionTag ?? undefined).catch(() => null);
@@ -1142,6 +1144,19 @@ export default function AssistantBrief() {
   // RENAME ON THE ROW (founder 2026-10-12: "no way to edit the title
   // easily, can we add that in here") — the feed list's exact grammar.
   const [briefRename, setBriefRename] = useState<string | null>(null);
+  // THE LAST CONVERSATION STANDS OPEN (founder 2026-11-26: "auto populate
+  // the last convo with each brain; or if you're in the meta brain, the last
+  // convo, period. Then have a button for new convo be the way someone
+  // starts a new one"): the newest conversation that pertains to this brain
+  // shows under the ask, and a send continues it; New conversation is the
+  // only way to start fresh. Space build threads stay one stream.
+  const [freshConvo, setFreshConvo] = useState(false);
+  const lastConvo = !spaceParam && !freshConvo ? (briefConvos[0] ?? null) : null;
+  const lastEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = lastEndRef.current?.parentElement;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lastConvo?.id, lastConvo?.entries.length]);
   async function saveBriefName(convoId: string, value: string) {
     const t = value.trim().replace(/\s+/g, ' ').slice(0, 120);
     const chosen = briefNames[convoId];
@@ -1422,14 +1437,43 @@ export default function AssistantBrief() {
           not want to address anything in the summary at all"): its own
           section under a hairline, its own heading, a neutral placeholder. */}
       <div className="abrief__ask" ref={askRef}>
-      <p className="abrief__convos-h">Ask Claude anything</p>
+      {!spaceParam && (lastConvo || freshConvo) ? (
+        <div className="abrief__lasthead">
+          <p className="abrief__convos-h">{lastConvo ? <>Your last conversation · <span className="abrief__lasttitle">{lastConvo.title}</span></> : 'New conversation'}</p>
+          {lastConvo ? (
+            <button type="button" className="abrief__newconvo" onClick={() => setFreshConvo(true)}>
+              <Icon name="plus" size={13} /> New conversation
+            </button>
+          ) : briefConvos.length > 0 && (
+            <button type="button" className="abrief__newconvo abrief__newconvo--back" onClick={() => setFreshConvo(false)}>
+              ← Back to the last conversation
+            </button>
+          )}
+        </div>
+      ) : (
+        <p className="abrief__convos-h">Ask Claude anything</p>
+      )}
+      {lastConvo && (
+        <div className="abrief__last" aria-label="Your last conversation">
+          {lastConvo.entries.slice(-8).map((e) => (
+            <div key={e.id} className={'abrief__lastmsg' + (e.author === 'claude' ? ' is-claude' : ' is-me')}>
+              <p>{renderBold((e.body ?? '').slice(0, 1200) || (e.attachments?.length ? '[a photo or attachment]' : ''), (t) => t)}</p>
+            </div>
+          ))}
+          <div ref={lastEndRef} />
+          <button type="button" className="abrief__lastopen"
+            onClick={() => navigate(`/assistant/feed?thread=${encodeURIComponent(lastConvo.thread)}&convo=${encodeURIComponent(lastConvo.id)}${sectionTag && lastConvo.thread !== section ? `&sec=${sectionTag}` : ''}`)}>
+            Open the whole conversation ›
+          </button>
+        </div>
+      )}
       <AssistantComposer
         key={params.get('ask') ?? 'blank'}
         onSend={sendToClaude}
         initialText={params.get('ask') ?? undefined}
         uploaderId={me || undefined}
         attachment={mailRef ? <MailRefCard m={mailRef} onRemove={() => setMailRef(null)} /> : undefined}
-        placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : 'Reply to the summary, or ask anything…'}
+        placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : lastConvo ? 'Continue this conversation…' : 'Reply to the summary, or ask anything…'}
       />
       </div>
       </div>
@@ -1439,10 +1483,10 @@ export default function AssistantBrief() {
           conversations, section-labeled; a section's brain lists only its
           own. Each row opens the real exchange in the feed. Not the retired
           generic pills — this is the member's own history, in context. */}
-      {briefConvos.length > 0 && (
+      {briefConvos.length > (lastConvo ? 1 : 0) && (
         <div className="afeed__convos abrief__convos">
           <p className="abrief__convos-h">Earlier conversations</p>
-          {briefConvos.map((c) => {
+          {briefConvos.filter((c) => c.id !== lastConvo?.id).map((c) => {
             const renaming = briefRename === c.id;
             const nameable = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(c.id);
             const open = () => navigate(`/assistant/feed?thread=${encodeURIComponent(c.thread)}&convo=${encodeURIComponent(c.id)}${sectionTag && c.thread !== section ? `&sec=${sectionTag}` : ''}`);

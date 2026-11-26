@@ -177,3 +177,18 @@
   .abrief__split .abrief__ask .assist-composer__input { flex: 1; }
   .abrief__split .abrief__card { box-sizing: border-box; }
 }
+
+/* THE LAST CONVERSATION STANDS OPEN (founder 2026-11-26). */
+.abrief__lasthead { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
+.abrief__lasthead .abrief__convos-h { margin-bottom: 0; min-width: 0; }
+.abrief__lasttitle { color: var(--ink); text-transform: none; letter-spacing: 0; }
+.abrief__newconvo { display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; padding: 4px 0; font: inherit; font-size: 13px; color: var(--peach-deep); cursor: pointer; white-space: nowrap; }
+.abrief__newconvo:hover { text-decoration: underline; text-decoration-color: var(--peach); }
+.abrief__last { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; margin: 10px 0 12px; padding: 10px; border-radius: 14px; background: var(--bone-warm, #f6f1e7); border: 1px solid var(--bone-edge); }
+.abrief__lastmsg { max-width: 88%; }
+.abrief__lastmsg p { margin: 0; padding: 8px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.abrief__lastmsg.is-claude { align-self: flex-start; }
+.abrief__lastmsg.is-claude p { background: #fff; border: 1px solid var(--bone-edge); border-radius: 4px 14px 14px 14px; }
+.abrief__lastmsg.is-me { align-self: flex-end; }
+.abrief__lastmsg.is-me p { background: var(--peach-tint); border-radius: 14px 4px 14px 14px; }
+.abrief__lastopen { align-self: center; background: none; border: 0; font: inherit; font-size: 13px; color: var(--peach-deep); cursor: pointer; padding: 4px; }
