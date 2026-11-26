@@ -37,6 +37,7 @@ import CollectionPage from './routes/CollectionPage';
 
 // mapbox-gl is heavy — the Maps screen loads as its own chunk on first visit.
 const MapView = lazy(() => import('./routes/MapView'));
+import TaskPage from './routes/TaskPage';
 import Calendar from './routes/Calendar';
 import EventComposer from './routes/EventComposer';
 import CalendarSettings from './routes/CalendarSettings';
@@ -390,6 +391,7 @@ export default function App() {
           <Route path="/spaces/:id/drive" element={<ChatRoomDrive mode="space" />} />
           <Route path="/docs/:docId" element={<ChatDocPage />} />
           <Route path="/calendar"  element={<Calendar />} />
+          <Route path="/tasks/:id" element={<TaskPage />} />
           <Route path="/calendar/new" element={<EventComposer />} />
           <Route path="/calendar/edit/:eventId" element={<EventComposer />} />
           <Route path="/calendar/settings" element={<CalendarSettings />} />

@@ -586,6 +586,12 @@
  "remindersApi:setDone": {
   "tool": "change_task"
  },
+ "remindersApi:setTaskItemDone": {
+  "tool": "change_task"
+ },
+ "remindersApi:saveTaskItems": {
+  "tool": "change_task"
+ },
  "resourcesApi:createResource": {
   "gap": "1"
  },

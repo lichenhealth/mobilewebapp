@@ -920,3 +920,4 @@
 .calp__leave-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .calp__leave-stay { margin-left: auto; }
 .calp__pickdoor { margin: 6px 0 2px; }
+.calp__rem-items { color: var(--ink-muted); font-variant-numeric: tabular-nums; font-weight: 400; }

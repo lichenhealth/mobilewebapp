@@ -16,6 +16,7 @@
 const OFF_PREFIX: { re: RegExp; family: string; mark: boolean }[] = [
   { re: /^\/organize/, family: '/drive', mark: true },
   { re: /^\/trash/, family: '/drive', mark: true },
+  { re: /^\/tasks\/[^/]+/, family: '/calendar', mark: true }, // a task's checklist (2026-11-26)
   // THE CHAT BRAIN IS THE WHOLE BRAIN (founder 2026-11-02): Chat's brain
   // door renders the general brief at ?section=chat — the bottom nav keeps
   // CHAT lit so the context the retired rail circle carried survives.
