@@ -18,6 +18,16 @@ import BrowserExtension from './BrowserExtension';
 import './Connections.css';
 
 const idField = { autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false } as const;
+/** A KEY IS NOT A LOGIN (founder 2026-11-26: the browser's password manager
+ *  filled her email + saved password into the Twilio key boxes). Browsers
+ *  ignore autocomplete="off" on password inputs, so the secret is a TEXT
+ *  input masked by CSS, every key box opts out of autofill and the common
+ *  password managers, and connect() refuses a login-shaped value before
+ *  anything leaves the device. */
+const keyField = {
+  ...idField, autoComplete: 'off', 'data-1p-ignore': 'true', 'data-lpignore': 'true',
+  'data-bwignore': 'true', 'data-form-type': 'other',
+} as const;
 
 function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -90,6 +100,11 @@ export default function Connections() {
   const others = isAdmin ? suggs.filter((x) => true) : [];
 
   async function connect() {
+    const a = acct.trim(), k = keySid.trim();
+    if (!/^AC/i.test(a) || !/^SK/i.test(k) || a.includes('@') || k.includes('@') || secret.includes('@')) {
+      setErr('Those don’t look like Twilio keys — the Account SID starts with AC and the API key SID with SK. If your browser filled in your login, clear these boxes and paste the keys from Twilio instead.');
+      return;
+    }
     setBusy(true); setErr('');
     try {
       const r = await connectTwilio(acct, keySid, secret);
@@ -212,13 +227,13 @@ export default function Connections() {
               from the home page, then under Account → API keys &amp; tokens create a Standard API key and copy its SID and secret.
             </p>
             <label className="conn__label">Account SID
-              <input className="conn__input" {...idField} value={acct} onChange={(e) => setAcct(e.target.value)} placeholder="AC…" />
+              <input className="conn__input" {...keyField} name="twilio-account-sid" value={acct} onChange={(e) => setAcct(e.target.value)} placeholder="AC…" />
             </label>
             <label className="conn__label">API key SID
-              <input className="conn__input" {...idField} value={keySid} onChange={(e) => setKeySid(e.target.value)} placeholder="SK…" />
+              <input className="conn__input" {...keyField} name="twilio-api-key-sid" value={keySid} onChange={(e) => setKeySid(e.target.value)} placeholder="SK…" />
             </label>
             <label className="conn__label">API key secret
-              <input className="conn__input" type="password" autoComplete="off" {...idField} value={secret} onChange={(e) => setSecret(e.target.value)} />
+              <input className="conn__input conn__input--secret" type="text" {...keyField} name="twilio-api-key-secret" value={secret} onChange={(e) => setSecret(e.target.value)} />
             </label>
             <p className="conn__fine">Lichen checks the key with Twilio, keeps it locked to your account, and never shows it again. You can delete the key in Twilio any time.</p>
             <div className="conn__acts">
