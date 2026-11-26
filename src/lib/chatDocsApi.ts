@@ -27,6 +27,9 @@ export interface ChatDocRow {
   created_at: string;
   updated_at: string;
   updated_by: string | null;
+  /** Personal docs only: who else may open it by link (2026-11-26). */
+  link_access?: 'lichen' | 'anyone' | null;
+  share_token?: string | null;
 }
 
 export interface PollVote { doc_id: string; profile_id: string; option_idx: number }
@@ -34,7 +37,7 @@ export interface PollVote { doc_id: string; profile_id: string; option_idx: numb
 export const DOC_KIND_LABEL: Record<ChatDocKind, string> = { doc: 'Doc', poll: 'Poll', sheet: 'Spreadsheet', slides: 'Presentation' };
 export const DOC_KIND_ICON: Record<ChatDocKind, IconName> = { doc: 'book', poll: 'check', sheet: 'sheet', slides: 'slides' };
 
-const DOC_COLS = 'id, chat_id, space_id, kind, title, body, data, ai_enabled, created_by, created_at, updated_at, updated_by';
+const DOC_COLS = 'id, chat_id, space_id, kind, title, body, data, ai_enabled, created_by, created_at, updated_at, updated_by, link_access, share_token';
 
 export async function createChatDoc(
   me: string,
@@ -154,9 +157,70 @@ export async function createPersonalDoc(
 }
 
 export async function listMyPersonalDocs(): Promise<ChatDocRow[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  // created_by matters since 2026-11-26: RLS now also returns docs shared
+  // with me and every linked doc — "mine" must stay mine.
   const { data } = await supabase.from('chat_docs')
     .select(DOC_COLS)
     .is('chat_id', null)
+    .eq('created_by', user.id)
     .order('updated_at', { ascending: false });
   return (data as ChatDocRow[] | null) ?? [];
+}
+
+/* ── SHARING A DOC LIKE GOOGLE (founder 2026-11-26) ─────────────────────── */
+
+export type ShareLevel = 'view' | 'edit';
+export interface DocShare { profile_id: string; level: ShareLevel; name: string; avatar_url: string | null }
+
+export async function listDocShares(docId: string): Promise<DocShare[]> {
+  const { data } = await supabase.from('chat_doc_shares')
+    .select('profile_id, level, profiles!chat_doc_shares_profile_id_fkey(full_name, avatar_url)')
+    .eq('doc_id', docId).order('created_at');
+  return ((data ?? []) as unknown as { profile_id: string; level: ShareLevel; profiles: { full_name: string | null; avatar_url: string | null } | null }[])
+    .map((r) => ({ profile_id: r.profile_id, level: r.level, name: r.profiles?.full_name ?? 'Member', avatar_url: r.profiles?.avatar_url ?? null }));
+}
+
+/** Share with a member (or change their level). They get a bell. */
+export async function shareDoc(docId: string, profileId: string, level: ShareLevel): Promise<void> {
+  const { data: existing } = await supabase.from('chat_doc_shares').select('profile_id').eq('doc_id', docId).eq('profile_id', profileId).maybeSingle();
+  const { error } = existing
+    ? await supabase.from('chat_doc_shares').update({ level }).eq('doc_id', docId).eq('profile_id', profileId)
+    : await supabase.from('chat_doc_shares').insert({ doc_id: docId, profile_id: profileId, level });
+  if (error) throw error;
+}
+
+export async function unshareDoc(docId: string, profileId: string): Promise<void> {
+  const { error } = await supabase.from('chat_doc_shares').delete().eq('doc_id', docId).eq('profile_id', profileId);
+  if (error) throw error;
+}
+
+/** Restricted (null) · anyone on Lichen with the link · anyone at all. */
+export async function setDocLink(docId: string, access: 'lichen' | 'anyone' | null): Promise<{ link_access: 'lichen' | 'anyone' | null; share_token: string | null }> {
+  const { data, error } = await supabase.from('chat_docs').update({ link_access: access })
+    .eq('id', docId).select('link_access, share_token').single();
+  if (error) throw error;
+  return data as { link_access: 'lichen' | 'anyone' | null; share_token: string | null };
+}
+
+/** The address to send: members open the doc itself; "anyone" opens the
+ *  read-only public page. */
+export function docShareUrl(doc: Pick<ChatDocRow, 'id' | 'link_access' | 'share_token'>): string {
+  const origin = window.location.origin;
+  return doc.link_access === 'anyone' && doc.share_token ? `${origin}/d/${doc.share_token}` : `${origin}/docs/${doc.id}`;
+}
+
+/** Docs other members shared with me, newest first. */
+export async function listDocsSharedWithMe(): Promise<(ChatDocRow & { owner_name: string; level: ShareLevel })[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data: sh } = await supabase.from('chat_doc_shares').select('doc_id, level').eq('profile_id', user.id);
+  const rows = (sh ?? []) as { doc_id: string; level: ShareLevel }[];
+  if (!rows.length) return [];
+  const { data } = await supabase.from('chat_docs')
+    .select(DOC_COLS + ', owner:profiles!chat_docs_created_by_fkey(full_name)')
+    .in('id', rows.map((r) => r.doc_id)).order('updated_at', { ascending: false });
+  return ((data ?? []) as unknown as (ChatDocRow & { owner: { full_name: string | null } | null })[])
+    .map((d) => ({ ...d, owner_name: d.owner?.full_name ?? 'A member', level: rows.find((r) => r.doc_id === d.id)?.level ?? 'view' }));
 }

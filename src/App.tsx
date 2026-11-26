@@ -17,6 +17,7 @@ import Directory from './routes/Directory';
 import IdentityPage, { IdentitiesDirectory } from './routes/Identities';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
+import SharedDoc from './routes/SharedDoc';
 import ChatDocPage from './routes/ChatDocPage';
 import ChatRoomDrive from './routes/ChatRoomDrive';
 import Donate from './routes/Donate';
@@ -110,7 +111,7 @@ function BookGate() {
     : <BookPublic />;
 }
 
-const GATE_EXEMPT = ['/login', '/signup', '/intro', '/invite/decline', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/p', '/book', '/about'];
+const GATE_EXEMPT = ['/login', '/signup', '/intro', '/invite/decline', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/p', '/d', '/book', '/about'];
 
 /** Client-side "/" for signed-out visitors → the static marketing homepage. */
 function GoWelcome() {
@@ -152,7 +153,7 @@ export default function App() {
   // bottom with drive highlighted") — it keeps the TopBar + bottom nav.
   const isChatThread = /^\/chat\/[^/]+/.test(pathname) && !/^\/chat\/[^/]+\/drive/.test(pathname);
   const isAuth = pathname === '/login' || pathname === '/signup' || pathname === '/intro' || pathname === '/onboarding' || pathname === '/invite/decline';
-  const isGuest = pathname.startsWith('/e/') || pathname.startsWith('/b/') || pathname.startsWith('/p/');   // external guest landing — no app chrome
+  const isGuest = pathname.startsWith('/e/') || pathname.startsWith('/b/') || pathname.startsWith('/p/') || pathname.startsWith('/d/');   // external guest landing — no app chrome
   // A NAKED-SITE rendering — embed pane, ?preview=1, or a colour trial (one
   // shared decision, src/lib/siteView.ts — founder 2026-09-09 after the
   // builder's Preview showed the side nav and bone ground). The chrome
@@ -548,6 +549,7 @@ export default function App() {
           <Route path="/events/:postId" element={<VanityRoute area="events" scoped={SECTION_EL.events} />} />
           <Route path="/events/:param/:slug" element={<VanityRoute area="events" />} />
           <Route path="/e/:token" element={<GuestEvent />} />
+          <Route path="/d/:token" element={<SharedDoc />} />
           <Route path="/p/:token" element={<GuestPost />} />
           <Route path="/about" element={<StaticAboutRedirect />} />
           {/* OFFLINE WHILE THEY'RE MADE BETTER (founder 2026-08-25: "don't

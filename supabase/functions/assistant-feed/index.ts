@@ -903,6 +903,53 @@ Deno.serve(async (req) => {
     briefContext += `\n\n[They attached an email thread from Mail: "${String(mailRefAtt.subject ?? '').slice(0, 200)}" from ${String(mailRefAtt.from ?? '').slice(0, 200)} — inbox ${String(mailRefAtt.account ?? '').slice(0, 120)}, thread_id ${String(mailRefAtt.thread_id).slice(0, 80)}. Read it with read_mail (that account and thread_id) before answering; their words above are their context about it.]`;
   }
 
+  // A DOC ATTACHED FROM THE DOC ITSELF (founder 2026-11-26: "i want to be
+  // able to ask claude a question, like, how much butter do I add again? And
+  // have it scan the recipe and reply"): the doc_ctx card names a doc; we
+  // read it HERE, only if this member may open it and its AI switches allow,
+  // and fold its words into the trigger. voice=true means the reply will be
+  // read aloud while their hands are busy.
+  const docAtt = (Array.isArray(trigger?.attachments) ? trigger.attachments : [])
+    .find((a: { type?: string; doc_id?: string }) => a?.type === 'doc_ctx' && typeof a.doc_id === 'string') as
+    { doc_id: string; voice?: boolean } | undefined;
+  if (docAtt && /^[0-9a-f-]{36}$/i.test(docAtt.doc_id)) {
+    try {
+      const d = ((await (await sb(`chat_docs?id=eq.${docAtt.doc_id}&select=id,kind,title,body,data,chat_id,created_by,link_access,ai_enabled`)).json()) ?? [])[0] as
+        { id: string; kind: string; title: string; body: string | null; data: Record<string, unknown> | null; chat_id: string | null; created_by: string; link_access: string | null; ai_enabled: boolean } | undefined;
+      let ok = false, why = '';
+      if (d) {
+        if (d.chat_id) {
+          const mem = ((await (await sb(`chat_members?chat_id=eq.${d.chat_id}&profile_id=eq.${profile_id}&select=profile_id`)).json()) ?? []).length > 0;
+          const room = ((await (await sb(`chats?id=eq.${d.chat_id}&select=assistant_enabled`)).json()) ?? [])[0] as { assistant_enabled?: boolean } | undefined;
+          ok = mem && d.ai_enabled && room?.assistant_enabled !== false;
+          if (mem && !ok) why = 'its room or its creator keeps it away from every assistant';
+        } else {
+          const shared = d.created_by === profile_id
+            || ((await (await sb(`chat_doc_shares?doc_id=eq.${d.id}&profile_id=eq.${profile_id}&select=profile_id`)).json()) ?? []).length > 0
+            || !!d.link_access;
+          ok = shared && !(await assistantConsentOff(profile_id, [{ type: 'section', id: 'saved' }]));
+          if (shared && !ok) why = 'their Drive AI switch is off (Profile → Privacy)';
+        }
+      }
+      if (d && ok) {
+        let text = '';
+        const data = d.data ?? {};
+        if (d.kind === 'sheet') {
+          const sheets = (data.sheets as { name: string; cells: string[][] }[] | undefined) ?? [{ name: 'Sheet1', cells: (data.cells as string[][]) ?? [] }];
+          text = sheets.map((t) => `# ${t.name}\n` + t.cells.map((r) => r.join('\t')).join('\n')).join('\n\n');
+        } else if (d.kind === 'slides') {
+          text = ((data.slides as { title?: string; body?: string; body2?: string; notes?: string }[] | undefined) ?? [])
+            .map((sl, i) => `Slide ${i + 1}: ${sl.title ?? ''}\n${sl.body ?? ''}${sl.body2 ? '\n' + sl.body2 : ''}${sl.notes ? '\nNotes: ' + sl.notes : ''}`).join('\n\n');
+        } else text = d.body ?? '';
+        const noun = d.kind === 'sheet' ? 'spreadsheet' : d.kind === 'slides' ? 'presentation' : 'doc';
+        briefContext += `\n\n[They are looking at their ${noun} «${d.title}» right now and asked about it. Answer from what it says — quote amounts, steps and times exactly as written; if it doesn't say, say so plainly, then offer what you know. Here it is:\n<<<\n${text.slice(0, 14000)}\n>>>]`;
+        if (docAtt.voice) briefContext += `\n\n[VOICE: your reply will be READ ALOUD — their hands are busy (cooking, working). Answer in one to three short spoken sentences, the answer first. No lists, headings, links or symbols.]`;
+      } else if (d && why) {
+        briefContext += `\n\n[They asked about a doc, but you can't read it — ${why}. Say that plainly in one sentence.]`;
+      }
+    } catch (e) { console.error('doc-ctx', e); }
+  }
+
   // A SPACE'S BUILD THREAD (founder 2026-08-22): thread `space:<uuid>` — the
   // member's own private rows, ABOUT a space. The space id comes from the
   // thread name, never from the model, so the tools below still take no

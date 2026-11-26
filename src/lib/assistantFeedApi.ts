@@ -440,6 +440,9 @@ export async function postToAssistantFeed(
   briefCtx?: { section: string; text: string },
   /** An email thread attached from Mail (founder 2026-11-14). */
   mailRef?: { account_id: string; account: string; thread_id: string; subject: string; from: string },
+  /** A doc asked about from the doc itself (founder 2026-11-26); voice =
+   *  the reply will be read aloud. The server reads the doc, never the client. */
+  docCtx?: { doc_id: string; title: string; voice?: boolean },
 ): Promise<FeedPostRow> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
@@ -452,6 +455,7 @@ export async function postToAssistantFeed(
       ? [{ type: 'brief_ctx', section: briefCtx.section, text: briefCtx.text.slice(0, 2000) } as const]
       : []),
     ...(mailRef ? [{ type: 'mailref', ...mailRef, subject: mailRef.subject.slice(0, 200), from: mailRef.from.slice(0, 200) } as const] : []),
+    ...(docCtx ? [{ type: 'doc_ctx', doc_id: docCtx.doc_id, title: docCtx.title.slice(0, 160), voice: !!docCtx.voice } as const] : []),
   ];
   const { data, error } = await supabase.from('assistant_feed_posts').insert({
     profile_id: user.id, author: 'member', body,

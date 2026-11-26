@@ -56,6 +56,7 @@ export type IconName =
   | 'merkaba'
   | 'message'
   | 'mic'
+  | 'speaker'
   | 'newsfeed'
   | 'more-horizontal'
   | 'grip'
@@ -323,6 +324,11 @@ const ICONS: Record<IconName, IconEntry> = {
     viewBox: '0 0 24 24',
     strokeWidth: 1.6,
     content: <><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" /></>,
+  },
+  'speaker': {
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.6,
+    content: <><path d="M3.5 9.5h3.5L11.5 5.5v13L7 14.5H3.5z" /><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a7.5 7.5 0 0 1 0 11" /></>,
   },
   'more-horizontal': {
     viewBox: '0 0 24 24',

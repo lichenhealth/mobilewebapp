@@ -288,6 +288,18 @@
  "chatDocsApi:retractVote": {
   "gap": "3"
  },
+ "chatDocsApi:shareDoc": {
+  "gap": "2",
+  "note": "sharing a doc reaches another person — a confirm-card share tool is the next rung (2026-11-26)"
+ },
+ "chatDocsApi:unshareDoc": {
+  "gap": "2",
+  "note": "pairs with the share tool"
+ },
+ "chatDocsApi:setDocLink": {
+  "gap": "2",
+  "note": "opening a doc's link widens who can read it — confirm-card rung"
+ },
  "chatDocsApi:createPersonalDoc": {
   "tool": "drive_doc (create/update personal docs, spreadsheets, presentations)"
  },

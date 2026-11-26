@@ -18,6 +18,10 @@ import SlidesEditor from '../components/office/SlidesEditor';
 import { aiDoorOn } from '../components/AssistantDoor';
 import { PageHead } from '../components/PageHead';
 import DocComments, { useDocComments } from '../components/office/DocComments';
+import DocSharePanel from '../components/office/DocSharePanel';
+import DocVoice from '../components/office/DocVoice';
+import DocReader from '../components/office/DocReader';
+import { unshareDoc, listDocShares } from '../lib/chatDocsApi';
 import { cellMark, firstName, peerColor, type Anchor, type Goto, type Peer } from '../components/office/collab';
 import './ChatDocs.css';
 
@@ -46,6 +50,11 @@ export default function ChatDocPage() {
   const [msg, setMsg] = useState('');
   const [fileMenu, setFileMenu] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+  // SHARING + CLAUDE IN THE DOC (founder 2026-11-26).
+  const [shareOpen, setShareOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(() => new URLSearchParams(window.location.search).get('claude') === '1');
+  const [myLevel, setMyLevel] = useState<'owner' | 'edit' | 'view' | 'link' | null>(null);
+  const [shareCount, setShareCount] = useState(0);
   type Patch = { title?: string; body?: string | null; data?: ChatDocRow['data'] };
   const pending = useRef<Patch | null>(null);
   const docRef = useRef<string | null>(null);
@@ -86,7 +95,20 @@ export default function ChatDocPage() {
       setTheme(d.data?.theme ?? 'paper');
       lastSent.current = stable(d.data ?? null);
       baseTabs.current = d.data?.sheets?.length ? JSON.parse(JSON.stringify(d.data.sheets)) : [{ name: 'Sheet1', cells: (d.data?.cells ?? [['']]).map((r) => [...r]) }];
-      if (!d.chat_id) { setRoom(null); return; }
+      if (!d.chat_id) {
+        setRoom(null);
+        if (d.created_by === me) {
+          setMyLevel('owner');
+          void listDocShares(d.id).then((r) => { if (active) setShareCount(r.length); });
+        } else {
+          const { data: sh } = await supabase.from('chat_doc_shares').select('level').eq('doc_id', d.id).eq('profile_id', me).maybeSingle();
+          if (!active) return;
+          setMyLevel(((sh as { level: 'view' | 'edit' } | null)?.level) ?? 'link');
+          const { data: o } = await supabase.from('profiles').select('full_name').eq('id', d.created_by).maybeSingle();
+          if (active) setNames((n) => ({ ...n, [d.created_by]: (o as { full_name: string | null } | null)?.full_name ?? 'A member' }));
+        }
+        return;
+      }
       const [{ data: c }, { data: m }] = await Promise.all([
         supabase.from('chats')
           .select('topic, title, room_space:spaces!chats_space_id_fkey(id, name)')
@@ -209,12 +231,22 @@ export default function ChatDocPage() {
   if (doc === 'gone') {
     return (
       <div className="cdocp">
-        <p className="cdocp__missing">That item doesn&rsquo;t exist, or you&rsquo;re not in its room.</p>
+        <p className="cdocp__missing">That item doesn&rsquo;t exist, or it isn&rsquo;t shared with you.</p>
       </div>
     );
   }
   if (!doc) return <div className="cdocp"><p className="cdocp__missing">Loading…</p></div>;
 
+  const personal = !doc.chat_id;
+  const isOwner = personal && doc.created_by === me;
+  const canEdit = !personal || isOwner || myLevel === 'edit';
+  const ownerName = names[doc.created_by] ?? 'a member';
+  const accessWord = !personal ? null
+    : isOwner
+      ? (doc.link_access === 'anyone' ? 'Anyone with the link can view'
+        : doc.link_access === 'lichen' ? `Anyone on Lichen with the link${shareCount ? ` · shared with ${shareCount}` : ''}`
+        : shareCount ? `Shared with ${shareCount} ${shareCount === 1 ? 'person' : 'people'}` : 'Private — only you')
+      : `Shared by ${ownerName} · ${myLevel === 'edit' ? 'you can edit' : 'view only'}`;
   const saveWith = (patch: Patch) => queue(patch);
   const dataNow = (over: Partial<NonNullable<ChatDocRow['data']>>) => ({ ...(doc.data ?? {}), ...over });
   const onTitle = (v: string) => {
@@ -259,7 +291,7 @@ export default function ChatDocPage() {
           </button>
         ) : (
           <span className="cdocp__drivelink" style={{ textDecoration: 'none', cursor: 'default' }}>
-            Private — only you
+            {accessWord}
           </span>
         )}
       </div>
@@ -272,7 +304,7 @@ export default function ChatDocPage() {
         <>
           <div className="cdocp__titlerow">
             <input
-              className="cdocp__title" value={title} maxLength={120}
+              className="cdocp__title" value={title} maxLength={120} readOnly={!canEdit}
               onChange={(e) => onTitle(e.target.value)}
               onBlur={() => { if (!title.trim()) setTitle(doc.title); }}
               aria-label="Title"
@@ -282,9 +314,11 @@ export default function ChatDocPage() {
               {fileMenu && (
                 <div className="sheet__menu cdocp__filemenu" onMouseLeave={() => setFileMenu(false)}>
                   <button onClick={() => void makeCopy()}>Make a copy</button>
-                  {!doc.chat_id && <button onClick={() => { setFileMenu(false); openPicker(doc.id, 'doc'); }}>Add to a folder…</button>}
+                  {personal && <button onClick={() => { setFileMenu(false); setShareOpen(true); }}>Share…</button>}
+                  {isOwner && <button onClick={() => { setFileMenu(false); openPicker(doc.id, 'doc'); }}>Add to a folder…</button>}
                   <button onClick={() => { setFileMenu(false); window.print(); }}>Print / save as PDF</button>
-                  <button className="is-danger" onClick={() => { setFileMenu(false); setConfirmDel(true); }}>{doc.chat_id ? 'Delete…' : 'Move to trash…'}</button>
+                  {(!personal || isOwner) && <button className="is-danger" onClick={() => { setFileMenu(false); setConfirmDel(true); }}>{doc.chat_id ? 'Delete…' : 'Move to trash…'}</button>}
+                  {personal && !isOwner && myLevel !== 'link' && <button onClick={async () => { setFileMenu(false); await unshareDoc(doc.id, me); navigate('/drive'); }}>Remove it from my Drive</button>}
                 </div>
               )}
             </div>
@@ -300,24 +334,40 @@ export default function ChatDocPage() {
                   <span className="cdocp__peerword">{peers.length === 1 ? `${firstName(peers[0].name)} is here` : `${peers.length} others here`}</span>
                 </span>
               )}
+              {personal && (
+                <button className="cdocp__cbtn cdocp__sharebtn" onClick={() => setShareOpen(true)}>Share</button>
+              )}
+              <button className={'cdocp__cbtn' + (voiceOpen ? ' is-on' : '')} onClick={() => setVoiceOpen((v) => !v)} aria-label="Claude — ask about this, or have it read to you">
+                <Icon name="brain" size={14} /> Claude
+              </button>
               <button className={'cdocp__cbtn' + (commentsOpen ? ' is-on' : '')} onClick={() => setCommentsOpen((v) => !v)}>
                 💬 Comments{openRoots.length ? ` · ${openRoots.length}` : ''}
               </button>
             </span>
           </div>
-          {doc.kind === 'doc' && (
+          {!canEdit && (
+            <DocReader kind={doc.kind} html={html} sheets={tabs} slides={slides} theme={theme} />
+          )}
+          {canEdit && doc.kind === 'doc' && (
             <DocEditor html={html} title={title} onChange={onDoc} chatId={doc.chat_id} onAnchor={onAnchor} goto={goto} remote={remote}
               placeholder={doc.chat_id ? 'Write here — everyone in the room can read and edit this.' : 'Write here — this lives in your Drive, yours alone.'} />
           )}
-          {doc.kind === 'sheet' && <SheetEditor tabs={tabs} onChange={onSheet} title={title} onAnchor={onAnchor} marks={cellMarks} peers={peers} goto={goto} />}
-          {doc.kind === 'slides' && <SlidesEditor slides={slides} theme={theme} onChange={onSlides} title={title} chatId={doc.chat_id} onAnchor={onAnchor} marks={slideMarks} peers={peers} goto={goto} />}
+          {canEdit && doc.kind === 'sheet' && <SheetEditor tabs={tabs} onChange={onSheet} title={title} onAnchor={onAnchor} marks={cellMarks} peers={peers} goto={goto} />}
+          {canEdit && doc.kind === 'slides' && <SlidesEditor slides={slides} theme={theme} onChange={onSlides} title={title} chatId={doc.chat_id} onAnchor={onAnchor} marks={slideMarks} peers={peers} goto={goto} />}
           {commentsOpen && (
             <DocComments docId={doc.id} me={me} rows={comments} setRows={setComments} anchor={anchor}
               onGoto={jump} onClose={() => setCommentsOpen(false)} focusId={sp.get('comment')} />
           )}
         </>
       )}
-      <div className="cdocp__settings">
+      {shareOpen && (
+        <DocSharePanel doc={doc} me={me} onClose={() => { setShareOpen(false); if (isOwner) void listDocShares(doc.id).then((r) => setShareCount(r.length)); }}
+          onLink={(v) => setDoc((cur) => (cur && cur !== 'gone' ? { ...cur, ...v } : cur))} />
+      )}
+      {voiceOpen && doc.kind !== 'poll' && (
+        <DocVoice doc={doc} html={html} body={body} onClose={() => setVoiceOpen(false)} />
+      )}
+      {(!personal || isOwner) && <div className="cdocp__settings">
         {doc.chat_id ? (
           <label className="thread__docpanel-ai">
             <input type="checkbox" checked={doc.ai_enabled} onChange={(e) => void flipAi(e.target.checked)} />
@@ -343,7 +393,7 @@ export default function ChatDocPage() {
         ) : (
           <button className="cdocp__del" onClick={() => setConfirmDel(true)}>{doc.chat_id ? 'Delete' : 'Move to trash'}</button>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

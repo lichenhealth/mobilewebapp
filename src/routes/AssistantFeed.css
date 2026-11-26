@@ -599,3 +599,9 @@
 /* While Delete asks, Rename steps aside so the title keeps its room. */
 .afeed__convo-titlerow:has(.afeed__convo-del.is-armed) .afeed__convo-rename:not(.afeed__convo-del) { display: none; }
 .afeed__entry { scroll-margin-top: calc(var(--top-h, 64px) + 12px); }
+/* READ ALOUD (2026-11-26) — any reply can be heard, voice mode or not. */
+.afeed__readaloud {
+  margin-left: auto; border: 0; background: transparent; cursor: pointer; padding: 2px 4px;
+  display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 11px; color: var(--peach-deep);
+}
+.afeed__readaloud:hover { text-decoration: underline; }

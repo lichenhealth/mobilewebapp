@@ -185,3 +185,15 @@
 .cdocp__peerword { margin-left: 6px; }
 .cdocp__cbtn { border: 1px solid var(--bone-edge); background: #fff; border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12px; cursor: pointer; color: var(--ink-soft); }
 .cdocp__cbtn.is-on, .cdocp__cbtn:hover { border-color: var(--peach); color: var(--peach-deep); }
+/* SHARE + CLAUDE IN THE DOC (2026-11-26) */
+.cdocp__cbtn { display: inline-flex; align-items: center; gap: 5px; }
+.cdocp__sharebtn { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
+/* /d/<token> — the open-web page of a doc (2026-11-26). */
+.sdoc { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; box-sizing: border-box; }
+.sdoc__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+.sdoc__brand { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display, serif); font-size: 20px; color: var(--ink); text-decoration: none; }
+.sdoc__inside { font-size: 14px; color: var(--peach-deep); }
+.sdoc__title { font-family: var(--font-display, serif); font-weight: 400; font-size: 34px; margin: 0 0 6px; line-height: 1.15; }
+.sdoc__by { margin: 0 0 16px; font-size: 13px; color: var(--ink-muted); }
+.sdoc__foot { margin-top: 32px; font-size: 13px; color: var(--ink-muted); text-wrap: pretty; }
+.sdoc__foot a { color: var(--peach-deep); }

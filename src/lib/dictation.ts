@@ -20,7 +20,11 @@ export function speechRecognition(): (new () => SpeechRecognitionLike) | null {
   // iPadOS masquerades as MacIntel — the touch-points check catches it.
   const iOS = /iP(hone|ad|od)/.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (iOS) return null;
+  // The hang is the INSTALLED app's; Safari itself listens fine (2026-11-26,
+  // voice mode), so only a standalone iOS web app is refused.
+  const standalone = window.matchMedia?.('(display-mode: standalone)').matches
+    || (navigator as unknown as { standalone?: boolean }).standalone === true;
+  if (iOS && standalone) return null;
   const w = window as unknown as {
     webkitSpeechRecognition?: new () => SpeechRecognitionLike;
     SpeechRecognition?: new () => SpeechRecognitionLike;
