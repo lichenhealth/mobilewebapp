@@ -33,7 +33,8 @@ export async function twilioGet(c: TwilioCreds, path: string): Promise<Record<st
     headers: { Authorization: 'Basic ' + btoa(`${c.key_sid}:${c.key_secret}`) },
     signal: AbortSignal.timeout(12000),
   });
-  if (res.status === 401 || res.status === 403) throw new Error('Twilio didn’t accept those keys — the key may have been deleted or the Account SID doesn’t match.');
+  if (res.status === 401) throw new Error('Twilio didn’t accept those keys. Usually the secret doesn’t belong to that key (Twilio shows a secret only once, when the key is made), or the key was made under a different account or subaccount than the Account SID, or in a region other than United States (US1). Making a fresh Standard key under the same account fixes all three.');
+  if (res.status === 403) throw new Error('Twilio recognised the key but won’t let it read your account. It’s probably a Restricted key. Make a Standard key instead.');
   if (!res.ok) throw new Error(`Twilio answered ${res.status}.`);
   return await res.json();
 }
