@@ -18,6 +18,7 @@ import IdentityPage, { IdentitiesDirectory } from './routes/Identities';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import GlobalWake from './components/GlobalWake';
+import LocalSpeechChoice from './components/LocalSpeechChoice';
 import Handoff from './routes/Handoff';
 import SharedDoc from './routes/SharedDoc';
 import ChatDocPage from './routes/ChatDocPage';
@@ -587,6 +588,7 @@ export default function App() {
       {!isAuth && !isGuest && !isEmbed && <GuestGate />}
       {!isEmbed && <InstallGuide />}
       {!isEmbed && !isGuest && <GlobalWake />}
+      {!isEmbed && <LocalSpeechChoice />}
       {!isGuest && !isEmbed && <AccountMismatch />}
       {/* The docked desktop rail is app chrome too — it stands down with the
           rest on a naked-site rendering (founder 2026-09-09: the builder's

@@ -20,6 +20,7 @@ const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 const subscribe = (f: () => void) => { subs.add(f); return () => { subs.delete(f); }; };
 const set = (s: Partial<Status>) => { status = { ...status, ...s }; emit(); };
+export const localSpeechStatusNow = () => status.state;
 export const useLocalSpeechStatus = () => useSyncExternalStore(subscribe, () => status, () => status);
 
 const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -142,28 +143,49 @@ function to16k(chunks: Float32Array[], rate: number): Float32Array {
   return out;
 }
 
-/** Listen for one phrase on this device. Same contract as startDictation:
- *  onPhrase with the whole phrase, onEnd exactly once. */
+/** Listen on this device. Same contract as startDictation: onPhrase with
+ *  the WHOLE text so far, onEnd exactly once.
+ *  One-phrase mode (voice conversations, the wake loop) ends at the first
+ *  pause. CONTINUOUS mode (plain voice-to-text — founder 2026-11-26: "it
+ *  stopped recording the stuff I said after that") keeps listening until
+ *  stop(): each short pause turns that stretch into words right away, so
+ *  text appears as you go instead of all at the end. */
 export function startLocalListening(opts: {
-  onPhrase: (p: string) => void; onEnd: () => void; background?: boolean;
+  onPhrase: (p: string) => void; onEnd: () => void; background?: boolean; continuous?: boolean;
   onState?: (s: 'listening' | 'hearing' | 'thinking') => void;
 }): { stop: () => void } {
   let ended = false, stopped = false;
   const end = () => { if (ended) return; ended = true; listeners.delete(onFrame); closeMicSoon(); opts.onEnd(); };
-  const chunks: Float32Array[] = []; const pre: Float32Array[] = [];
+  const cont = !!opts.continuous && !opts.background;
+  let chunks: Float32Array[] = []; const pre: Float32Array[] = [];
   let speaking = false, silentMs = 0, spokenMs = 0, waitedMs = 0, floor = 0.006;
   const rate = () => ctx?.sampleRate ?? 48000;
-  const maxWait = opts.background ? 12000 : 8000;
-  const tailMs = opts.background ? 900 : 1500;
-  const finish = async () => {
+  // Continuous: a long idle (a minute with nothing said) ends it; a short
+  // pause (0.7s) cuts a stretch so its words show up quickly.
+  const maxWait = cont ? 60000 : opts.background ? 12000 : 8000;
+  const tailMs = cont ? 700 : opts.background ? 900 : 1500;
+  const maxSpoken = cont ? 12000 : 20000;
+  let said = '';
+  let queue: Promise<void> = Promise.resolve();
+  let pending = 0;
+  const cut = () => {
+    const audio = (speaking && spokenMs >= 300) ? to16k(chunks, rate()) : null;
+    chunks = []; speaking = false; silentMs = 0; spokenMs = 0; waitedMs = 0;
+    if (!audio) return;
+    pending++; opts.onState?.('thinking');
+    queue = queue.then(async () => {
+      try {
+        const text = clean(await transcribe(audio));
+        if (text && !ended) { said = said ? said + ' ' + text : text; opts.onPhrase(said); }
+      } catch (err) { console.warn('[on-device listening]', err); /* an error is silence, not words */ }
+      pending--;
+      if (!ended && !stopped && pending === 0) opts.onState?.('listening');
+    });
+  };
+  const finish = () => {
     listeners.delete(onFrame);
-    if (!speaking || spokenMs < 300) { end(); return; }
-    opts.onState?.('thinking');
-    try {
-      const text = clean(await transcribe(to16k(chunks, rate())));
-      if (text && !ended) opts.onPhrase(text);
-    } catch (err) { console.warn('[on-device listening]', err); /* an error is silence, not words */ }
-    end();
+    cut();
+    void queue.then(end);
   };
   const onFrame = (f: Float32Array) => {
     if (ended) return;
@@ -172,16 +194,19 @@ export function startLocalListening(opts: {
     const rms = Math.sqrt(sum / f.length);
     const loud = rms > Math.max(0.012, floor * 3);
     if (!loud) floor = floor * 0.95 + rms * 0.05;
+    if (stopped) { finish(); return; }
     if (!speaking) {
       pre.push(f); if (pre.length > 3) pre.shift();
       waitedMs += ms;
       if (loud) { speaking = true; chunks.push(...pre); opts.onState?.('hearing'); }
-      else if (waitedMs > maxWait || stopped) { void finish(); }
+      else if (waitedMs > maxWait) finish();
       return;
     }
     chunks.push(f);
     if (loud) { spokenMs += ms; silentMs = 0; } else silentMs += ms;
-    if (silentMs > tailMs || spokenMs > 20000 || stopped) void finish();
+    if (silentMs > tailMs || spokenMs > maxSpoken) {
+      if (cont) cut(); else finish();
+    }
   };
   void (async () => {
     try {
@@ -194,9 +219,11 @@ export function startLocalListening(opts: {
   })();
   return {
     stop: () => {
+      if (stopped) return;
       stopped = true;
       // Stopping mid-phrase still turns what was said into words.
-      if (!speaking) end();
+      if (!speaking && pending === 0) { listeners.delete(onFrame); end(); }
+      else if (!speaking) { listeners.delete(onFrame); void queue.then(end); }
     },
   };
 }
