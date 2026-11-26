@@ -140,22 +140,24 @@
 .abrief__card { position: relative; }
 .abrief__card.is-clamped { overflow: hidden; }
 .abrief__card.is-folded { cursor: pointer; }
-/* Phones: three lines of the summary, then the caret (2026-11-26). */
-.abrief__card.is-clamped.is-short { max-height: 112px; }
-.abrief__card.is-folded::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
-  background: linear-gradient(to bottom, transparent, var(--bone-warm, #fff) 78%);
-  border-radius: 0 0 16px 6px; pointer-events: none;
-}
+/* Phones: the WORDS fold inside the bubble (2026-11-26, second pass —
+   "choppy and ugly"): three lines, the last one fading out by a mask (so it
+   fades to nothing over any background, never a painted band), and the
+   caret centered at the bubble's foot. The bubble keeps its whole edge. */
+.abrief__card.is-clamped.is-short { max-height: none; overflow: visible; }
 .abrief__card.is-folded .abrief__updated { display: none; }
+.abrief__card.is-clamped .abrief__sumtext { max-height: calc(15px * 1.65 * 3); overflow: hidden; }
+.abrief__card.is-folded .abrief__sumtext {
+  -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+}
 .abrief__card .abrief__sumfold {
-  position: absolute; right: 10px; bottom: 8px; z-index: 1;
-  width: 30px; height: 30px; border-radius: 50%;
-  border: 1px solid var(--peach); background: #fff; color: var(--peach-deep);
-  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  margin: 6px auto 0; padding: 4px 12px; border-radius: 999px;
+  border: 0; background: none; font: inherit; font-size: 13px;
+  color: var(--peach-deep); cursor: pointer;
 }
 .abrief__sumfold svg { transform: rotate(90deg); transition: transform 0.15s; }
-.abrief__card .abrief__sumfold.is-open { position: static; float: right; margin-top: 6px; }
 .abrief__sumfold.is-open svg { transform: rotate(-90deg); }
 .abrief__sumfold:hover { background: var(--peach-tint); }
 /* THE LAST CONVERSATION STANDS OPEN (founder 2026-11-26). */
@@ -194,8 +196,6 @@
   background: #fff; border: 1px solid var(--bone-edge);
   border-radius: 4px 16px 16px 16px; padding: 14px 16px; max-width: 100%;
 }
-.abrief__pane .abrief__card.is-clamped.is-short { max-height: 118px; }
-.abrief__pane .abrief__card.is-folded::after { background: linear-gradient(to bottom, transparent, var(--bone-warm, #f6f1e7) 80%); border-radius: 0; }
 .abrief__last { padding: 2px; }
 .abrief__pane--last .abrief__panebody { max-height: 360px; }
 .abrief__lastempty { margin: auto 0; padding: 24px 8px; text-align: center; font-size: 14px; color: var(--ink-faint); }

@@ -272,6 +272,7 @@ export default function AssistantBrief() {
   // fold"): at ≥1024 the summary bubble is clamped to the ask box's height;
   // the caret or a tap on the words opens it whole. Phones unchanged.
   const cardRef = useRef<HTMLDivElement>(null);
+  const sumTextRef = useRef<HTMLDivElement>(null);
   const [wideSplit, setWideSplit] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)');
@@ -288,7 +289,9 @@ export default function AssistantBrief() {
   const sumClamped = !sumOpen && !wideSplit;
   useEffect(() => {
     if (!sumClamped) return;
-    const el = cardRef.current;
+    // Measure the WORDS, folded inside the bubble (2026-11-26: the card
+    // itself used to clip and scroll, cutting the bubble's edge off).
+    const el = sumTextRef.current;
     if (!el) return;
     const measure = () => setSumOverflows(el.scrollHeight > el.clientHeight + 2);
     measure();
@@ -1405,6 +1408,7 @@ export default function AssistantBrief() {
         }}
       >
         <div className="abrief__bubble">
+        <div ref={sumTextRef} className="abrief__sumtext">
         {!doorOn && (
           <p className="abrief__text">
             The assistant is <strong>off</strong> for this part of your Lichen life — nothing
@@ -1423,18 +1427,21 @@ export default function AssistantBrief() {
           <p className="abrief__text">The briefing isn&rsquo;t available right now — your bell and queues hold everything in the meantime.</p>
         )}
         </div>
+      {/* The caret sits centered at the bubble's foot, under the words it
+          opens (founder 2026-11-26: "in the wrong place"). */}
       {(sumOverflows || sumOpen) && !wideSplit && (
         <button
           type="button"
           className={'abrief__sumfold' + (sumOpen ? ' is-open' : '')}
-          onClick={() => setSumOpen((v) => !v)}
+          onClick={(e) => { e.stopPropagation(); setSumOpen((v) => !v); }}
           aria-expanded={sumOpen}
           aria-label={sumOpen ? 'Fold the summary' : 'Open the whole summary'}
-          data-tip={sumOpen ? 'Fold it back' : 'Read it all'}
         >
-          <Icon name="chevron-right" size={16} />
+          <span>{sumOpen ? 'Show less' : 'Read it all'}</span>
+          <Icon name="chevron-right" size={14} />
         </button>
       )}
+        </div>
       </div>
       {showRight ? (
         <AssistantComposer
