@@ -9,6 +9,7 @@ import {
 } from '../lib/practiceApi';
 import RevenueStreams from '../components/RevenueStreams';
 import './Practice.css';
+import { useHashScroll } from '../lib/useHashScroll';
 
 /** /practice — a provider's own payments ledger + superbills (founder
  *  2026-11-12). Owner-only; diagnosis codes are typed per superbill and
@@ -23,7 +24,8 @@ export default function Practice() {
   const [loaded, setLoaded] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState<Set<string>>(new Set([typeof window !== 'undefined' && window.location.hash === '#streams' ? 'streams' : 'import']));
+  const [open, setOpen] = useState<Set<string>>(new Set([typeof window !== 'undefined' && window.location.hash.length > 1 ? window.location.hash.slice(1) : 'import']));
+  useHashScroll((id) => setOpen((s) => (s.has(id) ? s : new Set(s).add(id))));
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const fileRef = useRef<HTMLInputElement>(null);
 

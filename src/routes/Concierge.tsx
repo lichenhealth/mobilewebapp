@@ -2215,7 +2215,7 @@ export default function Concierge() {
               <p className="conc__care-gate-sub">
                 Add caregivers from your profile. Once someone joins, your care-team chat opens here.
               </p>
-              <button className="btn btn-primary" onClick={() => navigate('/profile')}>
+              <button className="btn btn-primary" onClick={() => navigate('/profile#care-for')}>
                 Manage care team
               </button>
             </div>
