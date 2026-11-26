@@ -34,6 +34,15 @@ export function speechRecognition(): (new () => SpeechRecognitionLike) | null {
 
 export interface DictationSession { stop: () => void }
 
+// ONE EAR AT A TIME (2026-11-26, "Hey Brain" always listening): engines run
+// one recognition session per page. The always-on wake listener is a
+// BACKGROUND session; anything a person starts (a mic tap, voice mode) is
+// FOREGROUND and stops the background one first. The wake loop waits while
+// a foreground session is live.
+const background = new Set<DictationSession>();
+let foreground = 0;
+export const foregroundListening = () => foreground > 0;
+
 /** One dictation session, duplicate-proof — THE one way every mic button
  *  starts recognition (AssistantComposer, SnapshotPanel; a new surface
  *  joins it, never hand-rolls onresult).
@@ -55,16 +64,26 @@ export function startDictation(opts: {
   /** Fires exactly once, however the session ends (silence, stop, error,
    *  refused start never calls it — startDictation returns null then). */
   onEnd: () => void;
+  /** The always-on wake listener — yields to anything a person starts. */
+  background?: boolean;
 }): DictationSession | null {
   const Ctor = speechRecognition();
   if (!Ctor) return null;
+  if (opts.background && foreground > 0) return null;
+  if (!opts.background) for (const b of [...background]) b.stop();
   const rec = new Ctor();
   rec.lang = navigator.language || 'en-US';
   rec.interimResults = false;
   rec.continuous = false;
   rec.maxAlternatives = 1;
   let ended = false;
-  const end = () => { if (!ended) { ended = true; opts.onEnd(); } };
+  let session: DictationSession | null = null;
+  const end = () => {
+    if (ended) return;
+    ended = true;
+    if (opts.background) { if (session) background.delete(session); } else foreground = Math.max(0, foreground - 1);
+    opts.onEnd();
+  };
   rec.onresult = (e) => {
     const parts: string[] = [];
     for (let i = 0; i < e.results.length; i++) {
@@ -81,5 +100,7 @@ export function startDictation(opts: {
   // A refused start (mic permission, engine state) is "no session" — the
   // caller never lights the button for it.
   try { rec.start(); } catch { return null; }
-  return { stop: () => { try { rec.stop(); } catch { end(); } } };
+  session = { stop: () => { try { rec.stop(); } catch { end(); } } };
+  if (opts.background) background.add(session); else foreground++;
+  return session;
 }

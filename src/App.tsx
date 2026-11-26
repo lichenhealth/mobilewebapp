@@ -17,6 +17,7 @@ import Directory from './routes/Directory';
 import IdentityPage, { IdentitiesDirectory } from './routes/Identities';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
+import GlobalWake from './components/GlobalWake';
 import SharedDoc from './routes/SharedDoc';
 import ChatDocPage from './routes/ChatDocPage';
 import ChatRoomDrive from './routes/ChatRoomDrive';
@@ -583,6 +584,7 @@ export default function App() {
           doors land here — Sign in, or Request to join. */}
       {!isAuth && !isGuest && !isEmbed && <GuestGate />}
       {!isEmbed && <InstallGuide />}
+      {!isEmbed && !isGuest && <GlobalWake />}
       {!isGuest && !isEmbed && <AccountMismatch />}
       {/* The docked desktop rail is app chrome too — it stands down with the
           rest on a naked-site rendering (founder 2026-09-09: the builder's

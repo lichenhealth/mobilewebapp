@@ -4,6 +4,7 @@ import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
 import { speechRecognition, startDictation, type DictationSession } from '../lib/dictation';
 import { revealBelow } from '../lib/smartReveal';
+import VoiceSettings from './VoiceSettings';
 import { canListen, canSpeak, setVoiceOn, stopSpeaking, useSpeaking, useVoiceMode } from '../lib/voice';
 import './AssistantComposer.css';
 
@@ -267,6 +268,8 @@ export default function AssistantComposer({
           <Icon name="send" size={15} />
         </button>
       </div>
+      {/* With voice mode on, the always-listening choice sits right here. */}
+      {voice && <VoiceSettings compact />}
     </form>
   );
 }
