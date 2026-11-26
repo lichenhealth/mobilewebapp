@@ -466,7 +466,7 @@ const APP_DOORS: Record<string, { path: string; label: string }> = {
 };
 const SEND_APP_DOOR_TOOL = {
   name: 'send_app_door',
-  description: 'Hand the member a BUTTON that opens a part of Lichen — it renders under your reply and walks them there in one tap. Always pick the MOST SPECIFIC door — a Profile section's own door (connections, privacy…) over profile_settings — so they land with that part already open. Use it whenever they would otherwise get navigation directions ("go to Profile → …"): hand the door instead. Prefer DOING the work with your own tools when you can; the door is for when they want the manual screen, or for a surface you cannot act on.',
+  description: 'Hand the member a BUTTON that opens a part of Lichen — it renders under your reply and walks them there in one tap. Always pick the MOST SPECIFIC door — a Profile section’s own door (connections, privacy…) over profile_settings — so they land with that part already open. Use it whenever they would otherwise get navigation directions ("go to Profile → …"): hand the door instead. Prefer DOING the work with your own tools when you can; the door is for when they want the manual screen, or for a surface you cannot act on.',
   input_schema: {
     type: 'object',
     properties: { destination: { type: 'string', enum: Object.keys(APP_DOORS), description: 'Which door to hand them.' } },
