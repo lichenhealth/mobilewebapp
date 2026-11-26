@@ -19,7 +19,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { useActing } from '../acting/ActingProvider';
 import IconRow, { IconRowItem } from '../components/IconRow';
 import { FEED_LENSES } from './Home';
-import { aiDoorOn } from '../components/AssistantDoor';
+import AssistantDoor from '../components/AssistantDoor';
 import './Mycelium.css';
 import { loadSpaceNames } from '../lib/postsApi';
 
@@ -44,8 +44,6 @@ const FILTERS = ['All', 'Social', 'Actionable'];
 const MYC_TOOLS: IconRowItem[] = [
   { icon: 'search', label: 'Search', to: '/search' },
   { icon: 'plus',   label: 'Post',   to: '/compose' },
-  { icon: 'brain',  label: 'Assistant', to: '/assistant?section=mycelium',
-    variant: 'icon-row__btn--ai' },
 ];
 type Item = {
   key: string;
@@ -176,9 +174,10 @@ export default function Mycelium() {
       <IconRow
         className="icon-row--tools"
         ariaLabel="Tools"
+        // THE CIRCLE RULE (founder 2026-11-26, circling Home's brain): the
+        // shared door — one press turns AI on/off, the › tab walks in.
+        trailing={<AssistantDoor section="mycelium" />}
         items={MYC_TOOLS.map((it) => {
-          if (it.label === 'Assistant')
-            return { ...it, variant: `icon-row__btn--ai${aiDoorOn('mycelium') ? '' : ' ai-off'}` };
           // The + follows the lit lenses, Home's 2026-10-15 rule: Feed = plain
           // social compose, lit lenses = actionable with those areas preloaded.
           if (it.label === 'Post' && areaSel.size > 0)

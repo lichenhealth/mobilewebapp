@@ -20,7 +20,7 @@ import { setHidden } from '../lib/hiddenApi';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import './Home.css';
-import { aiDoorOn } from '../components/AssistantDoor';
+import AssistantDoor from '../components/AssistantDoor';
 import { loadSpaceNames } from '../lib/postsApi';
 import { useActing } from '../acting/ActingProvider';
 import { spacePresentCount, availableList } from '../lib/presenceApi';
@@ -89,8 +89,6 @@ const TOOL_ICONS: IconRowItem[] = [
   { icon: 'search', label: 'Search', to: '/search' },
   { icon: 'plus',   label: 'Post',   to: '/compose' },
   // Searching, posting, and thinking-with are one family (founder 2026-07-28).
-  { icon: 'brain',  label: 'Assistant', to: '/assistant?section=home',
-    variant: 'icon-row__btn--ai' },
 ];
 // THE SECTIONS ARE FEED LENSES NOW, MULTI-SELECT (founder 2026-10-12:
 // "feed being 'all' but clicking on sub sections as filtering the feed to
@@ -194,9 +192,10 @@ export default function Home() {
       <IconRow
         className="icon-row--tools"
         ariaLabel="Tools"
+        // THE CIRCLE RULE (founder 2026-11-26, circling Home's brain): the
+        // shared door — one press turns AI on/off, the › tab walks in.
+        trailing={<AssistantDoor section="home" />}
         items={TOOL_ICONS.map((it) => {
-          if (it.label === 'Assistant')
-            return { ...it, variant: `icon-row__btn--ai${aiDoorOn('home') ? '' : ' ai-off'}` };
           // The + follows the lit lenses (founder 2026-10-15: "a plus to feed
           // should be social default, all others should be actionable and have
           // where you came from pre-loaded") — Feed/All keeps the plain social
