@@ -205,6 +205,15 @@
   .abrief__split.has-two {
     display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch;
   }
-  .abrief__split.has-two .abrief__pane { height: min(680px, max(380px, calc(100vh - 500px))); }
+  .abrief__split.has-two .abrief__pane { height: min(680px, max(380px, calc(100vh - 550px))); }
   .abrief__split.has-two .abrief__panebody { flex: 1; max-height: none; }
 }
+
+/* New conversation leads the brief (2026-11-26). */
+.abrief__newrow { display: flex; margin: 0 0 var(--s-3); }
+.abrief__newbtn {
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 14px;
+  padding: 8px 16px; border-radius: 999px; border: 1px solid var(--peach);
+  background: var(--peach-tint); color: var(--peach-deep); cursor: pointer;
+}
+.abrief__newbtn:hover { background: #fff; }

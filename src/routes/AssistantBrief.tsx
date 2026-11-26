@@ -1365,6 +1365,23 @@ export default function AssistantBrief() {
           side at ≥1024 at one height; stacked on phones. A reply to the
           summary starts a fresh conversation carrying the summary; a reply
           on the right continues that conversation. */}
+      {/* NEW CONVERSATION LEADS (founder 2026-11-26: "New conversation within
+          the box for the old conversation seems weird… have new conversation
+          actually be at the top, above summary and above picking up your last
+          conversation"). */}
+      {!spaceParam && briefConvos.length > 0 && (
+        <div className="abrief__newrow">
+          {freshConvo ? (
+            <button type="button" className="abrief__newconvo abrief__newconvo--back" onClick={() => setFreshConvo(false)}>
+              ← Back to the last conversation
+            </button>
+          ) : (
+            <button type="button" className="abrief__newbtn" onClick={() => setFreshConvo(true)}>
+              <Icon name="plus" size={15} /> New conversation
+            </button>
+          )}
+        </div>
+      )}
       <div className={'abrief__split' + (showRight ? ' has-two' : '')}>
       <section className="abrief__pane abrief__pane--sum" aria-label="Your summary">
         <div className="abrief__panehead">
@@ -1442,15 +1459,6 @@ export default function AssistantBrief() {
       <section className="abrief__pane abrief__pane--last" aria-label={lastConvo ? 'Your last conversation' : 'A new conversation'}>
         <div className="abrief__panehead abrief__lasthead">
           <p className="abrief__convos-h">{lastConvo ? <>Your last conversation · <span className="abrief__lasttitle">{lastConvo.title}</span></> : 'New conversation'}</p>
-          {lastConvo ? (
-            <button type="button" className="abrief__newconvo" onClick={() => setFreshConvo(true)}>
-              <Icon name="plus" size={13} /> New conversation
-            </button>
-          ) : briefConvos.length > 0 && (
-            <button type="button" className="abrief__newconvo abrief__newconvo--back" onClick={() => setFreshConvo(false)}>
-              ← Back to the last conversation
-            </button>
-          )}
         </div>
         <div className="abrief__panebody abrief__last">
           {lastConvo ? (
