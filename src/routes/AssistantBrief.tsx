@@ -1438,6 +1438,7 @@ export default function AssistantBrief() {
       </div>
       {showRight ? (
         <AssistantComposer
+          key={params.get('ask') ?? 'blank'}
           secondary
           onSend={(t, imgs) => sendToClaude(t, imgs, 'summary')}
           uploaderId={me || undefined}

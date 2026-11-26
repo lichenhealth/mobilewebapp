@@ -9,6 +9,7 @@ import {
   canListen, canSpeak, listenOnce, pushWakeHandler, speak, stopSpeaking, useSpeaking,
 } from '../../lib/voice';
 import { isIosHomeScreenApp } from '../../lib/browserHandoff';
+import { ensureLocalSpeech, usesLocalSpeech } from '../../lib/dictation';
 import OpenInBrowser from '../OpenInBrowser';
 import '../VoiceSettings.css';
 import './DocVoice.css';
@@ -185,8 +186,8 @@ export default function DocVoice({ doc, html, body, onClose }: {
           {err && <p className="dvoice__note">{err}</p>}
           {canListen() ? (
             <label className="dvoice__hands">
-              <input type="checkbox" checked={handsFree} onChange={(e) => setHandsFree(e.target.checked)} />
-              <span><strong>Hands-free</strong> — say “Hey Brain” (or “Hey Claude”), then a question, or “next”, “back”, “repeat”. Listens only while this panel is open and your screen is on; your browser’s speech service turns what you say into words.</span>
+              <input type="checkbox" checked={handsFree} onChange={(e) => { if (!e.target.checked || ensureLocalSpeech()) setHandsFree(e.target.checked); }} />
+              <span><strong>Hands-free</strong> — say “Hey Brain” (or “Hey Claude”), then a question, or “next”, “back”, “repeat”. Listens only while this panel is open and your screen is on; {usesLocalSpeech() ? 'this device turns what you say into words itself — the audio never leaves it.' : 'your browser’s speech service turns what you say into words.'}</span>
             </label>
           ) : isIosHomeScreenApp() ? (
             <OpenInBrowser to={`/docs/${doc.id}?claude=1&hands=1`} flags={{ voice: "1" }}
