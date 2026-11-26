@@ -9,7 +9,7 @@ import MailRefCard, { type MailRef } from '../components/MailRefCard';
 import {
   threadForSection, loadAssistantFeed, latestConvoIn, groupConvos, loadConvoNames,
   postToAssistantFeed, CONVO_GAP_MS, type ConvoGroup, type FeedPostRow,
-  ASSISTANT_THREADS, BRAIN_RAIL, sectionIcon, sectionLabel, renameConvo, deleteConvo,
+  ASSISTANT_THREADS, BRAIN_RAIL, TOPIC_RAIL, loadTopicSections, sectionIcon, sectionLabel, renameConvo, deleteConvo,
   loadThreadCursors, markThreadRead, isSnagNote,
 } from '../lib/assistantFeedApi';
 import { ScrollHintRow } from '../components/ScrollHintRow';
@@ -83,6 +83,12 @@ const FRAMES: Record<string, { title: string; frame: string }> = {
   events: { title: 'Events', frame: 'You help them gather: invitations, RSVPs, what is coming up.' },
   membership: { title: 'Membership', frame: 'You help them steward their stake in the commons.' },
   maps: { title: 'The map', frame: 'You help them see what has appeared around them: places newly pinned, gatherings with a location coming up, and members who have put themselves on the map. Lead with what is NEW since they last looked, then what is worth going to. Never guess at distances you were not given.' },
+  // Food's brain (founder 2026-11-26) + the other AreaFeed rooms' doors.
+  food: { title: 'Food', frame: 'You help them cook and eat well: recipes they have kept, meals coming up, shopping lists to tick off, and food shared on Lichen — harvests, recipes, meals. You can digitize recipe photos into docs, publish recipes to Food, and put a shopping list on a calendar date as a checklist task (add_task with items).' },
+  travel: { title: 'Travel', frame: 'You help them get around and stay places within their web: rides, hauls, flights and stays they offer or seek.' },
+  art: { title: 'Art', frame: 'You help them share and find art made by members\' own hands.' },
+  work: { title: 'Work', frame: 'You help them find and offer work within their web.' },
+  library: { title: 'The Library', frame: 'You help them find and gather essays, guides and resources worth keeping.' },
   saved: { title: 'Your shelf', frame: 'You help them return to what they kept: saved pieces, collections worth organizing.' },
   profile: { title: 'Your presence', frame: 'You help them tend how they show up: profile, offerings, identity.' },
   // Doors found unframed in the 2026-09-13 audit — they fell back to the
@@ -656,6 +662,27 @@ export default function AssistantBrief() {
             .gte('created_at', weekAgo);
           if (count) extras.new_marketplace_listings_this_week = count;
         }
+        if (section === 'food') {
+          const [mine, others, lists] = await Promise.all([
+            supabase.from('posts').select('id, title, body, details, created_at').eq('author_id', me)
+              .contains('service_areas', ['food']).order('created_at', { ascending: false }).limit(12),
+            supabase.from('posts').select('id, title, body, details, created_at').neq('author_id', me)
+              .contains('service_areas', ['food']).order('created_at', { ascending: false }).limit(8),
+            supabase.from('reminders').select('id, title, start_date, items').eq('profile_id', me)
+              .gte('end_date', new Date().toISOString().slice(0, 10)).order('start_date').limit(20),
+          ]);
+          type P = { id: string; title: string | null; body: string; details: Record<string, unknown> | null; created_at: string };
+          const keep = (rows: P[] | null) => (rows ?? []).filter((p) => !p.details?.aiExcluded);
+          const mineRows = keep(mine.data as P[] | null);
+          if (mineRows.length) extras.my_food_posts_and_recipes = mineRows.map((p) => ({ title: p.title || p.body.slice(0, 48), since: p.created_at.slice(0, 10) }));
+          const theirs = keep(others.data as P[] | null);
+          if (theirs.length) extras.recent_food_on_lichen = theirs.map((p) => ({ title: p.title || p.body.slice(0, 48), since: p.created_at.slice(0, 10) }));
+          const checklists = ((lists.data as { id: string; title: string; start_date: string; items: { done?: boolean }[] | null }[] | null) ?? [])
+            .filter((r) => (r.items?.length ?? 0) > 0);
+          if (checklists.length) extras.upcoming_checklists = checklists.map((r) => ({ title: r.title, on: r.start_date, checked: r.items!.filter((i) => i.done).length, of: r.items!.length }));
+          [...mineRows, ...theirs].forEach((p) => { if (p.title) found.push({ label: p.title, to: `/posts/${p.id}` }); });
+          checklists.forEach((r) => found.push({ label: r.title, to: `/tasks/${r.id}` }));
+        }
         if (section === 'currentcy') {
           // The money coach's eyes (founder 2026-09-13): their OWN wallet —
           // balance + recent statement, names resolved — their open
@@ -955,11 +982,16 @@ export default function AssistantBrief() {
   // always showing up in the list (which means we'll have 2 rows)") — the
   // current section lights IN PLACE; a section outside the standing list
   // (my-celium, a kind directory…) appends at the END, never prepends.
+  const [topics, setTopics] = useState<string[]>([]);
+  useEffect(() => { if (me) void loadTopicSections(me).then(setTopics).catch(() => {}); }, [me]);
   const railItems = useMemo(() => {
-    const items = BRAIN_RAIL.map((it) => ({ section: it.section, icon: it.icon, label: it.label }));
+    const items = [
+      ...BRAIN_RAIL.map((it) => ({ section: it.section, icon: it.icon, label: it.label })),
+      ...TOPIC_RAIL.filter((t) => topics.includes(t.section)).map((it) => ({ section: it.section, icon: it.icon, label: it.label })),
+    ];
     if (items.some((it) => it.section === section)) return items;
     return [...items, { section, icon: sectionIcon(section), label: sectionLabel(section) }];
-  }, [section]);
+  }, [section, topics]);
 
   /** The composer at the foot of the brief (founder 2026-08-05): reply to
    *  what you just read without hunting for a door. It really lands in the
