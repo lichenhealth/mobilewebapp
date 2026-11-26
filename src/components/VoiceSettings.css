@@ -5,3 +5,10 @@
 .vset__fine { margin: 0; font-size: 12px; color: var(--ink-muted); }
 .vset--compact { margin-top: 8px; }
 .vset--compact .vset__row { font-size: 12px; }
+/* The hand-off to Safari/Chrome from the iPhone home-screen app. */
+.oib { display: flex; flex-direction: column; gap: 6px; }
+.oib__lead { margin: 0; font-size: 12px; color: var(--ink-muted); line-height: 1.45; }
+.oib__btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.oib__btn { border: 1px solid var(--peach); background: var(--peach-tint); color: var(--peach-deep); border-radius: 999px;
+  padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.oib__btn:disabled { opacity: 0.6; cursor: default; }

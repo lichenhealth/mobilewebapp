@@ -18,6 +18,7 @@ import IdentityPage, { IdentitiesDirectory } from './routes/Identities';
 import Chat from './routes/Chat';
 import ChatThread from './routes/ChatThread';
 import GlobalWake from './components/GlobalWake';
+import Handoff from './routes/Handoff';
 import SharedDoc from './routes/SharedDoc';
 import ChatDocPage from './routes/ChatDocPage';
 import ChatRoomDrive from './routes/ChatRoomDrive';
@@ -112,7 +113,7 @@ function BookGate() {
     : <BookPublic />;
 }
 
-const GATE_EXEMPT = ['/login', '/signup', '/intro', '/invite/decline', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/p', '/d', '/book', '/about'];
+const GATE_EXEMPT = ['/login', '/signup', '/intro', '/invite/decline', '/reset-password', '/onboarding', '/membership', '/help', '/privacy', '/terms', '/donate', '/e', '/b', '/p', '/d', '/handoff', '/book', '/about'];
 
 /** Client-side "/" for signed-out visitors → the static marketing homepage. */
 function GoWelcome() {
@@ -551,6 +552,7 @@ export default function App() {
           <Route path="/events/:param/:slug" element={<VanityRoute area="events" />} />
           <Route path="/e/:token" element={<GuestEvent />} />
           <Route path="/d/:token" element={<SharedDoc />} />
+          <Route path="/handoff" element={<Handoff />} />
           <Route path="/p/:token" element={<GuestPost />} />
           <Route path="/about" element={<StaticAboutRedirect />} />
           {/* OFFLINE WHILE THEY'RE MADE BETTER (founder 2026-08-25: "don't

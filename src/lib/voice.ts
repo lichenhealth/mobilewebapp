@@ -40,6 +40,7 @@ export const canListen = () => !!speechRecognition();
 /** Words for the ear, not the eye: no markdown, links, emoji or arrows. */
 export function forSpeech(text: string): string {
   return text
+    .replace(/\[([^\]\n]+)\]\([^)\s]+\)/g, '$1')
     .replace(/https?:\/\/\S+/g, '')
     .replace(/\*\*|__|`+|#+\s/g, '')
     .replace(/[•›→←✓✔︎✨⚡]/g, ' ')
