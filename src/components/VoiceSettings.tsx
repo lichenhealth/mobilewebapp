@@ -36,7 +36,7 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
       )}
       <label className={'vset__row' + (listen ? '' : ' is-off')}>
         <input type="checkbox" checked={wake && listen} disabled={!listen}
-          onChange={(e) => { if (!e.target.checked || ensureLocalSpeech()) setWakeAlways(e.target.checked); }} />
+          onChange={(e) => { const v = e.target.checked; if (!v) { setWakeAlways(false); return; } void ensureLocalSpeech('talk').then((ok) => { if (ok) setWakeAlways(true); }); }} />
         <span>
           <strong>Always listen for “Hey Brain”</strong> (or “Hey Claude”) — then just say what you need, from any screen.
           {listen
@@ -52,8 +52,12 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
         <label className="vset__row">
           <input type="checkbox" checked={localSpeechOnly()}
             onChange={(e) => {
-              if (e.target.checked && !localSpeechAgreed() && !window.confirm(`Listen on this device only?\n\nA one-time download of about ${LOCAL_SPEECH_MB} MB. After that, what you say is turned into words right here — never sent to Google, Apple or anyone.`)) return;
-              setLocalSpeechOnly(e.target.checked);
+              const v = e.target.checked;
+              if (!v || localSpeechAgreed()) { setLocalSpeechOnly(v); return; }
+              // Mark the preference first so the sheet knows Lichen's own
+              // listener is the one being set up; undo if they back out.
+              setLocalSpeechOnly(true);
+              void ensureLocalSpeech('text').then((ok) => { if (!ok) setLocalSpeechOnly(false); });
             }} />
           <span><strong>Hear me on this device only</strong> — private listening: your words are made right here instead of by your browser’s speech service.</span>
         </label>

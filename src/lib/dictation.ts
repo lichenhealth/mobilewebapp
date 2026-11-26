@@ -1,4 +1,4 @@
-import { agreeLocalSpeech, localSpeechAgreed, localSpeechOnly, localSpeechSupported, LOCAL_SPEECH_MB, startLocalListening } from './localSpeech';
+import { localSpeechAgreed, localSpeechStatusNow, localSpeechOnly, localSpeechSupported, LOCAL_SPEECH_MB, startLocalListening } from './localSpeech';
 
 // Speech recognition that's actually USABLE here — not merely present.
 //
@@ -44,11 +44,24 @@ export function canDictate(): boolean {
 }
 /** Ask once for the on-phone download when this device will listen with
  *  it (a person's tap — a wake-word switch, hands-free); true = ready to go. */
-export function ensureLocalSpeech(): boolean {
-  if (!usesLocalSpeech() || localSpeechAgreed()) return true;
-  const yes = window.confirm(`Turn on listening on this phone?\n\nA one-time download of about ${LOCAL_SPEECH_MB} MB (Wi-Fi is best). After that, what you say is turned into words right here on your phone — the audio is never sent anywhere.`);
-  if (yes) agreeLocalSpeech();
-  return yes;
+export type VoiceChoice = 'talk' | 'text' | 'keyboard' | null;
+/** THE VOICE CHOICE (founder 2026-11-26: "the pop-up needs to show that you
+ *  can turn on voice conversations with Claude and it requires this
+ *  download, or like, no, I just want to use voice to text"). Opens the
+ *  app-wide sheet (LocalSpeechChoice.tsx) and resolves with what the person
+ *  chose — only once the download is ready, so the next step is theirs to
+ *  tap. Resolves straight away when no download is needed. */
+export function askVoiceChoice(prefer: 'talk' | 'text'): Promise<VoiceChoice> {
+  if (!usesLocalSpeech() || localSpeechAgreed() && localSpeechStatusNow() === 'ready') return Promise.resolve(prefer);
+  return new Promise((resolve) => {
+    window.dispatchEvent(new CustomEvent('lichen:voice-choice', { detail: { prefer, resolve } }));
+  });
+}
+/** For switches that need the listener (Hey Brain, hands-free, private
+ *  listening): true once it's ready. */
+export async function ensureLocalSpeech(prefer: 'talk' | 'text' = 'talk'): Promise<boolean> {
+  const c = await askVoiceChoice(prefer);
+  return c === 'talk' || c === 'text';
 }
 /** Which ear a session will use. */
 export function usesLocalSpeech(): boolean {
@@ -88,6 +101,10 @@ export function startDictation(opts: {
   onEnd: () => void;
   /** The always-on wake listener — yields to anything a person starts. */
   background?: boolean;
+  /** Keep listening across pauses until stop() — plain voice-to-text. */
+  continuous?: boolean;
+  /** On-device only: listening / hearing / thinking (writing it out). */
+  onState?: (s: 'listening' | 'hearing' | 'thinking') => void;
 }): DictationSession | null {
   if (opts.background && foreground > 0) return null;
   // ON-PHONE WHISPER (2026-11-26): where the browser can't listen (an
@@ -96,15 +113,16 @@ export function startDictation(opts: {
   // person-started session asks once for the one-time download; the
   // background wake listener never asks.
   if (usesLocalSpeech()) {
-    if (!localSpeechAgreed()) {
-      if (opts.background || !ensureLocalSpeech()) return null;
-    }
+    // Not set up yet: the caller asks first (askVoiceChoice) — never here.
+    if (!localSpeechAgreed()) return null;
     if (!opts.background) for (const b of [...background]) b.stop();
     let ended = false;
     let session: DictationSession | null = null;
     const l = startLocalListening({
       onPhrase: opts.onPhrase,
       background: opts.background,
+      continuous: opts.continuous,
+      onState: opts.onState,
       onEnd: () => {
         if (ended) return; ended = true;
         if (opts.background) { if (session) background.delete(session); } else foreground = Math.max(0, foreground - 1);
@@ -121,7 +139,7 @@ export function startDictation(opts: {
   const rec = new Ctor();
   rec.lang = navigator.language || 'en-US';
   rec.interimResults = false;
-  rec.continuous = false;
+  rec.continuous = !!opts.continuous && !opts.background;
   rec.maxAlternatives = 1;
   let ended = false;
   let session: DictationSession | null = null;

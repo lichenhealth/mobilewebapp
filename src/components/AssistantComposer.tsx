@@ -2,8 +2,8 @@ import { isHeic } from '../lib/heic';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
-import { canDictate, startDictation, usesLocalSpeech, type DictationSession } from '../lib/dictation';
-import { useLocalSpeechStatus } from '../lib/localSpeech';
+import { askVoiceChoice, canDictate, startDictation, usesLocalSpeech, type DictationSession } from '../lib/dictation';
+import { localSpeechAgreed, localSpeechStatusNow, useLocalSpeechStatus } from '../lib/localSpeech';
 import { revealBelow } from '../lib/smartReveal';
 import VoiceSettings from './VoiceSettings';
 import { canListen, canSpeak, setVoiceOn, stopSpeaking, useSpeaking, useVoiceMode } from '../lib/voice';
@@ -92,17 +92,39 @@ export default function AssistantComposer({
   const SR = canDictate();
   const localSt = useLocalSpeechStatus();
   const dictation = useRef<DictationSession | null>(null);
+  // On-device only: 'thinking' = turning a stretch of speech into words.
+  const [hearState, setHearState] = useState<'listening' | 'hearing' | 'thinking' | null>(null);
+  // Lichen's listener not set up (or still downloading): the voice choice
+  // sheet explains talk-vs-text and shows the download, then hands back
+  // what they picked (src/components/LocalSpeechChoice.tsx).
+  const needsChoice = () => usesLocalSpeech() && !(localSpeechAgreed() && localSpeechStatusNow() === 'ready');
+  async function routeChoice(prefer: 'talk' | 'text') {
+    const c = await askVoiceChoice(prefer);
+    if (c === 'talk') { setVoiceOn(true); voiceListen(); }
+    else if (c === 'text') startText();
+    else if (c === 'keyboard') taRef.current?.focus();
+  }
   function dictate() {
     if (!SR) return;
     // Second tap while live = stop (dictation.onEnd clears the light).
     if (listening) { dictation.current?.stop(); return; }
+    if (needsChoice()) { void routeChoice('text'); return; }
+    startText();
+  }
+  function startText() {
+    if (dictation.current) return;
     // The phrase REPLACES everything after this base — duplicate engine
     // deliveries re-set the same text instead of appending it again
     // (src/lib/dictation.ts has the whole story).
     const base = ask.trim() ? ask.replace(/\s+$/, '') + ' ' : '';
     const s = startDictation({
       onPhrase: (phrase) => setAsk(base + phrase),
-      onEnd: () => { setListening(false); dictation.current = null; },
+      onEnd: () => { setListening(false); setHearState(null); dictation.current = null; },
+      // Plain voice-to-text keeps listening across pauses until the mic is
+      // tapped again (founder 2026-11-26: "it stopped recording the stuff I
+      // said after that").
+      continuous: true,
+      onState: setHearState,
     });
     // A refused start (mic permission, engine state) returns null — never
     // strand the button lit.
@@ -125,8 +147,9 @@ export default function AssistantComposer({
     voicePhrase.current = '';
     const s = startDictation({
       onPhrase: (phrase) => { voicePhrase.current = phrase; setAsk(phrase); },
+      onState: setHearState,
       onEnd: () => {
-        setListening(false); dictation.current = null;
+        setListening(false); setHearState(null); dictation.current = null;
         const said = voicePhrase.current.trim();
         if (said) void submitRef.current(said);
       },
@@ -136,6 +159,7 @@ export default function AssistantComposer({
   }
   function toggleVoice() {
     if (voice) { dictation.current?.stop(); stopSpeaking(); setVoiceOn(false); return; }
+    if (needsChoice() && canListen()) { void routeChoice('talk'); return; }
     setVoiceOn(true);
     voiceListen();
   }
@@ -260,9 +284,11 @@ export default function AssistantComposer({
             <Icon name="mic" size={17} />
           </button>
         )}
-        {listening && usesLocalSpeech() && localSt.state === 'loading' && (
-          <span className="assist-composer__voiceword">Getting ready… {localSt.pct}%</span>
-        )}
+        {listening && usesLocalSpeech() && (localSt.state === 'loading'
+          ? <span className="assist-composer__voiceword">Getting ready… {localSt.pct}%</span>
+          : hearState === 'thinking' ? <span className="assist-composer__voiceword">Writing it out…</span>
+          : !voice && hearState ? <span className="assist-composer__voiceword">Listening… tap the mic when done</span>
+          : null)}
         {canSpeak() && !secondary && (
           <button type="button" className={'assist-composer__btn assist-composer__voice' + (voice ? ' is-live' : '')}
             onClick={toggleVoice} aria-pressed={voice}

@@ -186,7 +186,7 @@ export default function DocVoice({ doc, html, body, onClose }: {
           {err && <p className="dvoice__note">{err}</p>}
           {canListen() ? (
             <label className="dvoice__hands">
-              <input type="checkbox" checked={handsFree} onChange={(e) => { if (!e.target.checked || ensureLocalSpeech()) setHandsFree(e.target.checked); }} />
+              <input type="checkbox" checked={handsFree} onChange={(e) => { const v = e.target.checked; if (!v) { setHandsFree(false); return; } void ensureLocalSpeech('talk').then((ok) => { if (ok) setHandsFree(true); }); }} />
               <span><strong>Hands-free</strong> — say “Hey Brain” (or “Hey Claude”), then a question, or “next”, “back”, “repeat”. Listens only while this panel is open and your screen is on; {usesLocalSpeech() ? 'this device turns what you say into words itself — the audio never leaves it.' : 'your browser’s speech service turns what you say into words.'}</span>
             </label>
           ) : isIosHomeScreenApp() ? (
