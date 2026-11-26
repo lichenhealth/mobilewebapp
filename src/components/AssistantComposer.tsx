@@ -4,6 +4,7 @@ import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
 import { speechRecognition, startDictation, type DictationSession } from '../lib/dictation';
 import { revealBelow } from '../lib/smartReveal';
+import { canListen, canSpeak, setVoiceOn, stopSpeaking, useSpeaking, useVoiceMode } from '../lib/voice';
 import './AssistantComposer.css';
 
 /** The text box every surface that talks to Claude sends through — the
@@ -102,6 +103,43 @@ export default function AssistantComposer({
     setListening(!!s);
   }
 
+  // VOICE MODE (founder 2026-11-26: "talk to the brain with voice record and
+  // it can talk back"): one switch, the whole platform. On, this box listens;
+  // when you stop talking it sends what you said; the reply is read aloud
+  // (voiceReply, where replies land) and then it listens again. Where a
+  // phone can't listen, replies are still read aloud and the keyboard's mic
+  // does the hearing.
+  const voice = useVoiceMode();
+  const speakingNow = useSpeaking();
+  const voicePhrase = useRef('');
+  const submitRef = useRef<(t?: string) => Promise<void>>(async () => {});
+  function voiceListen() {
+    if (!SR || dictation.current) return;
+    voicePhrase.current = '';
+    const s = startDictation({
+      onPhrase: (phrase) => { voicePhrase.current = phrase; setAsk(phrase); },
+      onEnd: () => {
+        setListening(false); dictation.current = null;
+        const said = voicePhrase.current.trim();
+        if (said) void submitRef.current(said);
+      },
+    });
+    dictation.current = s;
+    setListening(!!s);
+  }
+  function toggleVoice() {
+    if (voice) { dictation.current?.stop(); stopSpeaking(); setVoiceOn(false); return; }
+    setVoiceOn(true);
+    voiceListen();
+  }
+  useEffect(() => {
+    const go = () => { if (voice) voiceListen(); };
+    window.addEventListener('lichen:voice-listen', go);
+    return () => window.removeEventListener('lichen:voice-listen', go);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voice]);
+  useEffect(() => () => { dictation.current?.stop(); }, []);
+
   async function addFiles(files: File[]) {
     if (!uploaderId || !files.length) return;
     setUpBusy(true);
@@ -154,8 +192,8 @@ export default function AssistantComposer({
     }
   }
 
-  async function submit() {
-    const text = ask.trim();
+  async function submit(override?: string) {
+    const text = (override ?? ask).trim();
     if ((!text && images.length === 0 && !attachment) || sending || upBusy) return;
     setSending(true);
     try {
@@ -166,6 +204,7 @@ export default function AssistantComposer({
       setSending(false);
     }
   }
+  submitRef.current = submit;
 
   return (
     <form
@@ -211,6 +250,15 @@ export default function AssistantComposer({
           <button type="button" className={'assist-composer__btn' + (listening ? ' is-live' : '')}
             onClick={dictate} aria-label="Speak instead">
             <Icon name="mic" size={17} />
+          </button>
+        )}
+        {canSpeak() && (
+          <button type="button" className={'assist-composer__btn assist-composer__voice' + (voice ? ' is-live' : '')}
+            onClick={toggleVoice} aria-pressed={voice}
+            aria-label={voice ? 'Turn voice mode off' : 'Voice mode — talk, and hear the reply'}
+            data-tip={voice ? 'Voice mode on — tap to turn off' : 'Voice mode'}>
+            <Icon name="speaker" size={17} />
+            {voice && <span className="assist-composer__voiceword">{speakingNow ? 'Speaking…' : listening ? 'Listening…' : canListen() ? 'Voice on' : 'Replies read aloud'}</span>}
           </button>
         )}
         <button className="assist-composer__send" type="submit"

@@ -1,3 +1,4 @@
+import { voiceReply, speak, stopSpeaking, canSpeak } from '../lib/voice';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { isAppleMapsUrl, isGoogleMapsUrl, outsideOrder, rememberNavApp } from '../lib/navApp';
 import { renderBold } from '../lib/inlineBold';
@@ -606,6 +607,7 @@ export default function AssistantFeed() {
       });
   }, [me]);
 
+  const [readingId, setReadingId] = useState<string | null>(null);
   // Realtime: Claude's reply lands without a manual refresh.
   useEffect(() => {
     if (!me) return;
@@ -643,6 +645,8 @@ export default function AssistantFeed() {
           // space's) — reload the frame beside the conversation so you SEE
           // the change rather than being told about it.
           if ((thread === 'profile' || spaceId) && row.author === 'claude') setPageNonce((n) => n + 1);
+          // VOICE MODE: the reply is read aloud, then the box listens again.
+          if (row.author === 'claude' && seeing && !isSnagNote(row.body)) void voiceReply(row.body);
         },
       )
       .subscribe();
@@ -1437,6 +1441,13 @@ export default function AssistantFeed() {
                         ? (handoff ? 'hand-off from manual mode' : 'AI Assistant')
                         : `steward of ${sctx?.name ?? 'this space'}`}
                     </span>
+                    {p.author === 'claude' && canSpeak() && (
+                      <button type="button" className="afeed__readaloud"
+                        onClick={() => { if (readingId === p.id) { stopSpeaking(); setReadingId(null); } else { setReadingId(p.id); void speak(p.body).then(() => setReadingId((cur) => (cur === p.id ? null : cur))); } }}
+                        aria-label={readingId === p.id ? 'Stop reading' : 'Read this aloud'}>
+                        <Icon name="speaker" size={13} /> {readingId === p.id ? 'Stop' : 'Read aloud'}
+                      </button>
+                    )}
                   </div>
                 )}
                 {shared && (

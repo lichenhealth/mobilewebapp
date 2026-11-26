@@ -336,3 +336,13 @@ ul.slx__b li { margin-bottom: .45em; }
 .dcm__link:hover { color: var(--peach-deep); }
 .dcm__link.is-danger:hover { color: var(--red-deep, #a8432a); }
 .dcm__resolvedtoggle { align-self: flex-start; margin-top: 4px; }
+/* READ-ONLY DOCS (2026-11-26) — shared to view, or open to the web. */
+.docx__desk--read { padding-top: 16px; }
+.docread__slides { display: grid; gap: 16px; }
+.docread__slide { container-type: inline-size; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+.docread__tab + .docread__tab { margin-top: 20px; }
+.docread__tabname { margin: 0 0 8px; font-size: 14px; font-weight: 500; }
+.docread__scroll { overflow-x: auto; background: #fff; border: 1px solid var(--bone-edge); border-radius: 10px; }
+.docread__table { border-collapse: collapse; font-size: 14px; }
+.docread__table th, .docread__table td { border: 1px solid var(--bone-edge); padding: 6px 10px; white-space: nowrap; text-align: left; }
+.docread__table th { background: var(--bone, #f6f2ea); color: var(--ink-muted); font-weight: 400; font-size: 12px; }
