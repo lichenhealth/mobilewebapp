@@ -21,12 +21,48 @@ export interface Reminder {
   /** The owner's name — set on rows ASSIGNED to you (profile_id ≠ you), so
    *  the list can say whose task it is. */
   owner?: { full_name: string | null } | null;
+  /** A checklist riding the task (founder 2026-11-26 — a shopping list on a
+   *  date). Empty = a plain task. */
+  items?: TaskItem[];
+}
+
+export interface TaskItem { id: string; text: string; group?: string | null; done?: boolean; done_by?: string | null; done_at?: string | null }
+
+/** Where a task opens: its checklist page when it carries one, else the
+ *  editor for its owner (null = nothing to open). */
+export function taskOpenPath(r: Reminder, me: string): string | null {
+  if ((r.items?.length ?? 0) > 0) return `/tasks/${r.id}`;
+  return r.profile_id === me ? `/calendar/new?reminder=${r.id}` : null;
+}
+
+export function itemsLeft(r: Reminder): string | null {
+  const n = r.items?.length ?? 0;
+  if (!n) return null;
+  return `${r.items!.filter((i) => i.done).length}/${n}`;
+}
+
+export function newItemId(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+/** Tick or untick one checklist item — anyone ON the task may (the RPC
+ *  checks); returns the whole list as it now stands. */
+export async function setTaskItemDone(reminderId: string, itemId: string, done: boolean): Promise<TaskItem[]> {
+  const { data, error } = await supabase.rpc('set_task_item_done', { p_reminder: reminderId, p_item: itemId, p_done: done });
+  if (error) throw error;
+  return (data as TaskItem[] | null) ?? [];
+}
+
+/** The owner rewrites the list (add, remove, rename, reorder). */
+export async function saveTaskItems(me: string, reminderId: string, items: TaskItem[]): Promise<void> {
+  const { error } = await supabase.from('reminders').update({ items }).eq('id', reminderId).eq('profile_id', me);
+  if (error) throw error;
 }
 
 // A shared-nudge recipient — a person or a whole space (org/group/community).
 export interface Recipient { type: 'profile' | 'space'; id: string; name?: string }
 
-const COLS = 'id, profile_id, title, start_date, end_date, at_min, lead_min, recurrence, done_mode';
+const COLS = 'id, profile_id, title, start_date, end_date, at_min, lead_min, recurrence, done_mode, items';
 
 async function writeRecipients(reminderId: string, recipients: Recipient[]): Promise<void> {
   await supabase.from('reminder_recipients').delete().eq('reminder_id', reminderId);

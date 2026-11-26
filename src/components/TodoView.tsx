@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import { localDate } from '../lib/conciergeApi';
 import { minToLabel } from '../lib/calendarApi';
-import { remindersOn, type Reminder as ReminderRow } from '../lib/remindersApi';
+import { remindersOn, taskOpenPath, itemsLeft, type Reminder as ReminderRow } from '../lib/remindersApi';
 import { listTodos, createTodo, setTodoDone, deleteTodo, type Todo } from '../lib/todosApi';
 import { visibleTasksOf, type VisibleTasks } from '../lib/tasksApi';
 import { loadRecipientsFor } from '../lib/remindersApi';
@@ -205,8 +205,8 @@ export default function TodoView({
                       aria-label={done ? 'Mark not done' : 'Mark done'}
                       onClick={() => onToggleRem(r, iso)}
                     >{done ? '✓' : ''}</button>
-                    <button className="todo__title todo__title--btn" onClick={() => { if (r.profile_id === me) navigate(`/calendar/new?reminder=${r.id}`); }}>
-                      {r.title}
+                    <button className="todo__title todo__title--btn" onClick={() => { const to = taskOpenPath(r, me); if (to) navigate(to); }}>
+                      {r.title}{itemsLeft(r) ? <span className="calp__rem-items"> · {itemsLeft(r)}</span> : null}
                       {r.at_min != null && <span className="todo__when">{minToLabel(r.at_min)}</span>}
                       {done && doneBy && doneBy.profileId !== me && (
                         <span className="todo__doneby">done by {doneBy.name ?? 'someone on it'}</span>

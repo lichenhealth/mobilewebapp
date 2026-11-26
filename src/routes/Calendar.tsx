@@ -36,7 +36,7 @@ export function SmartLocation({ loc, className }: { loc: string; className: stri
 import { supabase } from '../lib/supabase';
 import { localDate, toISO, todayISO, formatDateShort, loadCarePosts } from '../lib/conciergeApi';
 import { occursOn, recurrenceLabel, weekdayMon0 } from '../lib/recurrence';
-import { listReminders, listDone, setDone, remindersOn, leaveReminder, type Reminder as ReminderRow } from '../lib/remindersApi';
+import { listReminders, listDone, setDone, remindersOn, leaveReminder, taskOpenPath, itemsLeft, type Reminder as ReminderRow } from '../lib/remindersApi';
 import {
   EventRow, FreeBusyRow, MemberWindow,
   loadMyEvents, loadSpaceEvents, deleteEvent, cancelCalendarInvites, rsvp, minToLabel, freeBusy, availabilityOf,
@@ -1122,9 +1122,9 @@ export default function Calendar() {
                       >{done ? '✓' : ''}</button>
                       <button
                         className="calp__rem-open"
-                        onClick={() => { if (r.profile_id === me) navigate(`/calendar/new?reminder=${r.id}`); }}
-                        title="Edit reminder"
-                      >{r.title}</button>
+                        onClick={() => { const to = taskOpenPath(r, me); if (to) navigate(to); }}
+                        title={r.items?.length ? 'Open the checklist' : 'Edit reminder'}
+                      >{r.title}{itemsLeft(r) ? <span className="calp__rem-items"> · {itemsLeft(r)}</span> : null}</button>
                     </div>
                   );
                 })}
@@ -1184,10 +1184,10 @@ export default function Calendar() {
                         >{done ? '✓' : ''}</button>
                         <button
                           className="calp__rem-open calp__rem-open--sched"
-                          onClick={() => { if (r.profile_id === me) navigate(`/calendar/new?reminder=${r.id}`); }}
-                          title="Edit reminder"
+                          onClick={() => { const to = taskOpenPath(r, me); if (to) navigate(to); }}
+                          title={r.items?.length ? 'Open the checklist' : 'Edit reminder'}
                         >
-                          <span className="calp__sched-title">{r.title}</span>
+                          <span className="calp__sched-title">{r.title}{itemsLeft(r) ? <span className="calp__rem-items"> · {itemsLeft(r)} checked</span> : null}</span>
                           {r.at_min != null && <span className="calp__sched-when">{minToLabel(r.at_min)}</span>}
                         </button>
                       </div>

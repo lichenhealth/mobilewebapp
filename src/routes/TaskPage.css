@@ -1,0 +1,27 @@
+/* A task's checklist — a phone in a store aisle (2026-11-26). */
+.taskp { display: flex; flex-direction: column; gap: var(--s-4); padding: var(--s-5) 0 var(--s-8); max-width: 640px; margin: 0 auto; width: 100%; }
+.taskp__head { display: flex; flex-direction: column; gap: 6px; }
+.taskp__title { font-family: var(--font-display, serif); font-size: 28px; font-weight: 400; line-height: 1.15; margin: 0; color: var(--ink); text-wrap: pretty; }
+.taskp__when { margin: 0; color: var(--ink-muted); font-size: 14px; }
+.taskp__prog { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.taskp__bar { flex: 1; height: 6px; border-radius: 999px; background: var(--bone-edge); overflow: hidden; }
+.taskp__bar > span { display: block; height: 100%; background: var(--green, #6b8f5e); border-radius: inherit; transition: width .25s ease; }
+.taskp__count { font-size: 13px; color: var(--ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.taskp__tools { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 4px; }
+.taskp__tool { background: none; border: 0; padding: 4px 0; color: var(--peach-deep); font: inherit; font-size: 14px; cursor: pointer; }
+.taskp__tool:hover { text-decoration: underline; text-decoration-color: var(--peach); }
+.taskp__group { display: flex; flex-direction: column; gap: 4px; }
+.taskp__gname { margin: var(--s-3) 0 2px; font-family: var(--font-mono, monospace); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); font-weight: 500; }
+.taskp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--bone-edge); border-radius: 14px; overflow: hidden; }
+.taskp__item { display: flex; align-items: center; border-top: 1px solid var(--bone-edge); }
+.taskp__item:first-child { border-top: 0; }
+.taskp__row { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: none; border: 0; text-align: left; font: inherit; font-size: 16px; color: var(--ink); cursor: pointer; min-height: 52px; }
+.taskp__box { flex-shrink: 0; width: 24px; height: 24px; border-radius: 7px; border: 1.5px solid var(--ink-faint); display: grid; place-items: center; color: #fff; background: #fff; transition: background .15s, border-color .15s; }
+.taskp__item.is-done .taskp__box { background: var(--green, #6b8f5e); border-color: var(--green, #6b8f5e); }
+.taskp__text { overflow-wrap: anywhere; }
+.taskp__item.is-done .taskp__text { color: var(--ink-faint); text-decoration: line-through; }
+.taskp__rm { flex-shrink: 0; width: 36px; height: 36px; margin-right: 8px; border-radius: 50%; border: 1px solid var(--bone-edge); background: #fff; color: var(--ink-muted); display: grid; place-items: center; cursor: pointer; }
+.taskp__add { display: flex; gap: 8px; margin-top: var(--s-2); }
+.taskp__input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--bone-edge); background: #fff; font: inherit; font-size: 16px; }
+.taskp__quiet { color: var(--ink-muted); margin: 0; }
+.taskp__err { color: var(--red-deep, #a3442f); margin: 0; font-size: 14px; }

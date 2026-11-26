@@ -21,7 +21,7 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'change_task',
-    description: 'Change one of THEIR OWN tasks/reminders/to-dos by its exact title (from my_lists tasks): mark it done (or not done), rename it, move its date or time, or delete it. To ADD a task use add_task.',
+    description: 'Change one of THEIR OWN tasks/reminders/to-dos by its exact title (from my_lists tasks): mark it done (or not done), rename it, move its date or time, or delete it — and work its CHECKLIST: add_items, remove_items (exact item texts), check_items / uncheck_items (exact item texts). To ADD a task use add_task (which can carry a checklist from the start).',
     input_schema: {
       type: 'object',
       properties: {
@@ -31,6 +31,10 @@ export const LIFE_TOOLS = [
         date: { type: 'string', description: 'YYYY-MM-DD — reminders only.' },
         time_min: { type: 'integer', description: 'Minutes after midnight; -1 makes it untimed. Reminders only.' },
         delete: { type: 'boolean' },
+        add_items: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, group: { type: 'string' } }, required: ['text'] }, description: 'Checklist items to add (optional group heading).' },
+        remove_items: { type: 'array', items: { type: 'string' }, description: 'Exact texts of checklist items to remove.' },
+        check_items: { type: 'array', items: { type: 'string' }, description: 'Exact texts of checklist items to tick off.' },
+        uncheck_items: { type: 'array', items: { type: 'string' }, description: 'Exact texts of checklist items to untick.' },
       },
       required: ['title'],
     },
@@ -395,12 +399,15 @@ export async function runLifeTool(
 
   if (name === 'my_lists') {
     if (which === 'tasks') {
-      const rems = await (await sb(`reminders?profile_id=eq.${me}&end_date=gte.${today()}&select=title,start_date,at_min,recurrence&order=start_date.asc&limit=40`)).json();
+      const rems = await (await sb(`reminders?profile_id=eq.${me}&end_date=gte.${today()}&select=title,start_date,at_min,recurrence,items&order=start_date.asc&limit=40`)).json();
       const todos = await (await sb(`todos?profile_id=eq.${me}&done=eq.false&select=title&order=created_at.desc&limit=40`)).json();
       return {
         ok: true,
-        reminders: (Array.isArray(rems) ? rems : []).map((r: { title: string; start_date: string; at_min: number | null; recurrence: unknown }) =>
-          `"${r.title}" ${r.start_date}${r.at_min != null ? ` at minute ${r.at_min}` : ''}${r.recurrence ? ' (repeats)' : ''}`),
+        reminders: (Array.isArray(rems) ? rems : []).map((r: { title: string; start_date: string; at_min: number | null; recurrence: unknown; items?: { text: string; group?: string | null; done?: boolean }[] }) => {
+          const head = `"${r.title}" ${r.start_date}${r.at_min != null ? ` at minute ${r.at_min}` : ''}${r.recurrence ? ' (repeats)' : ''}`;
+          const its = Array.isArray(r.items) ? r.items : [];
+          return its.length ? `${head} — checklist: ${its.map((i) => `${i.done ? '[x]' : '[ ]'} ${i.group ? i.group + ': ' : ''}${i.text}`).join('; ')}` : head;
+        }),
         todos: (Array.isArray(todos) ? todos : []).map((t: { title: string }) => `"${t.title}"`),
       };
     }
@@ -435,7 +442,7 @@ export async function runLifeTool(
   if (name === 'change_task') {
     const title = String(input.title ?? '').trim();
     if (!title) return { ok: false, error: 'Which task? Use its exact title from my_lists tasks.' };
-    const rems = await (await sb(`reminders?profile_id=eq.${me}&title=ilike.${enc(title)}&select=id,title,start_date,end_date,at_min,done_mode&limit=2`)).json();
+    const rems = await (await sb(`reminders?profile_id=eq.${me}&title=ilike.${enc(title)}&select=id,title,start_date,end_date,at_min,done_mode,items&limit=2`)).json();
     const todos = await (await sb(`todos?profile_id=eq.${me}&title=ilike.${enc(title)}&select=id,title,done&limit=2`)).json();
     const r = Array.isArray(rems) ? rems : []; const t = Array.isArray(todos) ? todos : [];
     if (r.length + t.length === 0) return { ok: false, error: `No task of theirs is titled "${title}" — read my_lists tasks.` };
@@ -473,12 +480,43 @@ export async function runLifeTool(
       patch.at_min = tm < 0 ? null : Math.min(1439, tm);
       changes.push(tm < 0 ? 'made untimed' : `set to minute ${tm}`);
     }
+    // The checklist (2026-11-26) — exact item texts only, never a guess.
+    const arr = (v: unknown) => (Array.isArray(v) ? v : []);
+    if (arr(input.add_items).length || arr(input.remove_items).length || arr(input.check_items).length || arr(input.uncheck_items).length) {
+      type Item = { id: string; text: string; group?: string | null; done?: boolean };
+      let items: Item[] = Array.isArray((rem as { items?: unknown }).items) ? [...((rem as { items: Item[] }).items)] : [];
+      const key = (x: string) => x.trim().toLowerCase();
+      const missing: string[] = [];
+      const pick = (texts: unknown[]) => texts.map((x) => String(x)).filter((x) => {
+        const hit = items.some((i) => key(i.text) === key(x));
+        if (!hit) missing.push(x);
+        return hit;
+      }).map(key);
+      const rm = new Set(pick(arr(input.remove_items)));
+      if (rm.size) { items = items.filter((i) => !rm.has(key(i.text))); changes.push(`removed ${rm.size} item${rm.size === 1 ? '' : 's'}`); }
+      const ck = new Set(pick(arr(input.check_items)));
+      const uck = new Set(pick(arr(input.uncheck_items)));
+      if (ck.size || uck.size) {
+        items = items.map((i) => ck.has(key(i.text)) ? { ...i, done: true } : uck.has(key(i.text)) ? { ...i, done: false } : i);
+        if (ck.size) changes.push(`checked off ${ck.size}`);
+        if (uck.size) changes.push(`unchecked ${uck.size}`);
+      }
+      const adds = arr(input.add_items).map((it) => ({
+        id: crypto.randomUUID().slice(0, 8),
+        text: String((it as { text?: unknown })?.text ?? '').trim().slice(0, 200),
+        group: (it as { group?: unknown })?.group ? String((it as { group: unknown }).group).trim().slice(0, 60) : null,
+        done: false,
+      })).filter((it) => it.text);
+      if (adds.length) { items = [...items, ...adds].slice(0, 300); changes.push(`added ${adds.length} item${adds.length === 1 ? '' : 's'}`); }
+      patch.items = items;
+      if (missing.length) changes.push(`couldn't find: ${missing.slice(0, 8).join(', ')}`);
+    }
     if (Object.keys(patch).length) {
       const res = await sb(`reminders?id=eq.${rem.id}&profile_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
       if (!res.ok) return { ok: false, error: 'The task would not save.' };
     }
-    if (!changes.length) return { ok: false, error: 'Nothing to change — pass done, new_title, date, time_min or delete.' };
-    return { ok: true, change: `task "${rem.title}": ${changes.join('; ')}` };
+    if (!changes.length) return { ok: false, error: 'Nothing to change — pass done, new_title, date, time_min, delete or checklist items.' };
+    return { ok: true, change: `task "${rem.title}": ${changes.join('; ')}`, door: (patch.items || (rem as { items?: unknown[] }).items?.length) ? { path: `/tasks/${rem.id}`, label: `Open the ${rem.title} checklist` } : undefined };
   }
 
   if (name === 'coupons') {

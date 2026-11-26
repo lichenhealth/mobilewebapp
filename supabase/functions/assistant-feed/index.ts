@@ -756,6 +756,11 @@ const ACT_TOOLS = [
         title: { type: 'string', description: 'The task, in their words.' },
         date: { type: 'string', description: 'YYYY-MM-DD.' },
         time_min: { type: 'number', description: 'Optional. Minutes since midnight for a timed reminder.' },
+        items: {
+          type: 'array', maxItems: 300,
+          description: 'Optional CHECKLIST riding the task — a shopping list, packing list, steps. Each item is one thing to tick ({text, group}); group is an optional heading like "Produce" or "Dairy". The task then opens as a checklist page anyone on it can tick off item by item (in a store aisle, say). Use this — not a separate doc — whenever they want to check things off on a date. Never list things that aren\'t to be bought/done (no "tap water" reminders, no equipment they already own unless they asked).',
+          items: { type: 'object', properties: { text: { type: 'string' }, group: { type: 'string' } }, required: ['text'] },
+        },
       },
       required: ['title', 'date'],
     },
@@ -839,8 +844,13 @@ Deno.serve(async (req) => {
   // real message ("what do you think of this one?" is often implied).
   const triggerImages: string[] = (Array.isArray(trigger?.attachments) ? trigger.attachments : [])
     .filter((a: { type?: string; url?: string }) => a?.type === 'photo' && typeof a.url === 'string')
-    .map((a: { url: string }) => a.url)
-    .slice(0, 6);
+    .map((a: { url: string }) => a.url);
+  // Every photo they send is read (founder 2026-11-26 — seven recipe photos
+  // arrived and the seventh was silently dropped at a cap of 6). The model
+  // takes up to 100 images a request; 20 keeps a reply affordable, and any
+  // beyond that are named so nothing vanishes without a word.
+  const droppedImages = Math.max(0, triggerImages.length - 20);
+  triggerImages.splice(20);
   if (!trigger?.body?.trim() && triggerImages.length === 0) return json({ ok: true, skipped: 'empty-post' });
   // A WATCH THAT DOES THE LEGWORK (founder 2026-11-24: "do the legwork
   // necessary to get to the steps gated by me"): assistant-watch calls here
@@ -1408,7 +1418,7 @@ Deno.serve(async (req) => {
   // Pasted photos (founder 2026-08-22): the model can SEE them — say so,
   // and hold the no-pretending line when tools aren't armed.
   const imageRule = triggerImages.length
-    ? `\n\nTHE MEMBER PASTED ${triggerImages.length === 1 ? 'A PHOTO' : `${triggerImages.length} PHOTOS`} INTO THIS MESSAGE — you can see ${triggerImages.length === 1 ? 'it' : 'them'} above their words. If they want ${triggerImages.length === 1 ? 'it' : 'one'} on the page and your page tools are armed, place_uploaded_photo puts it there (photo 1 is the first in the message). If your tools are NOT armed, say what you would do and where the manual door is — never claim to have placed anything.`
+    ? `\n\nTHE MEMBER PASTED ${triggerImages.length === 1 ? 'A PHOTO' : `${triggerImages.length} PHOTOS`} INTO THIS MESSAGE — you can see ${triggerImages.length === 1 ? 'it' : 'them'} above their words. If they want ${triggerImages.length === 1 ? 'it' : 'one'} on the page and your page tools are armed, place_uploaded_photo puts it there (photo 1 is the first in the message). If your tools are NOT armed, say what you would do and where the manual door is — never claim to have placed anything.` + (triggerImages.length > 1 ? ` Work through EVERY one of the ${triggerImages.length} photos — when they ask you to digitize, list or file what\'s in them, account for each photo by number and say if one was unreadable; never quietly skip one.` : '') + (droppedImages ? ` They sent ${droppedImages} more photo${droppedImages === 1 ? '' : 's'} beyond the ${triggerImages.length} you can see — say so plainly and ask them to send the rest in a second message.` : '')
     : '';
 
   // THE MONEY COACH (founder 2026-09-13: "a money coach feels like a
@@ -1455,7 +1465,7 @@ Deno.serve(async (req) => {
 
   let actRule = '';
   if (canAct) {
-    actRule = '\n\nYOU HAVE TWO SMALL HANDS ACROSS THEIR LIFE: save_post_to_drive (only the post shared into THIS conversation) and add_task (their calendar & to-do). Use one when they ask, or when they say yes to your offer — never unasked. Report exactly what you did every time, and never invent a date or claim a save you did not make. Sending Current-cy, trust/recommend/weave and joining or leaving a space go through the CONFIRM tools — they propose a card the member taps; booking someone else still lives on the booking screens.';
+    actRule = '\n\nYOU HAVE TWO SMALL HANDS ACROSS THEIR LIFE: save_post_to_drive (only the post shared into THIS conversation) and add_task (their calendar & to-do — a task can carry a CHECKLIST via items: a shopping list from recipe photos, a packing list, steps; put the list on the task, never in a separate doc, so they tick items off on that date). Use one when they ask, or when they say yes to your offer — never unasked. Report exactly what you did every time, and never invent a date or claim a save you did not make. Sending Current-cy, trust/recommend/weave and joining or leaving a space go through the CONFIRM tools — they propose a card the member taps; booking someone else still lives on the booking screens.';
   }
 
   let coursesRule = '';
@@ -1687,6 +1697,11 @@ Deno.serve(async (req) => {
         // The file it just built or touched rides as a real Open button.
         const door = lr.door as { path: string; label: string } | undefined;
         if (door && /^\/docs\/[0-9a-f-]{36}$/.test(door.path) && !appDoors.some((d) => d.path === door.path)) appDoors.push(door);
+        delete lr.door;
+      }
+      if (name === 'change_task' && lr.ok) {
+        const door = lr.door as { path: string; label: string } | undefined;
+        if (door && /^\/tasks\/[0-9a-f-]{36}$/.test(door.path) && !appDoors.some((d) => d.path === door.path)) appDoors.push(door);
         delete lr.door;
       }
       if (name === 'coupons') {
@@ -3386,12 +3401,26 @@ Deno.serve(async (req) => {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: 'date must be YYYY-MM-DD. Ask them for the day rather than guessing.' };
       const raw = input.time_min == null || input.time_min === '' ? null : Number(input.time_min);
       const atMin = raw == null || !Number.isFinite(raw) ? null : Math.max(0, Math.min(1439, Math.round(raw)));
+      const items = (Array.isArray(input.items) ? input.items : []).slice(0, 300)
+        .map((it: { text?: unknown; group?: unknown }) => ({
+          id: crypto.randomUUID().slice(0, 8),
+          text: String(it?.text ?? '').trim().slice(0, 200),
+          group: it?.group ? String(it.group).trim().slice(0, 60) : null,
+          done: false,
+        }))
+        .filter((it: { text: string }) => it.text);
       const r = await sb('reminders', {
-        method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ profile_id, title, start_date: date, end_date: date, at_min: atMin, lead_min: 0, recurrence: null, done_mode: 'shared' }),
+        method: 'POST', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ profile_id, title, start_date: date, end_date: date, at_min: atMin, lead_min: 0, recurrence: null, done_mode: 'shared', items }),
       });
       if (!r.ok) return { ok: false, error: `The database refused: ${(await r.text()).slice(0, 120)}` };
+      const made = await r.json().catch(() => null);
+      const rid = Array.isArray(made) ? made[0]?.id : null;
       const when = atMin != null ? `${date} at ${String(Math.floor(atMin / 60)).padStart(2, '0')}:${String(atMin % 60).padStart(2, '0')}` : `${date} (finish-by, morning nudge)`;
+      if (items.length && rid) {
+        appDoors.push({ path: `/tasks/${rid}`, label: `Open the ${title} checklist` });
+        return { ok: true, change: `added the task "${title}" for ${when} with a ${items.length}-item checklist they can tick off (an "Open the checklist" button is attached)` };
+      }
       return { ok: true, change: `added the task "${title}" for ${when}` };
     }
 
