@@ -150,9 +150,11 @@
 .abrief__card { position: relative; }
 .abrief__card.is-clamped { overflow: hidden; }
 .abrief__card.is-folded { cursor: pointer; }
+/* Phones: three lines of the summary, then the caret (2026-11-26). */
+.abrief__card.is-clamped.is-short { max-height: 112px; }
 .abrief__card.is-folded::after {
   content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
-  background: linear-gradient(to bottom, rgba(255,255,255,0), #fff 78%);
+  background: linear-gradient(to bottom, transparent, var(--bone-warm, #fff) 78%);
   border-radius: 0 0 16px 6px; pointer-events: none;
 }
 .abrief__card.is-folded .abrief__updated { display: none; }

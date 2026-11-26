@@ -295,7 +295,10 @@ export default function AssistantBrief() {
     return () => ro.disconnect();
   }, []);
   const [sumOverflows, setSumOverflows] = useState(false);
-  const sumClamped = wideSplit && !sumOpen && askH > 0;
+  // Phones fold it too (founder 2026-11-26: "the summary brain be closed with
+  // the opportunity to open it with a drop down, so that the last convo and
+  // start a new convo are above the fold on mobile") — three lines + a caret.
+  const sumClamped = !sumOpen && (wideSplit ? askH > 0 : true);
   useEffect(() => {
     if (!sumClamped) return;
     const el = cardRef.current;
@@ -1372,8 +1375,8 @@ export default function AssistantBrief() {
         <div className="abrief__run-row">
       <div
         ref={cardRef}
-        className={'abrief__card' + (sumClamped ? ' is-clamped' : '') + (sumClamped && sumOverflows ? ' is-folded' : '')}
-        style={sumClamped ? { height: askH, maxHeight: askH } : (wideSplit && askH > 0 ? { minHeight: askH } : undefined)}
+        className={'abrief__card' + (sumClamped ? ' is-clamped' : '') + (sumClamped && !wideSplit ? ' is-short' : '') + (sumClamped && sumOverflows ? ' is-folded' : '')}
+        style={sumClamped && wideSplit ? { height: askH, maxHeight: askH } : (wideSplit && askH > 0 ? { minHeight: askH } : undefined)}
         onClick={(e) => {
           if (!sumClamped || !sumOverflows) return;
           if ((e.target as HTMLElement).closest('a,button')) return;
@@ -1403,7 +1406,7 @@ export default function AssistantBrief() {
         {doorOn && state === 'quietly-unavailable' && (
           <p className="abrief__text">The briefing isn&rsquo;t available right now — your bell and queues hold everything in the meantime.</p>
         )}
-      {wideSplit && (sumOverflows || sumOpen) && (
+      {(sumOverflows || sumOpen) && (
         <button
           type="button"
           className={'abrief__sumfold' + (sumOpen ? ' is-open' : '')}
