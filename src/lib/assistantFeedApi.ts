@@ -49,10 +49,7 @@ export type FeedAttachment =
   | { type: 'mail_reconnect'; accounts: string[] }
   /** An email the brain DRAFTED (founder 2026-11-15) — the card carries Send; the person's tap sends it. */
   | { type: 'mail_draft'; account_id: string; account: string; thread_id: string; message_id: string; to: string; cc?: string; subject: string; body: string; reply?: boolean }
-<<<<<<< HEAD
   | { type: 'allow_mail_reply'; draft?: { account_id: string; account: string; message_id: string; to: string } }
-=======
->>>>>>> origin/main
   /** A COPYABLE VALUE (founder 2026-11-02, the feed-URL reply overflowing
    *  its bubble in broken code fences: "just have a copy button and have it
    *  check when its copied"): the reply hands a real Copy button instead of
