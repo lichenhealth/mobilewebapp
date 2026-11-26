@@ -248,6 +248,31 @@ export const BRAIN_RAIL: BrainRailItem[] = [
   { section: 'currentcy', icon: 'currentcy', label: 'Current-cy', thread: 'currentcy' },
 ];
 
+/** TOPIC ROWS (founder 2026-11-26: "have food become one of the brain rows
+ *  now that I've asked a food question"): a section without a standing
+ *  rail circle joins the rail once a conversation of theirs is ABOUT it —
+ *  tagged by the Brain (assistant-feed stamps food talk 'food') or born on
+ *  that section's own brief. Appended after the fixed rail, never reordering
+ *  it. */
+export const TOPIC_RAIL: BrainRailItem[] = [
+  { section: 'food', icon: 'fork-spoon', label: 'Food' },
+  { section: 'travel', icon: 'plane', label: 'Travel' },
+  { section: 'art', icon: 'palette', label: 'Art' },
+  { section: 'work', icon: 'briefcase', label: 'Work' },
+  { section: 'library', icon: 'book', label: 'Library' },
+];
+
+/** Which topic rows this member has earned — sections tagged on any of
+ *  their own conversations. */
+export async function loadTopicSections(me: string): Promise<string[]> {
+  const ids = TOPIC_RAIL.map((t) => t.section);
+  const { data } = await supabase.from('assistant_feed_posts')
+    .select('sections').eq('profile_id', me).overlaps('sections', ids).limit(200);
+  const seen = new Set<string>();
+  for (const r of (data as { sections: string[] | null }[] | null) ?? []) for (const x of r.sections ?? []) if (ids.includes(x)) seen.add(x);
+  return ids.filter((x) => seen.has(x));
+}
+
 /** Non-thread sections that can tag a conversation (founder 2026-10-07:
  *  a Maps-brain exchange wears the maps icon) — each with the mark its own
  *  surface already wears, so the icon can never say something new. */

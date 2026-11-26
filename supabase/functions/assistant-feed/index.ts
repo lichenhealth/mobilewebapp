@@ -44,6 +44,7 @@ import { KNOCK_TOOLS, KNOCK_TOOL_NAMES, runKnockTool, type KnockDraft } from '..
 import { CONFIRM_TOOLS, CONFIRM_TOOL_SECTION, runConfirmTool, type ConfirmDoor } from '../_shared/confirmTools.ts';
 import { videoServiceOf } from '../_shared/videoHosts.ts';
 
+const FOOD_TALK_RE = /\b(recipes?|cook(?:ing|ed)?|bak(?:e|ing|ed)|ingredients?|grocer(?:y|ies)|shopping list|meals?|dinner|lunch|breakfast|thanksgiving|stuffing|turkey|soups?|salads?|dessert|pies?|cookies|food|kitchen|harvest)\b/i;
 const ANTHROPIC_API_KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
 const WEBHOOK_SECRET = Deno.env.get('PUSH_HOOK_SECRET');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
@@ -1418,7 +1419,7 @@ Deno.serve(async (req) => {
   // Pasted photos (founder 2026-08-22): the model can SEE them — say so,
   // and hold the no-pretending line when tools aren't armed.
   const imageRule = triggerImages.length
-    ? `\n\nTHE MEMBER PASTED ${triggerImages.length === 1 ? 'A PHOTO' : `${triggerImages.length} PHOTOS`} INTO THIS MESSAGE — you can see ${triggerImages.length === 1 ? 'it' : 'them'} above their words. If they want ${triggerImages.length === 1 ? 'it' : 'one'} on the page and your page tools are armed, place_uploaded_photo puts it there (photo 1 is the first in the message). If your tools are NOT armed, say what you would do and where the manual door is — never claim to have placed anything.` + (triggerImages.length > 1 ? ` Work through EVERY one of the ${triggerImages.length} photos — when they ask you to digitize, list or file what\'s in them, account for each photo by number and say if one was unreadable; never quietly skip one.` : '') + (droppedImages ? ` They sent ${droppedImages} more photo${droppedImages === 1 ? '' : 's'} beyond the ${triggerImages.length} you can see — say so plainly and ask them to send the rest in a second message.` : '')
+    ? `\n\nTHE MEMBER PASTED ${triggerImages.length === 1 ? 'A PHOTO' : `${triggerImages.length} PHOTOS`} INTO THIS MESSAGE — you can see ${triggerImages.length === 1 ? 'it' : 'them'} above their words. If they want ${triggerImages.length === 1 ? 'it' : 'one'} on the page and your page tools are armed, place_uploaded_photo puts it there (photo 1 is the first in the message). If your tools are NOT armed, say what you would do and where the manual door is — never claim to have placed anything.` + (triggerImages.length > 1 ? ` Work through EVERY one of the ${triggerImages.length} photos — when they ask you to digitize, list or file what\'s in them, account for each photo by number and say if one was unreadable; never quietly skip one. Several photos can be PAGES OF ONE THING: a page that opens mid-piece ("Step 3…", a continued ingredient list, no title of its own) continues another photo — even when it was sent first or out of order. Join those pages into ONE recipe/document in reading order, and say so plainly ("photos 1 and 2 are two pages of Festive Green Beans"), so your count of recipes matches what they actually sent.` : '') + (droppedImages ? ` They sent ${droppedImages} more photo${droppedImages === 1 ? '' : 's'} beyond the ${triggerImages.length} you can see — say so plainly and ask them to send the rest in a second message.` : '')
     : '';
 
   // THE MONEY COACH (founder 2026-09-13: "a money coach feels like a
@@ -3896,6 +3897,10 @@ Deno.serve(async (req) => {
   const replySections = spaceId ? [] : [...new Set([
     ...(Array.isArray(trigger.sections) ? trigger.sections.filter((s: unknown) => typeof s === 'string') : []),
     ...touchedSections,
+    // FOOD TALK FILES UNDER FOOD (founder 2026-11-26: "have food become one
+    // of the brain rows now that I've asked a food question") — the
+    // member's own words decide it, so the Food row appears on their rail.
+    ...(FOOD_TALK_RE.test(String(trigger.body ?? '')) ? ['food'] : []),
   ])].filter((s) => s !== thread && s !== 'general');
   await sb('assistant_feed_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
     profile_id, author: 'claude', body: reply, thread, convo_id: trigger.convo_id ?? null,

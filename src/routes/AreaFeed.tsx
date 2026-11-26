@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { webAuthorFilter, posterTrustKey, trustPostPoster } from '../lib/myceliumApi';
 import { Icon, IconName } from '../components/Icon';
 import ScopeBack from '../components/ScopeBack';
+import AssistantDoor from '../components/AssistantDoor';
 import { ScopeEmpty, ScopeMore } from '../components/ScopeEscape';
 import { possessive } from '../lib/names';
 import FeedCard from '../components/FeedCard';
@@ -279,6 +280,9 @@ export default function AreaFeed({ area, icon, crumb, title, italic, sub, addLab
         >
           <span className="mkt__action-circle"><Icon name="plus" size={14} /></span>
         </button>
+        {/* Every section wears its brain (founder 2026-11-26: Food asked for
+            one) — search · + · brain, the platform order. */}
+        <AssistantDoor section={area} size={30} />
         {/* The third door: Curate, visible and labeled — creation deserves
             its own front door, not a hiding spot in the + (Library 2026-07-24;
             Courses joined 2026-07-25, retiring the +'s two-way chooser).

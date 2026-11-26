@@ -43,6 +43,10 @@ const AI_HINTS: Record<string, { line: string; tip: string }> = {
   mycelium: { line: 'Or work with AI on your web.', tip: 'Work with AI — My-celium' },
   maps: { line: 'Or work with AI on Maps.', tip: 'Work with AI — Maps' },
   chat: { line: 'Or work with AI across your conversations.', tip: 'Work with AI — Chat' },
+  food: { line: 'Or work with AI on recipes, meals and shopping lists.', tip: 'Work with AI — Food' },
+  art: { line: 'Or work with AI on your art.', tip: 'Work with AI — Art' },
+  work: { line: 'Or work with AI on work and jobs.', tip: 'Work with AI — Work' },
+  library: { line: 'Or work with AI on the Library.', tip: 'Work with AI — Library' },
 };
 
 /** The full hint sentence for a section's brain row. */

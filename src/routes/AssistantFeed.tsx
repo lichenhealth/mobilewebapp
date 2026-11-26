@@ -18,7 +18,7 @@ import {
   loadAssistantFeed, postToAssistantFeed, loadThreadBadges, markThreadRead, loadThreadCursors, isSnagNote,
   loadProfileContext, loadSpaceContext, spaceIdOfThread, spaceRoomOfThread, spaceThreadId, isSharedSpaceThread,
   loadSectionPresence, groupConvos, type ConvoGroup, loadConvoNames, renameConvo, deleteConvo,
-  ASSISTANT_THREADS, BRAIN_RAIL, threadLabel, sectionIcon, sectionLabel,
+  ASSISTANT_THREADS, BRAIN_RAIL, TOPIC_RAIL, loadTopicSections, threadLabel, sectionIcon, sectionLabel,
   type FeedPostRow, type ProfileContext, type SpaceContext,
 } from '../lib/assistantFeedApi';
 import { setConsent } from '../lib/assistantConsentApi';
@@ -59,6 +59,9 @@ export default function AssistantFeed() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const me = user?.id ?? '';
+  // Topic rows earned by conversations (Food, Travel…) — 2026-11-26.
+  const [topics, setTopics] = useState<string[]>([]);
+  useEffect(() => { if (me) void loadTopicSections(me).then(setTopics).catch(() => {}); }, [me]);
 
   // Rooms that mirror the platform (founder 2026-08-11) — ?thread= is the
   // thread, ?back= the way home to whatever sent you here.
@@ -72,7 +75,7 @@ export default function AssistantFeed() {
   // carries that section so the rail lights it, the head names it, the back
   // arrow returns to its brief, and every send keeps the tag.
   const secRaw = params.get('sec') || '';
-  const litSec = BRAIN_RAIL.some((it) => it.section === secRaw && !it.thread) ? secRaw : '';
+  const litSec = [...BRAIN_RAIL, ...TOPIC_RAIL].some((it) => it.section === secRaw && !it.thread) ? secRaw : '';
   // THE UNIVERSAL BACK (founder 2026-11-02, crossing out the "← Back" pill:
   // "have the universal back button be a circle in the upper left with a
   // carrot"): the feed broadcasts its back to the TopBar's arrow beside the
@@ -846,7 +849,7 @@ export default function AssistantFeed() {
           bottom-nav sections standing — Drive and Maps ride as brief-only
           brains (no thread, so no badge and never "on" here); the open
           thread's circle lights in place. */}
-      {BRAIN_RAIL.map((it) => {
+      {[...BRAIN_RAIL, ...TOPIC_RAIL.filter((x) => topics.includes(x.section) || x.section === litSec)].map((it) => {
         const t = it.thread ? ASSISTANT_THREADS.find((th) => th.id === it.thread) : null;
         const off = t && setup ? !setup[t.id] : false;
         return (
@@ -1032,7 +1035,7 @@ export default function AssistantFeed() {
               : spaceId
               ? `${possessive(sctx?.name ?? 'This space')} build thread — its page, its story, kept with the ${sctx?.kind ?? 'space'}.`
               : litSec
-              ? `Your ${BRAIN_RAIL.find((it) => it.section === litSec)?.label ?? 'section'} conversations — kept with that section, and part of the whole weave.`
+              ? `Your ${[...BRAIN_RAIL, ...TOPIC_RAIL].find((it) => it.section === litSec)?.label ?? 'section'} conversations — kept with that section, and part of the whole weave.`
               : thread === 'general'
               ? 'Everything you’ve shared and asked — the whole weave, drawing on every thread.'
               : `The ${threadLabel(thread)} thread — this is where that work stays woven together.`}
