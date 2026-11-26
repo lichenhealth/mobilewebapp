@@ -236,6 +236,7 @@ export default function Connections() {
               <input className="conn__input conn__input--secret" type="text" {...keyField} name="twilio-api-key-secret" value={secret} onChange={(e) => setSecret(e.target.value)} />
             </label>
             <p className="conn__fine">Lichen checks the key with Twilio, keeps it locked to your account, and never shows it again. You can delete the key in Twilio any time.</p>
+            {err && <p className="conn__err" role="alert">{err}</p>}
             <div className="conn__acts">
               <button className="conn__btn" disabled={busy || !acct || !keySid || !secret} onClick={() => void connect()}>{busy ? 'Checking…' : 'Connect'}</button>
               <button className="conn__btn conn__btn--quiet" onClick={() => { setOpen(false); setErr(''); }}>Cancel</button>
@@ -349,7 +350,7 @@ export default function Connections() {
         </>
       )}
 
-      {err && <p className="conn__err">{err}</p>}
+      {err && !open && <p className="conn__err" role="alert">{err}</p>}
     </div>
   );
 }
