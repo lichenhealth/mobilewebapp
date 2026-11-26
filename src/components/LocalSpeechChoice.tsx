@@ -3,6 +3,7 @@ import { Icon } from './Icon';
 import { agreeLocalSpeech, localSpeechAgreed, LOCAL_SPEECH_MB, useLocalSpeechStatus } from '../lib/localSpeech';
 import { isIosHomeScreenApp } from '../lib/browserHandoff';
 import type { VoiceChoice } from '../lib/dictation';
+import OpenInBrowser from './OpenInBrowser';
 import './LocalSpeechChoice.css';
 
 /** THE VOICE CHOICE (founder 2026-11-26, replacing a bare OK/Cancel box:
@@ -17,7 +18,11 @@ import './LocalSpeechChoice.css';
  *  points first to the keyboard's own mic — Apple's dictation is instant
  *  and needs no download. Choosing the listener shows the download's
  *  progress right here, then a Start button: the person's tap is the next
- *  step (iPhones only start audio from a tap). Opened by askVoiceChoice()
+ *  step (iPhones only start audio from a tap). On the iPhone home-screen app
+ *  VOICE CONVERSATIONS lead with the Safari/Chrome hand-off (founder
+ *  2026-11-26: "go back to the original strategy… open seamlessly the web
+ *  browser") — Apple's speech recognition, fast and accurate; the on-phone
+ *  listener stays as the private, slower option. Opened by askVoiceChoice()
  *  in src/lib/dictation.ts; mounted once in App.tsx. */
 type Req = { prefer: 'talk' | 'text'; resolve: (c: VoiceChoice) => void };
 
@@ -72,8 +77,18 @@ export default function LocalSpeechChoice() {
             <div className={'lsc__opt' + (req.prefer === 'talk' ? ' is-lead' : '')}>
               <div className="lsc__opthead"><Icon name="speaker" size={18} /><strong>Voice conversations with Claude</strong></div>
               <p className="lsc__optp">You talk, and Claude talks back. When you finish speaking it answers out loud, then listens for your reply — hands free.</p>
-              <p className="lsc__optfine">Needs a one-time download of about {LOCAL_SPEECH_MB} MB (Wi-Fi is best).</p>
-              <button className="btn btn-primary lsc__btn" onClick={() => choose('talk')}>Turn on voice conversations</button>
+              {iosApp ? (
+                <>
+                  <p className="lsc__optfine">Best in your browser: Lichen opens there signed in, on this same screen, with voice conversations on — using Apple’s fast, accurate speech recognition.</p>
+                  <OpenInBrowser flags={{ voice: '1' }} />
+                  <button className="lsc__link" onClick={() => choose('talk')}>Or stay in the app with Lichen’s private on-phone listener ({LOCAL_SPEECH_MB} MB download, slower)</button>
+                </>
+              ) : (
+                <>
+                  <p className="lsc__optfine">Needs a one-time download of about {LOCAL_SPEECH_MB} MB (Wi-Fi is best).</p>
+                  <button className="btn btn-primary lsc__btn" onClick={() => choose('talk')}>Turn on voice conversations</button>
+                </>
+              )}
             </div>
             <div className={'lsc__opt' + (req.prefer === 'text' ? ' is-lead' : '')}>
               <div className="lsc__opthead"><Icon name="mic" size={18} /><strong>Just voice-to-text</strong></div>
@@ -92,7 +107,9 @@ export default function LocalSpeechChoice() {
                 </>
               )}
             </div>
-            <p className="lsc__fine">With Lichen’s listener, this phone turns your speech into words itself — your voice never leaves it.</p>
+            <p className="lsc__fine">{iosApp
+              ? 'Apple doesn’t let home-screen apps use its speech recognition, so the browser does the listening. Lichen’s own listener turns speech into words on this phone — your voice never leaves it — but it’s slower.'
+              : 'With Lichen’s listener, this phone turns your speech into words itself — your voice never leaves it.'}</p>
           </>
         ) : (
           <>
