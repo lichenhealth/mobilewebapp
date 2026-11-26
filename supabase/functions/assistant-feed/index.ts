@@ -432,6 +432,26 @@ const SEARCH_HISTORY_TOOL = {
 const APP_DOORS: Record<string, { path: string; label: string }> = {
   profile_settings: { path: '/profile', label: 'Open your Profile settings' },
   public_page_builder: { path: '/profile#public-page', label: 'Open your public-page settings' },
+  // Every Profile section has its own door, landing with that section OPEN
+  // (founder 2026-11-26: "click through as far as you possibly can").
+  profile_info: { path: '/profile#about', label: 'Open your Profile info' },
+  connections: { path: '/profile#connections', label: 'Open Connections' },
+  privacy: { path: '/profile#privacy', label: 'Open your Privacy settings' },
+  notifications: { path: '/profile#notifications', label: 'Open your Notification settings' },
+  location: { path: '/profile#location', label: 'Open your Location settings' },
+  goods_and_services: { path: '/profile#offer', label: 'Open Goods & services you offer' },
+  currentcy_settings: { path: '/profile#currentcy', label: 'Open Current-cy in your Profile' },
+  concierge_settings: { path: '/profile#concierge', label: 'Open Concierge in your Profile' },
+  care_team: { path: '/profile#care-for', label: 'Open the people you care for' },
+  taken_offline: { path: '/profile#offline', label: 'Open what you’ve taken offline' },
+  calendar_sharing: { path: '/calendar/settings#shared', label: 'Open who you share your calendar with' },
+  subscriptions: { path: '/currentcy#subscriptions', label: 'Open your Subscriptions' },
+  coupons: { path: '/currentcy#coupons', label: 'Open your Coupons' },
+  practice: { path: '/practice', label: 'Open your Practice' },
+  practice_streams: { path: '/practice#streams', label: 'Open your services & who pays' },
+  contacts: { path: '/contacts', label: 'Open your Contacts' },
+  mail: { path: '/mail', label: 'Open Mail' },
+  google_drive_import: { path: '/drive/import', label: 'Open Google Drive import' },
   calendar: { path: '/calendar', label: 'Open your Calendar' },
   calendar_settings: { path: '/calendar/settings', label: 'Open Calendar settings' },
   bookings: { path: '/bookings', label: 'Open your sessions' },
@@ -446,7 +466,7 @@ const APP_DOORS: Record<string, { path: string; label: string }> = {
 };
 const SEND_APP_DOOR_TOOL = {
   name: 'send_app_door',
-  description: 'Hand the member a BUTTON that opens a part of Lichen — it renders under your reply and walks them there in one tap. Use it whenever they would otherwise get navigation directions ("go to Profile → …"): hand the door instead. Prefer DOING the work with your own tools when you can; the door is for when they want the manual screen, or for a surface you cannot act on.',
+  description: 'Hand the member a BUTTON that opens a part of Lichen — it renders under your reply and walks them there in one tap. Always pick the MOST SPECIFIC door — a Profile section's own door (connections, privacy…) over profile_settings — so they land with that part already open. Use it whenever they would otherwise get navigation directions ("go to Profile → …"): hand the door instead. Prefer DOING the work with your own tools when you can; the door is for when they want the manual screen, or for a surface you cannot act on.',
   input_schema: {
     type: 'object',
     properties: { destination: { type: 'string', enum: Object.keys(APP_DOORS), description: 'Which door to hand them.' } },

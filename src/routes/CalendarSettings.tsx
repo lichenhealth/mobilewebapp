@@ -38,6 +38,7 @@ import { numericAmount } from '../lib/ledgerApi';
 import './Concierge.css';
 import './Calendar.css';
 import { useConfirm } from '../components/ConfirmDialog';
+import { useHashScroll } from '../lib/useHashScroll';
 
 interface MemberOpt { id: string; full_name: string | null }
 
@@ -127,6 +128,7 @@ function RuleSelect(props: {
 }
 
 export default function CalendarSettings() {
+  useHashScroll();
   const { user } = useAuth();
   const me = user?.id ?? '';
   const navigate = useNavigate();
@@ -1144,7 +1146,7 @@ export default function CalendarSettings() {
           {myPhone !== null && !myPhone && windows.some((w) => w.kind === 'on_call') && (
             <p className="cedit__hint">
               You have on-call hours but no phone number — add one in your{' '}
-              <Link to="/profile">Profile</Link> so clients can call you when you&rsquo;re on call.
+              <Link to="/profile#about">Profile</Link> so clients can call you when you&rsquo;re on call.
             </p>
           )}
         </div>

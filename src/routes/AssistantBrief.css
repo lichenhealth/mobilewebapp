@@ -184,6 +184,15 @@
   border-radius: 18px; padding: 12px;
 }
 .abrief__panehead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 30px; padding: 0 2px 8px; }
+/* A clean seam under each pane's head (founder 2026-11-26: "a gray line at
+   the bottom of the header that separates the text instead of looking like
+   the two guardrails" — a bubble scrolled half out of view used to show only
+   its side edges running up into the head). Full pane width. */
+.abrief__pane .abrief__panehead {
+  margin: 0 -12px; padding: 0 14px 10px;
+  border-bottom: 1px solid var(--bone-edge);
+}
+.abrief__pane .abrief__panehead + .abrief__panebody { padding-top: 12px; }
 .abrief__panemeta { margin-left: auto; font-size: 11px; color: var(--ink-faint); }
 .abrief__pane .abrief__lasthead { justify-content: space-between; align-items: center; }
 .abrief__pane .abrief__convos-h { margin: 0; }

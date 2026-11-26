@@ -9,6 +9,7 @@ import CashOutCard from '../components/CashOutCard';
 import MoneySafeguards from '../components/MoneySafeguards';
 import './Concierge.css';
 import './Mycelium.css';   // shares the myc__ centered-header vocabulary (Drive's shape)
+import { useHashScroll } from '../lib/useHashScroll';
 
 /** The wallet's own screen (founder 2026-09-13: "your wallet just lives in
  *  your profile… it should be a left nav on desktop and a bottom nav on
@@ -20,6 +21,7 @@ import './Mycelium.css';   // shares the myc__ centered-header vocabulary (Drive
  *  load money into it" (founder 2026-10-01): the money-in doors are the
  *  shared MoneyInDoors component, which Profile's drawer mounts too. */
 export default function Currentcy() {
+  useHashScroll();
   return (
     <div className="cedit">
       {/* Drive's header grammar (founder 2026-10-02: "have the current-cy tab
