@@ -26,7 +26,12 @@ export const useLocalSpeechStatus = () => useSyncExternalStore(subscribe, () => 
 const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const write = (k: string, v: string | null) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* */ } emit(); };
 
+/** SWITCHED OFF (founder 2026-11-26: "we've decided that it's not high
+ *  enough quality… we're just going to use what's on the phone"). The
+ *  on-phone Whisper code stays dormant; flip this to bring it back. */
+export const LOCAL_SPEECH_ENABLED = false;
 export function localSpeechSupported(): boolean {
+  if (!LOCAL_SPEECH_ENABLED) return false;
   return typeof window !== 'undefined' && typeof Worker !== 'undefined' && typeof WebAssembly !== 'undefined'
     && !!navigator.mediaDevices?.getUserMedia
     && !!(window.AudioContext || (window as unknown as { webkitAudioContext?: unknown }).webkitAudioContext);
