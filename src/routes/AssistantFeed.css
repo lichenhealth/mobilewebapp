@@ -605,3 +605,10 @@
   display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 11px; color: var(--peach-deep);
 }
 .afeed__readaloud:hover { text-decoration: underline; }
+
+/* A reply to the summary quotes it (2026-11-26). */
+.afeed__briefquote {
+  margin: 0 0 6px; padding: 6px 10px; border-left: 2px solid var(--peach);
+  font-size: 12.5px; line-height: 1.45; color: var(--ink-muted); white-space: pre-wrap;
+}
+.afeed__briefquote-h { display: block; font-size: 11px; color: var(--peach-deep); margin-bottom: 2px; }

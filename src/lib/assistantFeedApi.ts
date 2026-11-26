@@ -37,7 +37,7 @@ export type FeedAttachment =
    *  client, never in the conversation). A brief-composer send carries what
    *  was on her screen so the model knows what "it" means. NEVER rendered —
    *  the member saw it as the brief card already. */
-  | { type: 'brief_ctx'; section: string; text: string }
+  | { type: 'brief_ctx'; section: string; text: string; reply?: boolean }
   | { type: 'mailref'; account_id: string; account: string; thread_id: string; subject: string; from: string }
   /** GOOGLE DRIVE → LICHEN (2026-11-15): files the brain picked; the card's
    *  tap re-creates each as a Lichen file through the member's own session. */
@@ -437,7 +437,7 @@ export async function postToAssistantFeed(
   /** The brief narration on screen when this was sent (founder 2026-11-02):
    *  rides as a brief_ctx attachment so the reply knows what the member was
    *  reading — the client never renders it. */
-  briefCtx?: { section: string; text: string },
+  briefCtx?: { section: string; text: string; reply?: boolean },
   /** An email thread attached from Mail (founder 2026-11-14). */
   mailRef?: { account_id: string; account: string; thread_id: string; subject: string; from: string },
   /** A doc asked about from the doc itself (founder 2026-11-26); voice =
@@ -452,7 +452,7 @@ export async function postToAssistantFeed(
     ...(here ? [{ type: 'here', lat: here[0], lng: here[1] } as const] : []),
     ...(images ?? []).map((url) => ({ type: 'photo', url } as const)),
     ...(briefCtx?.text.trim()
-      ? [{ type: 'brief_ctx', section: briefCtx.section, text: briefCtx.text.slice(0, 2000) } as const]
+      ? [{ type: 'brief_ctx', section: briefCtx.section, text: briefCtx.text.slice(0, 2000), ...(briefCtx.reply ? { reply: true } : {}) } as const]
       : []),
     ...(mailRef ? [{ type: 'mailref', ...mailRef, subject: mailRef.subject.slice(0, 200), from: mailRef.from.slice(0, 200) } as const] : []),
     ...(docCtx ? [{ type: 'doc_ctx', doc_id: docCtx.doc_id, title: docCtx.title.slice(0, 160), voice: !!docCtx.voice } as const] : []),

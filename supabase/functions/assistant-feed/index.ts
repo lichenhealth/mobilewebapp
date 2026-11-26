@@ -891,7 +891,9 @@ Deno.serve(async (req) => {
     ? [Number(hereAtt.lng), Number(hereAtt.lat)] : null;
   const briefCtxAtt = (Array.isArray(trigger?.attachments) ? trigger.attachments : [])
     .find((a: { type?: string; text?: string }) => a?.type === 'brief_ctx' && typeof a.text === 'string');
-  let briefContext = briefCtxAtt?.text?.trim()
+  let briefContext = briefCtxAtt?.text?.trim() && (briefCtxAtt as { reply?: boolean }).reply
+    ? `\n\n[They are REPLYING TO this briefing of theirs, from the box right under it — it is what their message is about: "${String(briefCtxAtt.text).slice(0, 2000)}"]`
+    : briefCtxAtt?.text?.trim()
     ? `\n\n[Right before sending this, they were reading this briefing of theirs on the same screen — it is background only. Their message may have nothing to do with it; answer what they actually asked, and only draw on the briefing if their words point at it: "${String(briefCtxAtt.text).slice(0, 2000)}"]`
     : '';
   // AN EMAIL THREAD ATTACHED FROM MAIL (founder 2026-11-14): the card names

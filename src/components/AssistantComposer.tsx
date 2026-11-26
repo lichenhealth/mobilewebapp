@@ -19,7 +19,7 @@ import './AssistantComposer.css';
  *  into the box (or picked via the + on phones, where paste barely exists)
  *  uploads immediately, previews as a chip, and rides the send. */
 export default function AssistantComposer({
-  onSend, placeholder = 'Ask about any of this…', className = '', initialText, uploaderId, attachment,
+  onSend, placeholder = 'Ask about any of this…', className = '', initialText, uploaderId, attachment, secondary = false,
 }: {
   onSend: (text: string, images?: string[]) => void | Promise<void>;
   placeholder?: string;
@@ -35,6 +35,10 @@ export default function AssistantComposer({
    *  additional context, below it"). Present = the box may send with no
    *  words, the attachment alone being the ask. */
   attachment?: React.ReactNode;
+  /** A second composer on the same screen (the brief's summary reply beside
+   *  the last conversation): it never catches window-wide drops or the
+   *  voice-mode listen cue, and wears no voice switch — one ear, one drop zone. */
+  secondary?: boolean;
 }) {
   const [ask, setAsk] = useState(initialText ?? '');
   // An attachment arriving means "write about this" — the box takes focus
@@ -134,11 +138,12 @@ export default function AssistantComposer({
     voiceListen();
   }
   useEffect(() => {
+    if (secondary) return;
     const go = () => { if (voice) voiceListen(); };
     window.addEventListener('lichen:voice-listen', go);
     return () => window.removeEventListener('lichen:voice-listen', go);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voice]);
+  }, [voice, secondary]);
   useEffect(() => () => { dictation.current?.stop(); }, []);
 
   async function addFiles(files: File[]) {
@@ -162,7 +167,7 @@ export default function AssistantComposer({
   const addFilesRef = useRef(addFiles);
   addFilesRef.current = addFiles;
   useEffect(() => {
-    if (!uploaderId) return;
+    if (!uploaderId || secondary) return;
     const hasFiles = (e: DragEvent) => [...(e.dataTransfer?.items ?? [])].some((it) => it.kind === 'file');
     const over = (e: DragEvent) => { if (hasFiles(e)) { e.preventDefault(); setDragOver(true); } };
     const leave = (e: DragEvent) => { if (!e.relatedTarget) setDragOver(false); };
@@ -179,7 +184,7 @@ export default function AssistantComposer({
       window.removeEventListener('dragleave', leave);
       window.removeEventListener('drop', drop);
     };
-  }, [uploaderId]);
+  }, [uploaderId, secondary]);
 
   function onPaste(e: React.ClipboardEvent) {
     if (!uploaderId) return;
@@ -253,7 +258,7 @@ export default function AssistantComposer({
             <Icon name="mic" size={17} />
           </button>
         )}
-        {canSpeak() && (
+        {canSpeak() && !secondary && (
           <button type="button" className={'assist-composer__btn assist-composer__voice' + (voice ? ' is-live' : '')}
             onClick={toggleVoice} aria-pressed={voice}
             aria-label={voice ? 'Turn voice mode off' : 'Voice mode — talk, and hear the reply'}
@@ -269,7 +274,7 @@ export default function AssistantComposer({
         </button>
       </div>
       {/* With voice mode on, the always-listening choice sits right here. */}
-      {voice && <VoiceSettings compact />}
+      {voice && !secondary && <VoiceSettings compact />}
     </form>
   );
 }
