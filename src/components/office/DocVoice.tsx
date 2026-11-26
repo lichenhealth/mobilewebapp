@@ -6,7 +6,7 @@ import { postToAssistantFeed } from '../../lib/assistantFeedApi';
 import { aiDoorOn } from '../AssistantDoor';
 import { renderBold } from '../../lib/inlineBold';
 import {
-  canListen, canSpeak, listenOnce, speak, startWakeWord, stopSpeaking, useSpeaking,
+  canListen, canSpeak, listenOnce, pushWakeHandler, speak, stopSpeaking, useSpeaking,
 } from '../../lib/voice';
 import './DocVoice.css';
 
@@ -125,7 +125,9 @@ export default function DocVoice({ doc, html, body, onClose }: {
   const askRef = useRef(ask); askRef.current = ask;
   useEffect(() => {
     if (!handsFree) return;
-    const w = startWakeWord((said) => {
+    // One ear for the whole app (GlobalWake) — this panel just claims the
+    // wake words while hands-free is on.
+    return pushWakeHandler((said) => {
       const s = said.toLowerCase().replace(/[.!?]+$/, '').trim();
       if (/^(next|next step|go on|continue)$/.test(s)) go(1);
       else if (/^(back|go back|previous|last step)$/.test(s)) go(-1);
@@ -133,7 +135,6 @@ export default function DocVoice({ doc, html, body, onClose }: {
       else if (/^(stop|quiet|pause|shush)$/.test(s)) stopSpeaking();
       else void askRef.current(said, true);
     });
-    return () => w.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handsFree]);
 

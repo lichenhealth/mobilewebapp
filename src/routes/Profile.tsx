@@ -40,6 +40,7 @@ import ClinicalHomeField from '../components/ClinicalHomeField';
 import AssistantDoor, { aiWorkHint } from '../components/AssistantDoor';
 import AssistantConsentList from '../components/AssistantConsentList';
 import AssistantAllowances from '../components/AssistantAllowances';
+import VoiceSettings from '../components/VoiceSettings';
 import { ContactSharesList } from '../components/ContactShares';
 import DownloadMyLichen from '../components/DownloadMyLichen';
 import Connections from '../components/Connections';
@@ -1267,6 +1268,8 @@ export default function Profile() {
         <AssistantConsentList />
         <p className="prof__privacy-sub">What Claude may do without asking</p>
         <AssistantAllowances />
+        <p className="prof__privacy-sub" id="voice">Talking with the brain — on this device</p>
+        <VoiceSettings />
 
         {/* Per-group contact permission (founder 2026-11-06): who in each
             group may see your email and phone. Nobody unless you choose. */}

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { speechRecognition, startDictation, type DictationSession } from './dictation';
+import { foregroundListening, speechRecognition, startDictation, type DictationSession } from './dictation';
 
 /** VOICE MODE (founder 2026-11-26: "give the brain the ability to speak, so
  *  we can talk back and forth… read my next step to me as I'm cooking" and
@@ -90,13 +90,14 @@ export function stopSpeaking() {
 }
 
 /** Listen for one phrase. Resolves with what was said ('' on silence/stop). */
-export function listenOnce(onPhrase?: (p: string) => void): { done: Promise<string>; stop: () => void } {
+export function listenOnce(onPhrase?: (p: string) => void, background = false): { done: Promise<string>; stop: () => void } {
   let phrase = '';
   let session: DictationSession | null = null;
   const done = new Promise<string>((resolve) => {
     session = startDictation({
       onPhrase: (p) => { phrase = p; onPhrase?.(p); },
       onEnd: () => resolve(phrase.trim()),
+      background,
     });
     if (!session) resolve('');
   });
@@ -124,8 +125,8 @@ export function startWakeWord(onAsk: (said: string) => void): { stop: () => void
   let cur: { stop: () => void } | null = null;
   const loop = async () => {
     while (active) {
-      if (document.visibilityState !== 'visible' || speaking) { await new Promise((r) => setTimeout(r, 400)); continue; }
-      const l = listenOnce();
+      if (document.visibilityState !== 'visible' || speaking || foregroundListening()) { await new Promise((r) => setTimeout(r, 400)); continue; }
+      const l = listenOnce(undefined, true);
       cur = l;
       const heard = await l.done;
       cur = null;
@@ -148,3 +149,31 @@ export function startWakeWord(onAsk: (said: string) => void): { stop: () => void
   void loop();
   return { stop: () => { active = false; cur?.stop(); } };
 }
+
+/* ── ALWAYS LISTENING FOR "HEY BRAIN" (founder 2026-11-26: "a setting for
+   audio, which is that Claude is always listening or the brain is always
+   listening for Hey Brain or Hey Claude") ─────────────────────────────────
+   A per-device switch. While it's on and Lichen is open on screen, the wake
+   listener runs app-wide (GlobalWake). A screen can take the wake words over
+   for itself (a doc's Claude panel: "Hey Brain, next") by pushing a handler;
+   otherwise the words go to the brain. */
+const WKEY = 'lichen.wakeAlways';
+let wakeAlways = false;
+try { wakeAlways = localStorage.getItem(WKEY) === '1'; } catch { /* */ }
+const handlers: ((said: string) => void)[] = [];
+export function useWakeAlways(): boolean { return useSyncExternalStore(subscribe, () => wakeAlways, () => false); }
+export function setWakeAlways(v: boolean) {
+  wakeAlways = v;
+  try { localStorage.setItem(WKEY, v ? '1' : '0'); } catch { /* */ }
+  emit();
+}
+let handlerTick = 0;
+export function useWakeWanted(): boolean {
+  return useSyncExternalStore(subscribe, () => wakeAlways || handlers.length > 0, () => false);
+}
+/** A screen claims the wake words while mounted; returns the release. */
+export function pushWakeHandler(fn: (said: string) => void): () => void {
+  handlers.push(fn); handlerTick++; emit();
+  return () => { const i = handlers.lastIndexOf(fn); if (i >= 0) handlers.splice(i, 1); handlerTick++; emit(); };
+}
+export function topWakeHandler(): ((said: string) => void) | null { return handlers[handlers.length - 1] ?? null; }
