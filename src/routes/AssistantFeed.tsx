@@ -31,6 +31,7 @@ import { ScrollHintRow } from '../components/ScrollHintRow';
 import { loadPostsByIds, type FeedPost } from '../lib/postsApi';
 import KnockDraftCard from '../components/KnockDraftCard';
 import MailDraftCard from '../components/MailDraftCard';
+import AllowRepliesCard from '../components/AllowRepliesCard';
 import GDriveImportCard from '../components/GDriveImportCard';
 import CalFeedCard from '../components/CalFeedCard';
 import CalShareCard from '../components/CalShareCard';
@@ -1573,6 +1574,15 @@ export default function AssistantFeed() {
                     <div className="afeed__pubrow" key={`${p.id}:mdraft:${a.message_id}`}>
                       <MailDraftCard accountId={a.account_id} account={a.account} threadId={a.thread_id} messageId={a.message_id}
                         to={a.to} cc={a.cc} subject={a.subject} body={a.body} reply={!!a.reply} />
+                    </div>
+                  ))}
+                {/* THE PERMISSION POP-UP (founder 2026-11-26) — their tap, never the model's. */}
+                {p.author === 'claude' && (p.attachments ?? [])
+                  .flatMap((a) => (a.type === 'allow_mail_reply' ? [a] : []))
+                  .slice(0, 1)
+                  .map((a) => (
+                    <div className="afeed__pubrow" key={`${p.id}:allowreply`}>
+                      <AllowRepliesCard draft={a.draft} />
                     </div>
                   ))}
                 {/* MESSAGES, DRAFTED (founder 2026-11-19) — the person taps Send. */}

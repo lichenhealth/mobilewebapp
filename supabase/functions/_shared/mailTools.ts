@@ -74,6 +74,11 @@ export const MAIL_TOOLS = [
     input_schema: { type: 'object', properties: { accounts: { type: 'array', items: { type: 'string' } } } },
   },
   {
+    name: 'ask_reply_permission',
+    description: 'When the member tells you, in their own words, that you may answer email for them ("you\'re free to reply", "go ahead and answer these yourself", "you can reply for me from now on"), call this. It puts a permission card in this conversation — like a phone\'s permissions pop-up — where THEY tap to let you send replies on your own (only on threads they are already in, never with a password, PIN or code, never agreeing to pay or cancel). If a reply draft is waiting in this conversation, the card also offers to send it. You cannot grant this yourself: never say you now have permission until they tap. No input.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
     name: 'mail_filters',
     description: 'Gmail FILTERS (standing rules for future mail) on one of their inboxes. op "list" shows them; op "create" makes one — match by from / to / subject / query (Gmail search grammar), then any of: skip_inbox (archive it on arrival), mark_read, star, trash, label (a label name, created if missing), never_spam; op "delete" removes one by filter_id from list. Create or delete ONLY a rule the member asked for in their own words, and say plainly what it now does to future mail. A filter never forwards. If Gmail refuses for missing permission, a Reconnect card is attached automatically — tell them to tap it here and say when they\'re back.',
     input_schema: {
@@ -124,6 +129,9 @@ export async function runMailTool(profileId: string, name: string, input: Record
       if (!['primary', 'subscriptions', 'promotions', 'updates'].includes(kind)) return { ok: false, error: 'kind must be primary, subscriptions, promotions or updates.' };
       if (!(await saveMailSortRule(profileId, sender, kind as 'primary'))) return { ok: false, error: 'That didn\'t save.' };
       return { ok: true, sorted: `${sender.startsWith('@') ? 'Everyone at ' + sender.slice(1) : sender} now files under ${kind}.` };
+    }
+    if (name === 'ask_reply_permission') {
+      return { ok: true, allowPrompt: true, note: 'A permission card is attached under your reply. Tell them in one line what tapping Allow means (you\'ll answer replies on threads they\'re already in, tell them after, never send passwords/codes or agree to pay or cancel) and that they can take it back any time in Profile → Privacy. Do not say permission is granted.' };
     }
     if (name === 'mail_reconnect') {
       const want = Array.isArray(input.accounts) ? (input.accounts as unknown[]).map((x) => String(x).trim().toLowerCase()).filter(Boolean) : [];
@@ -187,7 +195,7 @@ export async function runMailTool(profileId: string, name: string, input: Record
       const d = await draftMail(profileId, { accountId: acct.id, threadId: s('thread_id') || undefined, to, cc: s('cc') || undefined, subject: s('subject'), body: s('body') });
       const thread = d.threadId || s('thread_id');
       return {
-        ok: true, note: `Draft saved in ${acct.email}'s Drafts, to ${to}. Not sent${held ? ` — held because ${held}` : ''} — a card under your reply lets them edit and tap Send (or open it in Mail). Never say it was sent.`,
+        ok: true, note: `Draft saved in ${acct.email}'s Drafts, to ${to}. Not sent${held ? ` — held because ${held}` : ''} — a card under your reply lets them edit and tap Send (or open it in Mail). Never say it was sent.${held.startsWith('they haven') ? ' Say it in these words: "I\'ve drafted a reply and will send it with your go-ahead. If you\'d like me to answer emails like this on my own from now on, just tell me I\'m free to reply."' : ''}`,
         // THE DRAFT HANDS A SEND BUTTON (founder 2026-11-15: "there's no send
         // button") — the person's tap on the card sends it, nothing else does.
         mailDraft: { account_id: acct.id, account: acct.email, thread_id: thread, message_id: d.messageId, to, cc: s('cc'), subject: s('subject'), body: s('body'), ...(s('thread_id') ? { reply: true } : {}) },
