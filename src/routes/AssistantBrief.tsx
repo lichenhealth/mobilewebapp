@@ -1375,7 +1375,11 @@ export default function AssistantBrief() {
           the box for the old conversation seems weird… have new conversation
           actually be at the top, above summary and above picking up your last
           conversation"). */}
-      {!spaceParam && briefConvos.length > 0 && (
+      {/* The tools row's + is THE new-conversation door (founder 2026-11-26:
+          "can't we just have a plus button instead of new conversation? Just
+          like we do everywhere else"); only a person briefing, which has no
+          tools row, keeps the worded pill. */}
+      {!!memberId && !spaceParam && briefConvos.length > 0 && (
         <div className="abrief__newrow">
           <button type="button" className="abrief__newbtn" onClick={openNewConvo}>
             <Icon name="plus" size={15} /> New conversation
