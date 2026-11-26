@@ -727,6 +727,9 @@
  "assistantAllowanceApi:cancelProposal": {
   "exempt": "the person's own tap on a confirm card"
  },
+ "assistantAllowanceApi:allowMailReplies": {
+  "exempt": "only the person's tap grants an allowance — the assistant never grants itself one (doctrine)"
+ },
  "assistantAllowanceApi:revokeAllowance": {
   "exempt": "the assistant never edits its own permissions (doctrine)"
  },
