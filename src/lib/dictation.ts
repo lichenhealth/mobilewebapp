@@ -57,6 +57,15 @@ export function askVoiceChoice(prefer: 'talk' | 'text'): Promise<VoiceChoice> {
     window.dispatchEvent(new CustomEvent('lichen:voice-choice', { detail: { prefer, resolve } }));
   });
 }
+/** The iPhone home-screen app's voice sheet (2026-11-26): Apple keeps its
+ *  speech recognition from home-screen apps, so voice conversations hand
+ *  off to Safari/Chrome and voice-to-text uses the keyboard's own mic.
+ *  'talk' here means "just read replies aloud in the app". */
+export function askIosVoice(prefer: 'talk' | 'text'): Promise<VoiceChoice> {
+  return new Promise((resolve) => {
+    window.dispatchEvent(new CustomEvent('lichen:voice-choice', { detail: { prefer, resolve } }));
+  });
+}
 /** For switches that need the listener (Hey Brain, hands-free, private
  *  listening): true once it's ready. */
 export async function ensureLocalSpeech(prefer: 'talk' | 'text' = 'talk'): Promise<boolean> {

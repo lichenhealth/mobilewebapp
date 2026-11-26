@@ -2,7 +2,8 @@ import { isHeic } from '../lib/heic';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
-import { askVoiceChoice, canDictate, startDictation, usesLocalSpeech, type DictationSession } from '../lib/dictation';
+import { isIosHomeScreenApp } from '../lib/browserHandoff';
+import { askIosVoice, askVoiceChoice, canDictate, startDictation, usesLocalSpeech, type DictationSession } from '../lib/dictation';
 import { localSpeechAgreed, localSpeechStatusNow, useLocalSpeechStatus } from '../lib/localSpeech';
 import { revealBelow } from '../lib/smartReveal';
 import VoiceSettings from './VoiceSettings';
@@ -90,6 +91,10 @@ export default function AssistantComposer({
   // this is null — starting recognition in an installed web app hangs the
   // page, and the iPhone keyboard's own mic covers dictation anyway.
   const SR = canDictate();
+  // The iPhone home-screen app can't run speech recognition: the mic points
+  // to the keyboard's own (Apple's dictation), voice mode offers Safari.
+  const iosApp = !SR && isIosHomeScreenApp();
+  const [kbHint, setKbHint] = useState(false);
   const localSt = useLocalSpeechStatus();
   const dictation = useRef<DictationSession | null>(null);
   // On-device only: 'thinking' = turning a stretch of speech into words.
@@ -105,6 +110,7 @@ export default function AssistantComposer({
     else if (c === 'keyboard') taRef.current?.focus();
   }
   function dictate() {
+    if (iosApp) { taRef.current?.focus(); setKbHint(true); window.setTimeout(() => setKbHint(false), 6000); return; }
     if (!SR) return;
     // Second tap while live = stop (dictation.onEnd clears the light).
     if (listening) { dictation.current?.stop(); return; }
@@ -159,6 +165,13 @@ export default function AssistantComposer({
   }
   function toggleVoice() {
     if (voice) { dictation.current?.stop(); stopSpeaking(); setVoiceOn(false); return; }
+    if (iosApp) {
+      void askIosVoice('talk').then((c) => {
+        if (c === 'talk') setVoiceOn(true);
+        else if (c === 'keyboard') { taRef.current?.focus(); setKbHint(true); window.setTimeout(() => setKbHint(false), 6000); }
+      });
+      return;
+    }
     if (needsChoice() && canListen()) { void routeChoice('talk'); return; }
     setVoiceOn(true);
     voiceListen();
@@ -278,12 +291,13 @@ export default function AssistantComposer({
               onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
           </label>
         )}
-        {SR && (
+        {(SR || iosApp) && (
           <button type="button" className={'assist-composer__btn' + (listening ? ' is-live' : '')}
             onClick={dictate} aria-label="Speak instead">
             <Icon name="mic" size={17} />
           </button>
         )}
+        {kbHint && <span className="assist-composer__voiceword">Tap the mic on your keyboard</span>}
         {listening && usesLocalSpeech() && (localSt.state === 'loading'
           ? <span className="assist-composer__voiceword">Getting ready… {localSt.pct}%</span>
           : hearState === 'thinking' ? <span className="assist-composer__voiceword">Writing it out…</span>

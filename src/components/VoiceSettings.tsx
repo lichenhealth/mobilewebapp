@@ -45,7 +45,7 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
           {listen && !iosApp
             ? ' Listens only while Lichen is open on your screen; nothing that doesn’t start with “Hey Brain” is ever sent.'
             : iosApp
-              ? ' Best in your browser — Lichen opens there signed in with Hey Brain on, using Apple’s speech recognition. (It also works here with Lichen’s slower on-phone listener.)'
+              ? ' Best in your browser — Lichen opens there signed in with Hey Brain on, using Apple’s speech recognition. Apple doesn’t let home-screen apps listen.'
               : ' This browser can’t listen — try Chrome or Safari.'}
           {local && listen && ' Uses more battery while on.'}
         </span>
