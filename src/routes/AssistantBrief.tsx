@@ -1006,7 +1006,7 @@ export default function AssistantBrief() {
     if (mode === 'summary') { /* convo stays undefined: a fresh one */ }
     else if (!spaceParam && lastConvo && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(lastConvo.id)) {
       convo = lastConvo.id;
-    } else if (!spaceParam && !freshConvo) {
+    } else if (!spaceParam) {
       // A tagged section's send continues the latest conversation TAGGED
       // with it — never whatever unrelated exchange is freshest in general.
       const latest = await latestConvoIn(feedThread, sectionTag ?? undefined).catch(() => null);
@@ -1146,9 +1146,12 @@ export default function AssistantBrief() {
   // starts a new one"): the newest conversation that pertains to this brain
   // shows under the ask, and a send continues it; New conversation is the
   // only way to start fresh. Space build threads stay one stream.
-  const [freshConvo, setFreshConvo] = useState(false);
-  const lastConvo = !spaceParam && !freshConvo ? (briefConvos[0] ?? null) : null;
-  const showRight = !spaceParam && !!(lastConvo || freshConvo);
+  // NEW CONVERSATION OPENS ITS OWN WINDOW (founder 2026-11-26: "it should
+  // just go to a new conversation window because the back button will take
+  // me back to the summary… I don't need that summary to come with me").
+  const openNewConvo = () => navigate(`/assistant/feed?thread=${feedThread}&convo=new${sectionTag ? `&sec=${sectionTag}` : ''}${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`);
+  const lastConvo = !spaceParam ? (briefConvos[0] ?? null) : null;
+  const showRight = !spaceParam && !!lastConvo;
   const lastEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = lastEndRef.current?.parentElement;
@@ -1258,7 +1261,7 @@ export default function AssistantBrief() {
               className="abrief__rail-btn abrief__tool"
               aria-label="New conversation"
               data-tip="New conversation"
-              onClick={() => navigate(`/assistant/feed?thread=${feedThread}&convo=new${sectionTag ? `&sec=${sectionTag}` : ''}${backTo ? `&back=${encodeURIComponent(backTo)}` : ''}`)}
+              onClick={openNewConvo}
             >
               <Icon name="plus" size={16} />
             </button>
@@ -1374,15 +1377,9 @@ export default function AssistantBrief() {
           conversation"). */}
       {!spaceParam && briefConvos.length > 0 && (
         <div className="abrief__newrow">
-          {freshConvo ? (
-            <button type="button" className="abrief__newconvo abrief__newconvo--back" onClick={() => setFreshConvo(false)}>
-              ← Back to the last conversation
-            </button>
-          ) : (
-            <button type="button" className="abrief__newbtn" onClick={() => setFreshConvo(true)}>
-              <Icon name="plus" size={15} /> New conversation
-            </button>
-          )}
+          <button type="button" className="abrief__newbtn" onClick={openNewConvo}>
+            <Icon name="plus" size={15} /> New conversation
+          </button>
         </div>
       )}
       <div className={'abrief__split' + (showRight ? ' has-two' : '')}>
