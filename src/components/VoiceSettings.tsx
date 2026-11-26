@@ -1,4 +1,6 @@
 import { canListen, canSpeak, setVoiceOn, setWakeAlways, useVoiceMode, useWakeAlways } from '../lib/voice';
+import { isIosHomeScreenApp } from '../lib/browserHandoff';
+import OpenInBrowser from './OpenInBrowser';
 import './VoiceSettings.css';
 
 /** THE AUDIO SETTINGS (founder 2026-11-26: "we can have a setting for audio,
@@ -9,7 +11,7 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
   const voice = useVoiceMode();
   const wake = useWakeAlways();
   const listen = canListen();
-  const iosApp = !listen && /iP(hone|ad|od)/.test(navigator.userAgent);
+  const iosApp = !listen && isIosHomeScreenApp();
   if (!canSpeak()) return compact ? null : <p className="vset__fine">This browser can’t speak or listen — try Safari or Chrome.</p>;
   return (
     <div className={'vset' + (compact ? ' vset--compact' : '')}>
@@ -19,6 +21,11 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
           <span><strong>Voice mode</strong> — the brain reads its replies aloud, and listens for your answer.</span>
         </label>
       )}
+      {iosApp ? (
+        <div className="vset__row is-off">
+          <span><strong>Always listen for “Hey Brain”</strong> (or “Hey Claude”) — Apple doesn’t let home-screen apps listen, so this opens Lichen in your browser: signed in, on this same screen, already listening.</span>
+        </div>
+      ) : (
       <label className={'vset__row' + (listen ? '' : ' is-off')}>
         <input type="checkbox" checked={wake && listen} disabled={!listen} onChange={(e) => setWakeAlways(e.target.checked)} />
         <span>
@@ -26,10 +33,12 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
           {listen
             ? ' Listens only while Lichen is open on your screen; nothing that doesn’t start with “Hey Brain” is ever sent.'
             : iosApp
-              ? ' Not in the iPhone home-screen app yet — Apple doesn’t let installed web apps listen. Open lichen.health in Safari for hands-free.'
+              ? ' Apple doesn’t let home-screen apps listen, so this opens Lichen in your browser — signed in, on this same screen, already listening.'
               : ' This browser can’t listen — try Chrome or Safari.'}
         </span>
       </label>
+      )}
+      {iosApp && <OpenInBrowser flags={{ voice: '1', wake: '1' }} />}
       {!compact && listen && (
         <p className="vset__fine">Your browser turns speech into words (Chrome sends the audio to Google’s speech service; Safari does much of it on the device). Lichen never records or keeps audio — only the words you send.</p>
       )}

@@ -8,6 +8,9 @@ import { renderBold } from '../../lib/inlineBold';
 import {
   canListen, canSpeak, listenOnce, pushWakeHandler, speak, stopSpeaking, useSpeaking,
 } from '../../lib/voice';
+import { isIosHomeScreenApp } from '../../lib/browserHandoff';
+import OpenInBrowser from '../OpenInBrowser';
+import '../VoiceSettings.css';
 import './DocVoice.css';
 
 /** CLAUDE IN THE DOC (founder 2026-11-26: "we need the brain in every piece
@@ -61,7 +64,7 @@ export default function DocVoice({ doc, html, body, onClose }: {
   const [answer, setAnswer] = useState<{ q: string; a: string } | null>(null);
   const [err, setErr] = useState('');
   const [convo, setConvo] = useState<string | null>(null);
-  const [handsFree, setHandsFree] = useState(false);
+  const [handsFree, setHandsFree] = useState(() => new URLSearchParams(window.location.search).get('hands') === '1' && canListen());
   const [listening, setListening] = useState(false);
   // A room's doc answers to its room's switches (checked on the server).
   const aiOn = doc.chat_id ? true : aiDoorOn('saved');
@@ -185,6 +188,9 @@ export default function DocVoice({ doc, html, body, onClose }: {
               <input type="checkbox" checked={handsFree} onChange={(e) => setHandsFree(e.target.checked)} />
               <span><strong>Hands-free</strong> — say “Hey Brain” (or “Hey Claude”), then a question, or “next”, “back”, “repeat”. Listens only while this panel is open and your screen is on; your browser’s speech service turns what you say into words.</span>
             </label>
+          ) : isIosHomeScreenApp() ? (
+            <OpenInBrowser to={`/docs/${doc.id}?claude=1&hands=1`} flags={{ voice: "1" }}
+              lead="To talk hands-free (“Hey Brain, next”), open this doc in your browser — signed in, panel open, already listening. Apple doesn’t let home-screen apps listen." />
           ) : (
             <p className="dvoice__fine">To talk instead of type here, use your keyboard’s mic — or open Lichen in Safari or Chrome for hands-free “Hey Brain”.</p>
           )}
