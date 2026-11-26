@@ -2,7 +2,8 @@ import { isHeic } from '../lib/heic';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
-import { speechRecognition, startDictation, type DictationSession } from '../lib/dictation';
+import { canDictate, startDictation, usesLocalSpeech, type DictationSession } from '../lib/dictation';
+import { useLocalSpeechStatus } from '../lib/localSpeech';
 import { revealBelow } from '../lib/smartReveal';
 import VoiceSettings from './VoiceSettings';
 import { canListen, canSpeak, setVoiceOn, stopSpeaking, useSpeaking, useVoiceMode } from '../lib/voice';
@@ -88,7 +89,8 @@ export default function AssistantComposer({
   // Usable-here check, not merely present (src/lib/dictation.ts): on iOS
   // this is null — starting recognition in an installed web app hangs the
   // page, and the iPhone keyboard's own mic covers dictation anyway.
-  const SR = speechRecognition();
+  const SR = canDictate();
+  const localSt = useLocalSpeechStatus();
   const dictation = useRef<DictationSession | null>(null);
   function dictate() {
     if (!SR) return;
@@ -257,6 +259,9 @@ export default function AssistantComposer({
             onClick={dictate} aria-label="Speak instead">
             <Icon name="mic" size={17} />
           </button>
+        )}
+        {listening && usesLocalSpeech() && localSt.state === 'loading' && (
+          <span className="assist-composer__voiceword">Getting ready… {localSt.pct}%</span>
         )}
         {canSpeak() && !secondary && (
           <button type="button" className={'assist-composer__btn assist-composer__voice' + (voice ? ' is-live' : '')}

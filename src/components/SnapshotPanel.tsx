@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from './Icon';
-import { speechRecognition, startDictation, type DictationSession } from '../lib/dictation';
+import { canDictate, startDictation, type DictationSession } from '../lib/dictation';
 import {
   requestSnapshot, applySnapshot,
   type SnapshotProposal, type SnapshotListing,
@@ -56,7 +56,7 @@ export default function SnapshotPanel({ back, onDone, openInitially = false }: {
   // Usable-here check (src/lib/dictation.ts): null on iOS, where starting
   // recognition in an installed web app hangs the page — the iPhone
   // keyboard's own mic covers dictation there.
-  const SR = speechRecognition();
+  const SR = canDictate();
   const dictation = useRef<DictationSession | null>(null);
   function dictate() {
     if (!SR) return;

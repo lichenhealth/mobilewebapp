@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { foregroundListening, speechRecognition, startDictation, type DictationSession } from './dictation';
+import { canDictate, foregroundListening, startDictation, type DictationSession } from './dictation';
 
 /** VOICE MODE (founder 2026-11-26: "give the brain the ability to speak, so
  *  we can talk back and forth… read my next step to me as I'm cooking" and
@@ -35,7 +35,7 @@ export function useVoiceMode(): boolean { return useSyncExternalStore(subscribe,
 export function useSpeaking(): boolean { return useSyncExternalStore(subscribe, () => speaking, () => false); }
 
 export const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
-export const canListen = () => !!speechRecognition();
+export const canListen = () => canDictate();
 
 /** Words for the ear, not the eye: no markdown, links, emoji or arrows. */
 export function forSpeech(text: string): string {

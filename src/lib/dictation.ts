@@ -1,3 +1,5 @@
+import { agreeLocalSpeech, localSpeechAgreed, localSpeechOnly, localSpeechSupported, LOCAL_SPEECH_MB, startLocalListening } from './localSpeech';
+
 // Speech recognition that's actually USABLE here — not merely present.
 //
 // iOS Safari defines webkitSpeechRecognition, but starting it inside an
@@ -34,6 +36,26 @@ export function speechRecognition(): (new () => SpeechRecognitionLike) | null {
 
 export interface DictationSession { stop: () => void }
 
+
+/** Can this page hear at all — the browser's own speech service, or the
+ *  on-phone Whisper (2026-11-26) where the browser has none? */
+export function canDictate(): boolean {
+  return !!speechRecognition() || localSpeechSupported();
+}
+/** Ask once for the on-phone download when this device will listen with
+ *  it (a person's tap — a wake-word switch, hands-free); true = ready to go. */
+export function ensureLocalSpeech(): boolean {
+  if (!usesLocalSpeech() || localSpeechAgreed()) return true;
+  const yes = window.confirm(`Turn on listening on this phone?\n\nA one-time download of about ${LOCAL_SPEECH_MB} MB (Wi-Fi is best). After that, what you say is turned into words right here on your phone — the audio is never sent anywhere.`);
+  if (yes) agreeLocalSpeech();
+  return yes;
+}
+/** Which ear a session will use. */
+export function usesLocalSpeech(): boolean {
+  return localSpeechSupported() && (localSpeechOnly() || !speechRecognition());
+}
+
+
 // ONE EAR AT A TIME (2026-11-26, "Hey Brain" always listening): engines run
 // one recognition session per page. The always-on wake listener is a
 // BACKGROUND session; anything a person starts (a mic tap, voice mode) is
@@ -67,9 +89,34 @@ export function startDictation(opts: {
   /** The always-on wake listener — yields to anything a person starts. */
   background?: boolean;
 }): DictationSession | null {
+  if (opts.background && foreground > 0) return null;
+  // ON-PHONE WHISPER (2026-11-26): where the browser can't listen (an
+  // iPhone's home-screen app) or the person chose private listening, this
+  // device turns speech into words itself — audio never leaves it. A
+  // person-started session asks once for the one-time download; the
+  // background wake listener never asks.
+  if (usesLocalSpeech()) {
+    if (!localSpeechAgreed()) {
+      if (opts.background || !ensureLocalSpeech()) return null;
+    }
+    if (!opts.background) for (const b of [...background]) b.stop();
+    let ended = false;
+    let session: DictationSession | null = null;
+    const l = startLocalListening({
+      onPhrase: opts.onPhrase,
+      background: opts.background,
+      onEnd: () => {
+        if (ended) return; ended = true;
+        if (opts.background) { if (session) background.delete(session); } else foreground = Math.max(0, foreground - 1);
+        opts.onEnd();
+      },
+    });
+    session = { stop: l.stop };
+    if (opts.background) background.add(session); else foreground++;
+    return session;
+  }
   const Ctor = speechRecognition();
   if (!Ctor) return null;
-  if (opts.background && foreground > 0) return null;
   if (!opts.background) for (const b of [...background]) b.stop();
   const rec = new Ctor();
   rec.lang = navigator.language || 'en-US';
