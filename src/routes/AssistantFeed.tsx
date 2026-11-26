@@ -1455,6 +1455,14 @@ export default function AssistantFeed() {
                     {shared.title || shared.body.slice(0, 60)}
                   </button>
                 )}
+                {/* A reply to the summary quotes it (2026-11-26) — the briefing
+                    it answers stands above the words. */}
+                {(p.attachments ?? []).flatMap((a) => (a.type === 'brief_ctx' && a.reply ? [a] : [])).map((a, i) => (
+                  <blockquote key={i} className="afeed__briefquote">
+                    <span className="afeed__briefquote-h">Replying to your summary</span>
+                    {a.text.length > 240 ? a.text.slice(0, 240).trimEnd() + '…' : a.text}
+                  </blockquote>
+                ))}
                 {/* An attached email thread rides the bubble as its card. */}
                 {(p.attachments ?? []).flatMap((a) => (a.type === 'mailref' ? [a] : [])).map((a) => (
                   <div key={a.thread_id} style={{ marginBottom: 6 }}>

@@ -134,16 +134,6 @@
 }
 .abrief__filter.is-on { background: var(--peach-tint); border-color: var(--peach); color: var(--peach-deep); }
 
-/* SUMMARY LEFT, ASK RIGHT (founder 2026-11-15) — side by side at desktop,
-   so the summary, the ask and the first old conversations all stand above
-   the fold; phones keep the stacked order. */
-@media (min-width: 1024px) {
-  .abrief:has(.abrief__split) { max-width: 1120px; }
-  .abrief__split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--s-6); align-items: start; }
-  .abrief__split .abrief__run { margin-bottom: 0; }
-  .abrief__split .abrief__ask { margin-top: 0; padding-top: 0; border-top: none; position: sticky; top: calc(var(--top-h) + var(--s-4)); }
-}
-
 /* THE SUMMARY FOLDS ON DESKTOP (founder 2026-11-17) — clamped to the ask
    box's height (set inline from a ResizeObserver), a soft fade at the foot,
    and a caret that opens it whole; a tap on the words opens it too. */
@@ -168,25 +158,12 @@
 .abrief__card .abrief__sumfold.is-open { position: static; float: right; margin-top: 6px; }
 .abrief__sumfold.is-open svg { transform: rotate(-90deg); }
 .abrief__sumfold:hover { background: var(--peach-tint); }
-/* THE TWO BUBBLES MATCH (founder 2026-11-19): the label rows share one
-   height so the boxes start level, the composer stands a little taller, and
-   the summary card takes its exact height (set inline from the composer). */
-@media (min-width: 1024px) {
-  .abrief__split .abrief__run { gap: 8px; }
-  .abrief__split .abrief__run-meta,
-  .abrief__split .abrief__ask .abrief__convos-h { height: 30px; margin: 0; display: flex; align-items: center; }
-  .abrief__split .abrief__ask .assist-composer { margin-top: 8px; min-height: 140px; box-sizing: border-box; }
-  .abrief__split .abrief__ask .assist-composer__input { flex: 1; }
-  .abrief__split .abrief__card { box-sizing: border-box; }
-}
-
 /* THE LAST CONVERSATION STANDS OPEN (founder 2026-11-26). */
 .abrief__lasthead { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
 .abrief__lasthead .abrief__convos-h { margin-bottom: 0; min-width: 0; }
 .abrief__lasttitle { color: var(--ink); text-transform: none; letter-spacing: 0; }
 .abrief__newconvo { display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; padding: 4px 0; font: inherit; font-size: 13px; color: var(--peach-deep); cursor: pointer; white-space: nowrap; }
 .abrief__newconvo:hover { text-decoration: underline; text-decoration-color: var(--peach); }
-.abrief__last { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; margin: 10px 0 12px; padding: 10px; border-radius: 14px; background: var(--bone-warm, #f6f1e7); border: 1px solid var(--bone-edge); }
 .abrief__lastmsg { max-width: 88%; }
 .abrief__lastmsg p { margin: 0; padding: 8px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .abrief__lastmsg.is-claude { align-self: flex-start; }
@@ -194,3 +171,40 @@
 .abrief__lastmsg.is-me { align-self: flex-end; }
 .abrief__lastmsg.is-me p { background: var(--peach-tint); border-radius: 14px 4px 14px 14px; }
 .abrief__lastopen { align-self: center; background: none; border: 0; font: inherit; font-size: 13px; color: var(--peach-deep); cursor: pointer; padding: 4px; }
+
+/* TWO OPEN CONVERSATIONS (founder 2026-11-26) — each pane is a framed
+   conversation: a head, the running text, and its own open box at the foot.
+   Side by side at one height on desktop; stacked on phones. */
+.abrief__split { display: flex; flex-direction: column; gap: var(--s-5); margin-bottom: var(--s-4); }
+.abrief__pane {
+  display: flex; flex-direction: column; min-width: 0;
+  background: var(--bone-warm, #f6f1e7); border: 1px solid var(--bone-edge);
+  border-radius: 18px; padding: 12px;
+}
+.abrief__panehead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 30px; padding: 0 2px 8px; }
+.abrief__panemeta { margin-left: auto; font-size: 11px; color: var(--ink-faint); }
+.abrief__pane .abrief__lasthead { justify-content: space-between; align-items: center; }
+.abrief__pane .abrief__convos-h { margin: 0; }
+.abrief__panebody { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; }
+/* The summary reads as Claude's message: a white bubble in the transcript. */
+.abrief__pane .abrief__card.abrief__panebody {
+  background: transparent; border: 0; border-radius: 0; padding: 0; margin: 0;
+}
+.abrief__bubble {
+  background: #fff; border: 1px solid var(--bone-edge);
+  border-radius: 4px 16px 16px 16px; padding: 14px 16px; max-width: 100%;
+}
+.abrief__pane .abrief__card.is-clamped.is-short { max-height: 118px; }
+.abrief__pane .abrief__card.is-folded::after { background: linear-gradient(to bottom, transparent, var(--bone-warm, #f6f1e7) 80%); border-radius: 0; }
+.abrief__last { padding: 2px; }
+.abrief__pane--last .abrief__panebody { max-height: 360px; }
+.abrief__lastempty { margin: auto 0; padding: 24px 8px; text-align: center; font-size: 14px; color: var(--ink-faint); }
+.abrief__pane .assist-composer { margin-top: 10px; flex-shrink: 0; background: #fff; }
+@media (min-width: 1024px) {
+  .abrief:has(.abrief__split.has-two) { max-width: 1160px; }
+  .abrief__split.has-two {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch;
+  }
+  .abrief__split.has-two .abrief__pane { height: min(680px, max(380px, calc(100vh - 500px))); }
+  .abrief__split.has-two .abrief__panebody { flex: 1; max-height: none; }
+}

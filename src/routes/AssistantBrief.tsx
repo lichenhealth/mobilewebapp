@@ -271,8 +271,6 @@ export default function AssistantBrief() {
   // the same size and the conversations you can re-open are not below the
   // fold"): at ≥1024 the summary bubble is clamped to the ask box's height;
   // the caret or a tap on the words opens it whole. Phones unchanged.
-  const askRef = useRef<HTMLDivElement>(null);
-  const runMetaRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [wideSplit, setWideSplit] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
   useEffect(() => {
@@ -282,23 +280,12 @@ export default function AssistantBrief() {
     return () => mq.removeEventListener('change', on);
   }, []);
   const [sumOpen, setSumOpen] = useState(false);
-  const [askH, setAskH] = useState(0);
-  useEffect(() => {
-    const el = askRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    // The two BUBBLES match (founder 2026-11-19: "the height of the two
-    // bubbles is different, which looks sloppy"): measure the composer box
-    // itself, not the whole ask section with its heading.
-    const box = (el.querySelector('.assist-composer') as HTMLElement | null) ?? el;
-    const ro = new ResizeObserver(() => setAskH(box.offsetHeight));
-    ro.observe(box); setAskH(box.offsetHeight);
-    return () => ro.disconnect();
-  }, []);
   const [sumOverflows, setSumOverflows] = useState(false);
   // Phones fold it too (founder 2026-11-26: "the summary brain be closed with
   // the opportunity to open it with a drop down, so that the last convo and
   // start a new convo are above the fold on mobile") — three lines + a caret.
-  const sumClamped = !sumOpen && (wideSplit ? askH > 0 : true);
+  // Desktop panes scroll instead (2026-11-26, the two open conversations).
+  const sumClamped = !sumOpen && !wideSplit;
   useEffect(() => {
     if (!sumClamped) return;
     const el = cardRef.current;
@@ -308,7 +295,7 @@ export default function AssistantBrief() {
     const mo = new MutationObserver(measure);
     mo.observe(el, { childList: true, subtree: true, characterData: true });
     return () => mo.disconnect();
-  }, [sumClamped, askH]);
+  }, [sumClamped]);
   // A new briefing starts folded again.
   useEffect(() => { setSumOpen(false); }, [section, refreshTick]);
 
@@ -1002,7 +989,7 @@ export default function AssistantBrief() {
    *  relationship that's about gathering context over time) — the same
    *  daily cap, the same answering trigger — and we land you there to read
    *  the reply. */
-  async function sendToClaude(text: string, images?: string[]) {
+  async function sendToClaude(text: string, images?: string[], mode: 'auto' | 'summary' = 'auto') {
     if (!me) return;
     // A send CONTINUES the thread's conversation while it is still fresh
     // (the 6-hour self-organizing rule — founder 2026-10-06: toggling away
@@ -1011,7 +998,10 @@ export default function AssistantBrief() {
     // build thread stays one continuous stream (convo null). Photos ride
     // along (founder 2026-10-06: "just like with you").
     let convo: string | null | undefined = spaceParam ? null : undefined;
-    if (!spaceParam && lastConvo && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(lastConvo.id)) {
+    // A reply to the SUMMARY starts its own conversation, the summary riding
+    // along — never tacked onto whatever the last conversation was about.
+    if (mode === 'summary') { /* convo stays undefined: a fresh one */ }
+    else if (!spaceParam && lastConvo && /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(lastConvo.id)) {
       convo = lastConvo.id;
     } else if (!spaceParam && !freshConvo) {
       // A tagged section's send continues the latest conversation TAGGED
@@ -1025,7 +1015,7 @@ export default function AssistantBrief() {
     // whatever narration is on her screen rides the send as a brief_ctx
     // attachment, so "how long is the trip?" means what she just read.
     const briefCtx = !spaceParam && state === 'ready' && brief?.trim()
-      ? { section, text: brief } : undefined;
+      ? { section, text: brief, reply: mode === 'summary' } : undefined;
     const ref = mailRef;
     const row = await postToAssistantFeed(
       text || (ref ? 'Summarize this email thread and suggest a reply.' : text),
@@ -1155,6 +1145,7 @@ export default function AssistantBrief() {
   // only way to start fresh. Space build threads stay one stream.
   const [freshConvo, setFreshConvo] = useState(false);
   const lastConvo = !spaceParam && !freshConvo ? (briefConvos[0] ?? null) : null;
+  const showRight = !spaceParam && !!(lastConvo || freshConvo);
   const lastEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = lastEndRef.current?.parentElement;
@@ -1365,24 +1356,38 @@ export default function AssistantBrief() {
           something new. That allows both above the fold and you can see the
           old convos"): one row at ≥1024, stacked below. Claude's face rides
           beside the name now, so the bubble runs the full column. */}
-      <div className="abrief__split">
-      <div className="abrief__run">
-        <div className="abrief__run-meta" ref={runMetaRef}>
+      {/* TWO OPEN CONVERSATIONS (founder 2026-11-26: "the capacity to reply
+          to the summary should exist, just like to the latest thread. But
+          let's have both look like an open conversation on claude - the
+          running text above, but your line to enter in the next thing auto
+          open"): the summary and the last conversation are matching panes,
+          each its running text above and its own open box beneath. Side by
+          side at ≥1024 at one height; stacked on phones. A reply to the
+          summary starts a fresh conversation carrying the summary; a reply
+          on the right continues that conversation. */}
+      <div className={'abrief__split' + (showRight ? ' has-two' : '')}>
+      <section className="abrief__pane abrief__pane--sum" aria-label="Your summary">
+        <div className="abrief__panehead">
           <span className="abrief__run-ava" aria-hidden><Icon name="brain" size={15} /></span>
           <span className="abrief__run-name">Claude</span>
           <span className="abrief__run-role">· AI Assistant</span>
+          {doorOn && state === 'ready' && (
+            <span className="abrief__panemeta">
+              {updatedAt != null && <>Updated {timeAgo(updatedAt)} · </>}
+              <button type="button" className="abrief__refresh" onClick={refresh}>Refresh</button>
+            </span>
+          )}
         </div>
-        <div className="abrief__run-row">
       <div
         ref={cardRef}
-        className={'abrief__card' + (sumClamped ? ' is-clamped' : '') + (sumClamped && !wideSplit ? ' is-short' : '') + (sumClamped && sumOverflows ? ' is-folded' : '')}
-        style={sumClamped && wideSplit ? { height: askH, maxHeight: askH } : (wideSplit && askH > 0 ? { minHeight: askH } : undefined)}
+        className={'abrief__panebody abrief__card' + (sumClamped ? ' is-clamped' : '') + (sumClamped ? ' is-short' : '') + (sumClamped && sumOverflows ? ' is-folded' : '')}
         onClick={(e) => {
           if (!sumClamped || !sumOverflows) return;
           if ((e.target as HTMLElement).closest('a,button')) return;
           setSumOpen(true);
         }}
       >
+        <div className="abrief__bubble">
         {!doorOn && (
           <p className="abrief__text">
             The assistant is <strong>off</strong> for this part of your Lichen life — nothing
@@ -1392,21 +1397,16 @@ export default function AssistantBrief() {
         )}
         {doorOn && state === 'thinking' && <p className="abrief__thinking">Reading what&rsquo;s waiting…</p>}
         {doorOn && state === 'ready' && (
-          <>
-            <p className="abrief__text">{renderBold(brief ?? '', (t) => linkify(t, refs))}</p>
-            <p className="abrief__updated">
-              {updatedAt != null && <>Updated {timeAgo(updatedAt)} · </>}
-              <button type="button" className="abrief__refresh" onClick={refresh}>Refresh</button>
-            </p>
-          </>
+          <p className="abrief__text">{renderBold(brief ?? '', (t) => linkify(t, refs))}</p>
         )}
         {doorOn && state === 'capped' && (
-          <p className="abrief__text">Today&rsquo;s briefing budget is used up, so fresh summaries rest until tomorrow — a daily guardrail on AI costs, not a problem. Your bell and queues hold everything, and the conversations below still answer.</p>
+          <p className="abrief__text">Today&rsquo;s briefing budget is used up, so fresh summaries rest until tomorrow — a daily guardrail on AI costs, not a problem. Your bell and queues hold everything, and the conversations still answer.</p>
         )}
         {doorOn && state === 'quietly-unavailable' && (
           <p className="abrief__text">The briefing isn&rsquo;t available right now — your bell and queues hold everything in the meantime.</p>
         )}
-      {(sumOverflows || sumOpen) && (
+        </div>
+      {(sumOverflows || sumOpen) && !wideSplit && (
         <button
           type="button"
           className={'abrief__sumfold' + (sumOpen ? ' is-open' : '')}
@@ -1419,29 +1419,28 @@ export default function AssistantBrief() {
         </button>
       )}
       </div>
-        </div>
-      </div>
+      {showRight ? (
+        <AssistantComposer
+          secondary
+          onSend={(t, imgs) => sendToClaude(t, imgs, 'summary')}
+          uploaderId={me || undefined}
+          placeholder={doorOn && state === 'ready' ? 'Reply to the summary…' : 'Ask anything…'}
+        />
+      ) : (
+        <AssistantComposer
+          key={params.get('ask') ?? 'blank'}
+          onSend={(t, imgs) => sendToClaude(t, imgs)}
+          initialText={params.get('ask') ?? undefined}
+          uploaderId={me || undefined}
+          attachment={mailRef ? <MailRefCard m={mailRef} onRemove={() => setMailRef(null)} /> : undefined}
+          placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : 'Reply to the summary, or ask anything…'}
+        />
+      )}
+      </section>
 
-      {/* The "Open your feed" / "Search instead" pills were RETIRED here
-          (founder 2026-10-03: "seems non contextual because I'm in my
-          calendar's AI assistant… there's a search button on the preceding
-          screen") — the ← Back chip returns to the section, whose own
-          search circle is one tap away, and the composer below already
-          lands in the right feed thread. */}
-
-      {/* Always-there composer — answer the brief in place (founder
-          2026-08-05), lands in the feed (founder 2026-08-09). A door can
-          arrive with its errand via ?ask= (founder 2026-08-11: "Draft it
-          with Claude" shouldn't forget why you came) — press enter to send
-          it, or add more first (a website to read, a length, a tone).
-          Keyed so a new ?ask always lands even if the composer is mounted. */}
-      {/* THE ASK STANDS APART FROM THE SUMMARY (founder 2026-11-15: "it
-          feels like a reply to the summary right now, when in fact i might
-          not want to address anything in the summary at all"): its own
-          section under a hairline, its own heading, a neutral placeholder. */}
-      <div className="abrief__ask" ref={askRef}>
-      {!spaceParam && (lastConvo || freshConvo) ? (
-        <div className="abrief__lasthead">
+      {showRight && (
+      <section className="abrief__pane abrief__pane--last" aria-label={lastConvo ? 'Your last conversation' : 'A new conversation'}>
+        <div className="abrief__panehead abrief__lasthead">
           <p className="abrief__convos-h">{lastConvo ? <>Your last conversation · <span className="abrief__lasttitle">{lastConvo.title}</span></> : 'New conversation'}</p>
           {lastConvo ? (
             <button type="button" className="abrief__newconvo" onClick={() => setFreshConvo(true)}>
@@ -1453,32 +1452,34 @@ export default function AssistantBrief() {
             </button>
           )}
         </div>
-      ) : (
-        <p className="abrief__convos-h">Ask Claude anything</p>
-      )}
-      {lastConvo && (
-        <div className="abrief__last" aria-label="Your last conversation">
-          {lastConvo.entries.slice(-8).map((e) => (
-            <div key={e.id} className={'abrief__lastmsg' + (e.author === 'claude' ? ' is-claude' : ' is-me')}>
-              <p>{renderBold((e.body ?? '').slice(0, 1200) || (e.attachments?.length ? '[a photo or attachment]' : ''), (t) => t)}</p>
-            </div>
-          ))}
+        <div className="abrief__panebody abrief__last">
+          {lastConvo ? (
+            <>
+              {lastConvo.entries.slice(-8).map((e) => (
+                <div key={e.id} className={'abrief__lastmsg' + (e.author === 'claude' ? ' is-claude' : ' is-me')}>
+                  <p>{renderBold((e.body ?? '').slice(0, 1200) || (e.attachments?.length ? '[a photo or attachment]' : ''), (t) => t)}</p>
+                </div>
+              ))}
+              <button type="button" className="abrief__lastopen"
+                onClick={() => navigate(`/assistant/feed?thread=${encodeURIComponent(lastConvo.thread)}&convo=${encodeURIComponent(lastConvo.id)}${sectionTag && lastConvo.thread !== section ? `&sec=${sectionTag}` : ''}`)}>
+                Open the whole conversation ›
+              </button>
+            </>
+          ) : (
+            <p className="abrief__lastempty">A fresh page — ask Claude anything.</p>
+          )}
           <div ref={lastEndRef} />
-          <button type="button" className="abrief__lastopen"
-            onClick={() => navigate(`/assistant/feed?thread=${encodeURIComponent(lastConvo.thread)}&convo=${encodeURIComponent(lastConvo.id)}${sectionTag && lastConvo.thread !== section ? `&sec=${sectionTag}` : ''}`)}>
-            Open the whole conversation ›
-          </button>
         </div>
+        <AssistantComposer
+          key={params.get('ask') ?? 'blank'}
+          onSend={(t, imgs) => sendToClaude(t, imgs)}
+          initialText={params.get('ask') ?? undefined}
+          uploaderId={me || undefined}
+          attachment={mailRef ? <MailRefCard m={mailRef} onRemove={() => setMailRef(null)} /> : undefined}
+          placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : lastConvo ? 'Continue this conversation…' : 'Ask anything…'}
+        />
+      </section>
       )}
-      <AssistantComposer
-        key={params.get('ask') ?? 'blank'}
-        onSend={sendToClaude}
-        initialText={params.get('ask') ?? undefined}
-        uploaderId={me || undefined}
-        attachment={mailRef ? <MailRefCard m={mailRef} onRemove={() => setMailRef(null)} /> : undefined}
-        placeholder={mailRef ? 'Add any context — or just send, and I’ll summarize it and suggest a reply' : lastConvo ? 'Continue this conversation…' : 'Reply to the summary, or ask anything…'}
-      />
-      </div>
       </div>
 
       {/* EARLIER CONVERSATIONS (founder 2026-10-06) — the history log this
