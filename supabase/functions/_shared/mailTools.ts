@@ -4,9 +4,19 @@
 // account itself (Gmail and Lichen Mail both show it) and the person sends.
 // Every account resolves against the SENDER's own mail_accounts rows; a
 // thread id only ever reaches their own mailbox through their own token.
-import { mailAccountsOf, listThreads, mailSortRules, saveMailSortRule, readThread, draftMail, trashThread, modifyThread, unsubscribeThread, unsubscribeLinks, type UnsubResult, listFilters, createFilter, deleteFilter, labelIdFor, labelNames, type MailAccount } from './gmail.ts';
+import { mailAccountsOf, listThreads, mailSortRules, saveMailSortRule, readThread, draftMail, sendMail, trashThread, modifyThread, unsubscribeThread, unsubscribeLinks, type UnsubResult, listFilters, createFilter, deleteFilter, labelIdFor, labelNames, type MailAccount } from './gmail.ts';
 
 type Out = { ok: boolean; [k: string]: unknown };
+
+const SECRET_RE = /\b(password|passcode|pin|one[- ]time code|verification code|ssn|social security|cvv|card number)\b/i;
+/** The person's own "Always send replies for me" tap — nothing else writes it. */
+async function allowsMailReplies(profileId: string): Promise<boolean> {
+  const url = Deno.env.get('SUPABASE_URL'); const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !key) return false;
+  const r = await fetch(`${url}/rest/v1/assistant_allowances?profile_id=eq.${profileId}&kind=eq.mail_reply&select=kind`, { headers: { apikey: key, Authorization: `Bearer ${key}` } }).catch(() => null);
+  const rows = r?.ok ? await r.json().catch(() => []) : [];
+  return Array.isArray(rows) && rows.length > 0;
+}
 
 export const MAIL_TOOLS = [
   {
@@ -21,12 +31,13 @@ export const MAIL_TOOLS = [
   },
   {
     name: 'draft_mail',
-    description: 'Save an email DRAFT in one of their accounts — a reply (thread_id) or a new email (to + subject). body = the words they want, in their voice. This NEVER sends: the draft sits in their Drafts (Gmail and Lichen Mail) for them to review and send. Never say it was sent. Recipients only as they wrote them or as found in the thread being replied to.',
+    description: 'Write an email in one of their accounts — a reply (thread_id) or a new email (to + subject). body = the words they want, in their voice. By default it is a DRAFT for them to review and send. send = true asks to SEND a REPLY right away: it only goes when they have tapped "Always send replies for me" (a standing allowance), it replies on an existing thread, and every recipient is already in that thread — otherwise it stays a draft with a Send button, and the result says why. Only set send when the reply carries out something they already said they want, in their own words (a watch follow-up, their notebook, an earlier conversation) — never to agree to money, cancel, sign, or share a password, PIN, code or ID number. Never say it was sent unless the result says sent. Recipients only as they wrote them or as found in the thread being replied to.',
     input_schema: {
       type: 'object',
       properties: {
         account: { type: 'string' }, thread_id: { type: 'string' },
         to: { type: 'string' }, cc: { type: 'string' }, subject: { type: 'string' }, body: { type: 'string' },
+        send: { type: 'boolean' },
       },
       required: ['account', 'body'],
     },
@@ -149,13 +160,37 @@ export async function runMailTool(profileId: string, name: string, input: Record
       }
       if (!to) return { ok: false, error: 'Who is it to? Ask them, or reply on a thread.' };
       if (!s('thread_id') && !s('subject')) return { ok: false, error: 'A new email needs a subject.' };
+      // SEND WHEN ALREADY ALLOWED (founder 2026-11-26: "it should reply to
+      // the reply with whatever it already knows I want to do… so that I'm
+      // not involved at all unless there's something I need to do"). A reply
+      // goes out on its own only under the person's own "Always send replies"
+      // tap, on an existing thread, to people already in it, and never with
+      // a secret in it; anything else stays a draft with a Send button.
+      let held = '';
+      if (input.send === true) {
+        const t = s('thread_id') ? await readThread(profileId, acct.id, s('thread_id')).catch(() => null) : null;
+        const addr = (x: string) => (x.match(/<([^>]+)>/)?.[1] ?? x).trim().toLowerCase();
+        const inThread = new Set((t?.messages ?? []).filter((m) => !m.draft).flatMap((m) => [m.from, ...String(m.to ?? '').split(','), ...String(m.cc ?? '').split(',')]).map(addr).filter(Boolean));
+        const recips = [...to.split(','), ...s('cc').split(',')].map(addr).filter(Boolean);
+        if (!t) held = 'it isn\'t a reply on an existing thread';
+        else if (recips.some((r) => !inThread.has(r))) held = 'it adds someone who isn\'t already in that thread';
+        else if (SECRET_RE.test(s('body'))) held = 'it mentions a password, PIN, code or ID number — those stay theirs to send';
+        else if (!(await allowsMailReplies(profileId))) held = 'they haven\'t tapped "Always send replies for me" yet — the card under your reply offers it';
+        if (!held) {
+          await sendMail(profileId, { accountId: acct.id, threadId: s('thread_id'), to, cc: s('cc') || undefined, subject: s('subject'), body: s('body') });
+          return {
+            ok: true, sent: true, note: `Sent from ${acct.email} to ${to}, on the same thread — it sits in their Sent mail and in the thread. Tell them plainly you sent it and what it said.`,
+            door: { path: `/mail?thread=${acct.id}:${encodeURIComponent(s('thread_id'))}`, label: 'See the thread' },
+          };
+        }
+      }
       const d = await draftMail(profileId, { accountId: acct.id, threadId: s('thread_id') || undefined, to, cc: s('cc') || undefined, subject: s('subject'), body: s('body') });
       const thread = d.threadId || s('thread_id');
       return {
-        ok: true, note: `Draft saved in ${acct.email}'s Drafts, to ${to}. Not sent — a card under your reply lets them edit and tap Send (or open it in Mail). Never say it was sent.`,
+        ok: true, note: `Draft saved in ${acct.email}'s Drafts, to ${to}. Not sent${held ? ` — held because ${held}` : ''} — a card under your reply lets them edit and tap Send (or open it in Mail). Never say it was sent.`,
         // THE DRAFT HANDS A SEND BUTTON (founder 2026-11-15: "there's no send
         // button") — the person's tap on the card sends it, nothing else does.
-        mailDraft: { account_id: acct.id, account: acct.email, thread_id: thread, message_id: d.messageId, to, cc: s('cc'), subject: s('subject'), body: s('body') },
+        mailDraft: { account_id: acct.id, account: acct.email, thread_id: thread, message_id: d.messageId, to, cc: s('cc'), subject: s('subject'), body: s('body'), ...(s('thread_id') ? { reply: true } : {}) },
         door: thread
           ? { path: `/mail?thread=${acct.id}:${encodeURIComponent(thread)}`, label: 'Open the draft in Mail' }
           : { path: '/mail', label: 'Open Mail' },

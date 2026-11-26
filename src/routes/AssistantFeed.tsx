@@ -1572,7 +1572,7 @@ export default function AssistantFeed() {
                   .map((a) => (
                     <div className="afeed__pubrow" key={`${p.id}:mdraft:${a.message_id}`}>
                       <MailDraftCard accountId={a.account_id} account={a.account} threadId={a.thread_id} messageId={a.message_id}
-                        to={a.to} cc={a.cc} subject={a.subject} body={a.body} />
+                        to={a.to} cc={a.cc} subject={a.subject} body={a.body} reply={!!a.reply} />
                     </div>
                   ))}
                 {/* MESSAGES, DRAFTED (founder 2026-11-19) — the person taps Send. */}

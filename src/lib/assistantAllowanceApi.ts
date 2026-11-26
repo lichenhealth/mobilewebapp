@@ -5,7 +5,7 @@ import { supabase } from './supabase';
 // Always allow stores a standing allowance for that kind of act. Allowances
 // are listed — and revoked — in Profile → Privacy.
 
-export type ProposalKind = 'send_currentcy' | 'trust' | 'recommend' | 'weave' | 'join_space' | 'leave_space' | 'set_floor';
+export type ProposalKind = 'send_currentcy' | 'trust' | 'recommend' | 'weave' | 'join_space' | 'leave_space' | 'set_floor' | 'mail_reply';
 
 export interface Proposal {
   id: string; kind: ProposalKind; summary: string; amount: number | null;
@@ -20,6 +20,7 @@ export const ALLOWANCE_LABELS: Record<ProposalKind, string> = {
   weave: 'Weave into my web for me',
   join_space: 'Ask to join communities and groups for me',
   leave_space: 'Leave communities and groups for me',
+  mail_reply: 'Send email replies for me — only on threads you are already in, never with a password, PIN or code',
   // Never stored — a floor change always waits on the tap (the safeguard
   // would be decorative otherwise). Listed only to keep the record total.
   set_floor: 'Change my Current-cy floor',
@@ -56,5 +57,12 @@ export async function listAllowances(me: string): Promise<{ kind: ProposalKind; 
 
 export async function revokeAllowance(me: string, kind: ProposalKind): Promise<void> {
   const { error } = await supabase.from('assistant_allowances').delete().eq('profile_id', me).eq('kind', kind);
+  if (error) throw new Error(error.message);
+}
+
+/** The person's own "Always send replies for me" tap (founder 2026-11-26).
+ *  The only door that writes a mail_reply allowance — the brain never can. */
+export async function allowMailReplies(): Promise<void> {
+  const { error } = await supabase.rpc('grant_mail_reply_allowance');
   if (error) throw new Error(error.message);
 }

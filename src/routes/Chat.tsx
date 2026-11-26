@@ -69,6 +69,16 @@ export default function Chat() {
   const [mailOpen, setMailOpen] = useState<string | undefined>(
     () => new URLSearchParams(window.location.search).get('mail') || undefined,
   );
+  // A BELL THAT NAMES AN EMAIL OPENS THE EMAIL (founder 2026-11-26: the
+  // "Twilio replied" bell "just takes me to Lichen. It doesn't take me to
+  // the reply"): below 1024 there's no side pane, so ?mail= walks straight
+  // into Mail's own thread view instead of leaving the inbox list.
+  useEffect(() => {
+    const key = new URLSearchParams(window.location.search).get('mail');
+    if (key && !window.matchMedia('(min-width: 1024px)').matches) {
+      navigate(`/mail?thread=${encodeURIComponent(key)}`, { replace: true });
+    }
+  }, [navigate]);
   function openMail(key: string) {
     if (window.matchMedia('(min-width: 1024px)').matches) {
       setMailOpen(key); setSelectedId(undefined);
