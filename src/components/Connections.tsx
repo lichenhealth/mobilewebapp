@@ -195,18 +195,31 @@ export default function Connections() {
             {numbers && !numbers.length && <p className="conn__fine">No phone numbers on this account yet.</p>}
             {numbers && numbers.length > 0 && (
               <ul className="conn__nums">
-                {numbers.map((n) => (
-                  <li key={n.number} className="conn__num">
-                    <span>{n.number}{n.name && n.name !== n.number ? ` · ${n.name}` : ''}</span>
-                    {n.wired
-                      ? <span className="conn__status is-on">Answers through Lichen ✓</span>
-                      : <button className="conn__btn" disabled={busy} onClick={() => void wire(n.number)}>Connect to Lichen</button>}
-                  </li>
-                ))}
+                {numbers.map((n) => {
+                  // Twilio's "friendly name" is usually the same number,
+                  // formatted — show the readable one, once (founder 2026-11-26).
+                  const digits = (x: string) => x.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+                  const named = n.name && digits(n.name) !== digits(n.number);
+                  const pretty = /^\+1\d{10}$/.test(n.number)
+                    ? `(${n.number.slice(2, 5)}) ${n.number.slice(5, 8)}-${n.number.slice(8)}`
+                    : n.number;
+                  return (
+                    <li key={n.number} className="conn__num">
+                      <span>{pretty}{named ? ` · ${n.name}` : ''}</span>
+                      {n.wired
+                        ? <span className="conn__status is-on">Answers through Lichen ✓</span>
+                        : <button className="conn__btn" disabled={busy} onClick={() => void wire(n.number)}>Answer calls &amp; texts here</button>}
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {numbers && numbers.length > 0 && (
-              <p className="conn__fine">Connected numbers ring your own cell (the phone on your Lichen profile) for 20 seconds, then go to voicemail. Your Brain reads texts and voicemails there, and a bell rings for each new one.</p>
+              <p className="conn__fine">
+                {numbers.some((n) => !n.wired)
+                  ? 'Your Twilio account is connected, so your Brain can see your numbers. One more step for each number: tap Answer calls & texts here, and its calls ring your own cell (the phone on your Lichen profile) for 20 seconds, then go to voicemail. Your Brain reads texts and voicemails, and a bell rings for each new one.'
+                  : 'Calls to your number ring your own cell (the phone on your Lichen profile) for 20 seconds, then go to voicemail. Your Brain reads texts and voicemails, and a bell rings for each new one.'}
+              </p>
             )}
             <div className="conn__acts">
               <button className={'conn__btn conn__btn--quiet' + (arm ? ' is-armed' : '')} disabled={busy} onClick={() => void disconnect()}>
