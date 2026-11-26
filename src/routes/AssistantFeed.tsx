@@ -1574,6 +1574,7 @@ export default function AssistantFeed() {
                     <div className="afeed__pubrow" key={`${p.id}:mdraft:${a.message_id}`}>
                       <MailDraftCard accountId={a.account_id} account={a.account} threadId={a.thread_id} messageId={a.message_id}
                         to={a.to} cc={a.cc} subject={a.subject} body={a.body} reply={!!a.reply} />
+<<<<<<< HEAD
                     </div>
                   ))}
                 {/* THE PERMISSION POP-UP (founder 2026-11-26) — their tap, never the model's. */}
@@ -1583,6 +1584,8 @@ export default function AssistantFeed() {
                   .map((a) => (
                     <div className="afeed__pubrow" key={`${p.id}:allowreply`}>
                       <AllowRepliesCard draft={a.draft} />
+=======
+>>>>>>> origin/main
                     </div>
                   ))}
                 {/* MESSAGES, DRAFTED (founder 2026-11-19) — the person taps Send. */}

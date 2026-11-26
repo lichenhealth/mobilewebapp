@@ -195,7 +195,11 @@ export async function runMailTool(profileId: string, name: string, input: Record
       const d = await draftMail(profileId, { accountId: acct.id, threadId: s('thread_id') || undefined, to, cc: s('cc') || undefined, subject: s('subject'), body: s('body') });
       const thread = d.threadId || s('thread_id');
       return {
+<<<<<<< HEAD
         ok: true, note: `Draft saved in ${acct.email}'s Drafts, to ${to}. Not sent${held ? ` — held because ${held}` : ''} — a card under your reply lets them edit and tap Send (or open it in Mail). Never say it was sent.${held.startsWith('they haven') ? ' Say it in these words: "I\'ve drafted a reply and will send it with your go-ahead. If you\'d like me to answer emails like this on my own from now on, just tell me I\'m free to reply."' : ''}`,
+=======
+        ok: true, note: `Draft saved in ${acct.email}'s Drafts, to ${to}. Not sent${held ? ` — held because ${held}` : ''} — a card under your reply lets them edit and tap Send (or open it in Mail). Never say it was sent.`,
+>>>>>>> origin/main
         // THE DRAFT HANDS A SEND BUTTON (founder 2026-11-15: "there's no send
         // button") — the person's tap on the card sends it, nothing else does.
         mailDraft: { account_id: acct.id, account: acct.email, thread_id: thread, message_id: d.messageId, to, cc: s('cc'), subject: s('subject'), body: s('body'), ...(s('thread_id') ? { reply: true } : {}) },
