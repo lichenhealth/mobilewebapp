@@ -138,10 +138,15 @@ export function heardOwnWords(phrase: string): boolean {
   if (!lastSpoken || Date.now() - spokeUntil > 10_000) return false;
   const said = norm(lastSpoken);
   const heard = norm(phrase).split(' ').filter(Boolean);
-  if (heard.length < 2) return false;
+  // Strict on purpose (founder 2026-11-27: voice "worked once, but then it
+  // didn't work after"): a short reply sharing common words with the brain's
+  // answer is the PERSON, not an echo. Only a real run of the brain's own
+  // words counts — 4+ words found verbatim, or 6+ words nearly all from it.
+  if (heard.length < 4) return false;
   if (said.includes(heard.join(' '))) return true;
+  if (heard.length < 6) return false;
   const saidWords = new Set(said.split(' '));
-  return heard.filter((w) => saidWords.has(w)).length / heard.length >= 0.8;
+  return heard.filter((w) => saidWords.has(w)).length / heard.length >= 0.9;
 }
 /** Speak `text`; resolves when done or stopped. Long text goes sentence by
  *  sentence — some engines cut a single long utterance off mid-way. */
