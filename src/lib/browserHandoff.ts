@@ -17,6 +17,20 @@ export function isIosHomeScreenApp(): boolean {
   return iOS && !!standalone;
 }
 
+/** iPhone Chrome, Firefox, Edge, Opera, the Google app (founder 2026-11-27:
+ *  "i was in chrome - should i have chosen safari?"): every iPhone browser
+ *  but Safari runs inside Apple's in-app web view, which gives websites NO
+ *  speech recognition — the mic simply never hears anything. Only Safari
+ *  listens on an iPhone, so these get the same Safari hand-off the
+ *  home-screen app does. */
+export function isIosOtherBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iP(hone|ad|od)/.test(navigator.userAgent) && /CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(navigator.userAgent);
+}
+/** Anywhere on an iPhone/iPad that can't listen: the home-screen app or a
+ *  non-Safari browser. Safari is the answer for both. */
+export function iosCantListen(): boolean { return isIosHomeScreenApp() || isIosOtherBrowser(); }
+
 export type HandoffBrowser = 'safari' | 'chrome';
 
 /** `to` is an in-app path; `flags` ride along (voice=1, wake=1, hands=1). */

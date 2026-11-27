@@ -5,7 +5,7 @@ import {
   useLocalSpeechPrefs, useLocalSpeechStatus, LOCAL_SPEECH_MB,
 } from '../lib/localSpeech';
 import { speechRecognition } from '../lib/dictation';
-import { isIosHomeScreenApp } from '../lib/browserHandoff';
+import { iosCantListen } from '../lib/browserHandoff';
 import OpenInBrowser from './OpenInBrowser';
 import './VoiceSettings.css';
 
@@ -27,7 +27,7 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
   // The iPhone home-screen app recommends the browser hand-off even though
   // the on-phone listener could run here — Apple's recognition is far faster
   // and more accurate (founder 2026-11-26).
-  const iosApp = isIosHomeScreenApp();
+  const iosApp = iosCantListen();
   if (!canSpeak()) return compact ? null : <p className="vset__fine">This browser can’t speak or listen — try Safari or Chrome.</p>;
   return (
     <div className={'vset' + (compact ? ' vset--compact' : '')}>
@@ -45,7 +45,7 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
           {listen && !iosApp
             ? ' Listens only while Lichen is open on your screen; nothing that doesn’t start with “Hey Brain” is ever sent.'
             : iosApp
-              ? ' Best in your browser — Lichen opens there signed in with Hey Brain on, using Apple’s speech recognition. Apple doesn’t let home-screen apps listen.'
+              ? ' Best in Safari — Lichen opens there signed in with Hey Brain on, using Apple’s speech recognition. On an iPhone only Safari can listen — not the home-screen app, and not Chrome.'
               : ' This browser can’t listen — try Chrome or Safari.'}
           {local && listen && ' Uses more battery while on.'}
         </span>
