@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { supabase } from './supabase';
 import { canDictate, foregroundListening, hushAllListening, startDictation, type DictationSession } from './dictation';
 
 /** VOICE MODE (founder 2026-11-26: "give the brain the ability to speak, so
@@ -69,9 +70,42 @@ export function useVoices(): SpeechSynthesisVoice[] {
   }, []);
   return availableVoices();
 }
+// LICHEN'S DEFAULT PER KIND OF DEVICE (founder 2026-11-27: "a default voice
+// for lichen users on iphone, and on android"): an admin hears voices on a
+// device of that kind and makes one the default (platform_settings
+// 'default_voices'). Used only where the device HAS that voice and the
+// person hasn't chosen their own.
+export type VoicePlatform = 'iphone' | 'android' | 'mac' | 'windows' | 'other';
+export function devicePlatform(): VoicePlatform {
+  if (typeof navigator === 'undefined') return 'other';
+  const ua = navigator.userAgent;
+  if (/iP(hone|ad|od)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'iphone';
+  if (/Android/i.test(ua)) return 'android';
+  if (/Mac/.test(ua)) return 'mac';
+  if (/Windows/.test(ua)) return 'windows';
+  return 'other';
+}
+export const PLATFORM_LABEL: Record<VoicePlatform, string> = { iphone: 'iPhone & iPad', android: 'Android', mac: 'Mac', windows: 'Windows', other: 'this kind of device' };
+let defaults: Partial<Record<VoicePlatform, string>> = {};
+let defaultsLoaded = false;
+export function loadDefaultVoices(force = false) {
+  if (defaultsLoaded && !force) return;
+  defaultsLoaded = true;
+  void supabase.from('platform_settings').select('value').eq('key', 'default_voices').maybeSingle()
+    .then(({ data }) => { defaults = (data?.value as typeof defaults) ?? {}; emit(); });
+}
+export function defaultVoiceName(): string { loadDefaultVoices(); return defaults[devicePlatform()] ?? ''; }
+export async function setDefaultVoice(name: string | null) {
+  const { error } = await supabase.rpc('set_default_voice', { p_platform: devicePlatform(), p_name: name });
+  if (error) throw new Error(error.message);
+  loadDefaultVoices(true);
+}
+export function useDefaultVoiceName(): string { return useSyncExternalStore(subscribe, () => defaultVoiceName(), () => ''); }
 function pickVoice(): SpeechSynthesisVoice | null {
-  if (!voiceName) return null;
-  return window.speechSynthesis.getVoices().find((v) => v.name === voiceName) ?? null;
+  const all = window.speechSynthesis.getVoices();
+  if (voiceName) { const v = all.find((x) => x.name === voiceName); if (v) return v; }
+  const d = defaultVoiceName();
+  return d ? all.find((x) => x.name === d) ?? null : null;
 }
 
 export const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
