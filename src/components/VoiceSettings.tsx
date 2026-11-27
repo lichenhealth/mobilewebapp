@@ -1,4 +1,4 @@
-import { canListen, canSpeak, setVoiceOn, setWakeAlways, useVoiceMode, useWakeAlways } from '../lib/voice';
+import { canListen, canSpeak, chosenVoiceName, setVoiceName, setVoiceOn, setWakeAlways, speak, useVoiceMode, useVoices, useWakeAlways } from '../lib/voice';
 import { ensureLocalSpeech, usesLocalSpeech } from '../lib/dictation';
 import {
   forgetLocalSpeech, localSpeechAgreed, localSpeechOnly, localSpeechSupported, setLocalSpeechOnly,
@@ -28,6 +28,8 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
   // the on-phone listener could run here — Apple's recognition is far faster
   // and more accurate (founder 2026-11-26).
   const iosApp = iosCantListen();
+  const voices = useVoices();
+  const vname = chosenVoiceName();
   if (!canSpeak()) return compact ? null : <p className="vset__fine">This browser can’t speak or listen — try Safari or Chrome.</p>;
   return (
     <div className={'vset' + (compact ? ' vset--compact' : '')}>
@@ -36,6 +38,19 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
           <input type="checkbox" checked={voice} onChange={(e) => setVoiceOn(e.target.checked)} />
           <span><strong>Voice mode</strong> — the brain reads its replies aloud, and listens for your answer.</span>
         </label>
+      )}
+      {voices.length > 1 && (
+        <div className="vset__voice">
+          <label className="vset__voicelab">
+            <strong>Voice</strong>
+            <select className="vset__select" value={vname}
+              onChange={(e) => { setVoiceName(e.target.value); void speak('Hi, this is how I sound.'); }}>
+              <option value="">This device’s usual voice</option>
+              {voices.map((v) => <option key={v.voiceURI} value={v.name}>{v.name}</option>)}
+            </select>
+          </label>
+          <button type="button" className="vset__link" onClick={() => void speak('Hi, this is how I sound.')}>Hear it</button>
+        </div>
       )}
       <label className={'vset__row' + (listen ? '' : ' is-off')}>
         <input type="checkbox" checked={wake && listen} disabled={!listen}

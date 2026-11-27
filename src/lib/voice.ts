@@ -1,5 +1,5 @@
-import { useSyncExternalStore } from 'react';
-import { canDictate, foregroundListening, startDictation, type DictationSession } from './dictation';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { canDictate, foregroundListening, hushAllListening, startDictation, type DictationSession } from './dictation';
 
 /** VOICE MODE (founder 2026-11-26: "give the brain the ability to speak, so
  *  we can talk back and forth… read my next step to me as I'm cooking" and
@@ -34,6 +34,46 @@ export function setVoiceOn(v: boolean) {
 export function useVoiceMode(): boolean { return useSyncExternalStore(subscribe, () => on, () => false); }
 export function useSpeaking(): boolean { return useSyncExternalStore(subscribe, () => speaking, () => false); }
 
+// THE BRAIN'S VOICE (founder 2026-11-27: "Can we change her voice?"): the
+// device's own voices, chosen per device (voice names differ phone to
+// computer). Unset = the device default for the person's language.
+const VKEY = 'lichen.voiceName';
+let voiceName = '';
+try { voiceName = localStorage.getItem(VKEY) ?? ''; } catch { /* */ }
+export function chosenVoiceName(): string { return voiceName; }
+export function setVoiceName(n: string) {
+  voiceName = n;
+  try { if (n) localStorage.setItem(VKEY, n); else localStorage.removeItem(VKEY); } catch { /* */ }
+  emit();
+}
+/** Voices for the person's language (English first if theirs is missing),
+ *  the higher-quality ("Enhanced", "Premium", "Natural", Google) first. */
+export function availableVoices(): SpeechSynthesisVoice[] {
+  if (!canSpeak()) return [];
+  const all = window.speechSynthesis.getVoices();
+  const lang = (navigator.language || 'en-US').slice(0, 2).toLowerCase();
+  let list = all.filter((v) => v.lang.toLowerCase().startsWith(lang));
+  if (!list.length) list = all.filter((v) => v.lang.toLowerCase().startsWith('en'));
+  const score = (v: SpeechSynthesisVoice) => (/premium|enhanced|natural|neural|google/i.test(v.name) ? 0 : 1);
+  return [...list].sort((a, b) => score(a) - score(b) || a.name.localeCompare(b.name));
+}
+/** Voices arrive late in some browsers — re-render when they do. */
+export function useVoices(): SpeechSynthesisVoice[] {
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!canSpeak()) return;
+    const s = window.speechSynthesis;
+    const h = () => force((n) => n + 1);
+    s.addEventListener?.('voiceschanged', h);
+    return () => s.removeEventListener?.('voiceschanged', h);
+  }, []);
+  return availableVoices();
+}
+function pickVoice(): SpeechSynthesisVoice | null {
+  if (!voiceName) return null;
+  return window.speechSynthesis.getVoices().find((v) => v.name === voiceName) ?? null;
+}
+
 export const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window;
 export const canListen = () => canDictate();
 
@@ -52,6 +92,23 @@ export function forSpeech(text: string): string {
 }
 
 let token = 0;
+// What the brain last said, and when it stopped — so words that come back
+// through the microphone are recognized as its own echo, not the person.
+let lastSpoken = '';
+let spokeUntil = 0;
+const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+/** True when a heard phrase is just the brain's own reply coming back in
+ *  (within 10s of speaking): most of its words appear, in order, in what
+ *  the brain said. */
+export function heardOwnWords(phrase: string): boolean {
+  if (!lastSpoken || Date.now() - spokeUntil > 10_000) return false;
+  const said = norm(lastSpoken);
+  const heard = norm(phrase).split(' ').filter(Boolean);
+  if (heard.length < 2) return false;
+  if (said.includes(heard.join(' '))) return true;
+  const saidWords = new Set(said.split(' '));
+  return heard.filter((w) => saidWords.has(w)).length / heard.length >= 0.8;
+}
 /** Speak `text`; resolves when done or stopped. Long text goes sentence by
  *  sentence — some engines cut a single long utterance off mid-way. */
 export function speak(text: string): Promise<void> {
@@ -69,12 +126,15 @@ export function speak(text: string): Promise<void> {
     else chunks.push(p);
   }
   speaking = true; emit();
+  hushAllListening();
+  lastSpoken = clean; spokeUntil = Infinity;
   return new Promise((resolve) => {
-    const done = () => { if (my === token) { speaking = false; emit(); } resolve(); };
+    const done = () => { if (my === token) { speaking = false; spokeUntil = Date.now(); emit(); } resolve(); };
     const next = (i: number) => {
       if (my !== token || i >= chunks.length) { done(); return; }
       const u = new SpeechSynthesisUtterance(chunks[i]);
-      u.lang = navigator.language || 'en-US';
+      const v = pickVoice();
+      if (v) { u.voice = v; u.lang = v.lang; } else u.lang = navigator.language || 'en-US';
       u.rate = 1;
       u.onend = () => next(i + 1);
       u.onerror = () => next(i + 1);
@@ -110,7 +170,10 @@ export function listenOnce(onPhrase?: (p: string) => void, background = false): 
 export async function voiceReply(text: string) {
   if (!on) return;
   await speak(text);
-  if (on && canListen()) window.dispatchEvent(new Event('lichen:voice-listen'));
+  // Let the speakers fall silent before the mic opens — engines report the
+  // end of speech a beat before the last of it leaves the speakers.
+  await new Promise((r) => setTimeout(r, 900));
+  if (on && canListen() && !speaking) window.dispatchEvent(new Event('lichen:voice-listen'));
 }
 
 /** "HEY BRAIN" or "HEY CLAUDE" (founder 2026-11-26, both wake words: "or how about, hey brain";: "default claude listening when you
@@ -132,6 +195,7 @@ export function startWakeWord(onAsk: (said: string) => void): { stop: () => void
       const heard = await l.done;
       cur = null;
       if (!active) break;
+      if (heardOwnWords(heard)) continue;
       const m = WAKE.exec(heard);
       if (m) {
         let q = heard.slice(m.index + m[0].length).trim();

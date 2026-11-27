@@ -7,7 +7,7 @@ import { askIosVoice, askVoiceChoice, canDictate, startDictation, usesLocalSpeec
 import { localSpeechAgreed, localSpeechStatusNow, useLocalSpeechStatus } from '../lib/localSpeech';
 import { revealBelow } from '../lib/smartReveal';
 import VoiceSettings from './VoiceSettings';
-import { canListen, canSpeak, setVoiceOn, stopSpeaking, useSpeaking, useVoiceMode } from '../lib/voice';
+import { canListen, canSpeak, heardOwnWords, setVoiceOn, stopSpeaking, useSpeaking, useVoiceMode } from '../lib/voice';
 import './AssistantComposer.css';
 
 /** The text box every surface that talks to Claude sends through — the
@@ -171,6 +171,9 @@ export default function AssistantComposer({
       onEnd: () => {
         setListening(false); setHearState(null); dictation.current = null;
         const said = voicePhrase.current.trim();
+        // The brain's own reply coming back through the speakers is never
+        // sent as the person's words.
+        if (said && heardOwnWords(said)) { setAsk(''); setVoiceNote('That was me talking — tap here, then talk'); return; }
         if (said) void submitRef.current(said);
         else if (!errored) setVoiceNote('Didn’t catch that — tap to talk');
       },
