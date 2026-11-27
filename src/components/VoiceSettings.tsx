@@ -1,10 +1,12 @@
-import { canListen, canSpeak, chosenVoiceName, setVoiceName, setVoiceOn, setWakeAlways, speak, useVoiceMode, useVoices, useWakeAlways } from '../lib/voice';
+import { canListen, canSpeak, chosenVoiceName, devicePlatform, PLATFORM_LABEL, setDefaultVoice, setVoiceName, useDefaultVoiceName, setVoiceOn, setWakeAlways, speak, useVoiceMode, useVoices, useWakeAlways } from '../lib/voice';
 import { ensureLocalSpeech, usesLocalSpeech } from '../lib/dictation';
 import {
   forgetLocalSpeech, localSpeechAgreed, localSpeechOnly, localSpeechSupported, setLocalSpeechOnly,
   useLocalSpeechPrefs, useLocalSpeechStatus, LOCAL_SPEECH_MB,
 } from '../lib/localSpeech';
 import { speechRecognition } from '../lib/dictation';
+import { useAuth } from '../auth/AuthProvider';
+import { useState } from 'react';
 import { iosCantListen } from '../lib/browserHandoff';
 import OpenInBrowser from './OpenInBrowser';
 import './VoiceSettings.css';
@@ -30,6 +32,12 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
   const iosApp = iosCantListen();
   const voices = useVoices();
   const vname = chosenVoiceName();
+  const { isAdmin } = useAuth();
+  const dflt = useDefaultVoiceName();
+  const hasDflt = !!dflt && voices.some((v) => v.name === dflt);
+  const [dMsg, setDMsg] = useState('');
+  const plat = PLATFORM_LABEL[devicePlatform()];
+  const sample = (name: string) => { setVoiceName(name); void speak('Hi, this is how I sound.'); };
   if (!canSpeak()) return compact ? null : <p className="vset__fine">This browser can’t speak or listen — try Safari or Chrome.</p>;
   return (
     <div className={'vset' + (compact ? ' vset--compact' : '')}>
@@ -44,12 +52,25 @@ export default function VoiceSettings({ compact = false }: { compact?: boolean }
           <label className="vset__voicelab">
             <strong>Voice</strong>
             <select className="vset__select" value={vname}
-              onChange={(e) => { setVoiceName(e.target.value); void speak('Hi, this is how I sound.'); }}>
-              <option value="">This device’s usual voice</option>
+              onChange={(e) => { setDMsg(''); sample(e.target.value); }}>
+              <option value="">{hasDflt ? `Lichen’s voice (${dflt})` : 'This device’s usual voice'}</option>
               {voices.map((v) => <option key={v.voiceURI} value={v.name}>{v.name}</option>)}
             </select>
           </label>
           <button type="button" className="vset__link" onClick={() => void speak('Hi, this is how I sound.')}>Hear it</button>
+          {isAdmin && !compact && vname && vname !== dflt && (
+            <button type="button" className="vset__link"
+              onClick={() => void setDefaultVoice(vname).then(() => setDMsg(`Lichen will use ${vname} on ${plat} for everyone who has that voice and hasn’t picked their own.`)).catch((e) => setDMsg(e.message))}>
+              Make this Lichen’s voice on {plat}
+            </button>
+          )}
+          {isAdmin && !compact && dflt && (
+            <button type="button" className="vset__link"
+              onClick={() => void setDefaultVoice(null).then(() => setDMsg(`${plat} goes back to each device’s usual voice.`)).catch((e) => setDMsg(e.message))}>
+              Clear Lichen’s {plat} voice
+            </button>
+          )}
+          {dMsg && <p className="vset__fine" style={{ flexBasis: '100%', margin: 0 }}>{dMsg}</p>}
         </div>
       )}
       <label className={'vset__row' + (listen ? '' : ' is-off')}>
