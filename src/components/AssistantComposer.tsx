@@ -220,12 +220,15 @@ export default function AssistantComposer({
     if (!SR) return;
     // A session still winding down (stop() is asynchronous) used to make
     // the next listen quietly do nothing — stop it and start fresh.
+    // iPhones start the mic only inside the tap itself, so a session still
+    // winding down is stopped and the new one started RIGHT NOW; only if the
+    // engine refuses (still busy) do we retry a moment later.
+    let retried = false;
     if (dictation.current) {
       const old = dictation.current;
       dictation.current = null;
       try { old.stop(); } catch { /* */ }
-      window.setTimeout(() => voiceListen(), 350);
-      return;
+      retried = true;
     }
     voicePhrase.current = '';
     voiceSent.current = false;
@@ -271,6 +274,7 @@ export default function AssistantComposer({
         else if (!errored) setVoiceNote('Didn’t catch that — tap to talk');
       },
     });
+    if (!s && retried) { window.setTimeout(() => voiceListen(), 400); return; }
     mine = s;
     dictation.current = s;
     setListening(!!s);
