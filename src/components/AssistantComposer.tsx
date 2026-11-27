@@ -315,6 +315,16 @@ export default function AssistantComposer({
           </button>
         )}
         {kbHint && <span className="assist-composer__voiceword">Tap the mic on your keyboard</span>}
+        {/* VOICE ON, NOBODY LISTENING (founder 2026-11-27: "opened up voice
+            mode and spoke again but nothing happened"): switching voice on in
+            settings, or arriving with it on, can't start the mic by itself —
+            a phone needs a tap. Say so, and make the line the tap. */}
+        {voice && !secondary && !voiceNote && !listening && !speakingNow && !sending && (
+          <button type="button" className="assist-composer__voicenote"
+            onClick={() => { if (SR && !iosApp) voiceListen(); else { taRef.current?.focus(); setKbHint(true); window.setTimeout(() => setKbHint(false), 6000); } }}>
+            {SR && !iosApp ? 'Voice is on — tap here, then talk' : 'Voice is on — tap the box, then the mic on your keyboard, to talk'}
+          </button>
+        )}
         {voiceNote && !listening && !speakingNow && (
           <button type="button" className="assist-composer__voicenote"
             onClick={() => { if (voice) voiceListen(); else { setVoiceNote(null); dictate(); } }}>
