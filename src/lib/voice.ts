@@ -154,8 +154,18 @@ export function speak(text: string): Promise<void> {
   if (!canSpeak()) return Promise.resolve();
   const clean = forSpeech(text);
   if (!clean) return Promise.resolve();
+  closeVoiceStream();
   const my = ++token;
   try { window.speechSynthesis.cancel(); } catch { /* */ }
+  speaking = true; emit();
+  hushAllListening();
+  lastSpoken = clean; spokeUntil = Infinity;
+  return runChunks(chunksOf(clean), my).then(() => {
+    if (my === token) { speaking = false; spokeUntil = Date.now(); emit(); }
+  });
+}
+
+function chunksOf(clean: string): string[] {
   const parts = clean.match(/[^.!?]+[.!?]*|[^.!?]+$/g)?.map((s) => s.trim()).filter(Boolean) ?? [clean];
   // Join short sentences so the voice doesn't pause after every one.
   const chunks: string[] = [];
@@ -164,9 +174,12 @@ export function speak(text: string): Promise<void> {
     if (last && last.length + p.length < 180) chunks[chunks.length - 1] = `${last} ${p}`;
     else chunks.push(p);
   }
-  speaking = true; emit();
-  hushAllListening();
-  lastSpoken = clean; spokeUntil = Infinity;
+  return chunks;
+}
+
+/** Plays chunks in order without cancelling what came before (so streamed
+ *  sentences queue). Resolves 'refused' when the engine never started. */
+function runChunks(chunks: string[], my: number): Promise<'ok' | 'refused'> {
   return new Promise((resolve) => {
     // A WATCHDOG (founder 2026-11-27: on iPhone Safari "it never stopped
     // having speaking be on"): iOS silently refuses speech no tap started,
@@ -176,10 +189,9 @@ export function speak(text: string): Promise<void> {
     // on; the whole reply ends the same way.
     let finished = false;
     let timer = 0;
-    const done = () => {
+    const done = (how: 'ok' | 'refused' = 'ok') => {
       if (finished) return; finished = true; window.clearTimeout(timer);
-      if (my === token) { speaking = false; spokeUntil = Date.now(); emit(); }
-      resolve();
+      resolve(how);
     };
     const next = (i: number) => {
       window.clearTimeout(timer);
@@ -194,7 +206,7 @@ export function speak(text: string): Promise<void> {
         timer = window.setTimeout(() => {
           if (moved || my !== token) return;
           const synth = window.speechSynthesis;
-          if (!started && Date.now() - t0 > 2500 && !synth.speaking) { try { synth.cancel(); } catch { /* */ } done(); return; }
+          if (!started && Date.now() - t0 > 2500 && !synth.speaking) { try { synth.cancel(); } catch { /* */ } done('refused'); return; }
           if (started && !synth.speaking && !synth.pending) { go(); return; }
           if (Date.now() - t0 > limit) { try { synth.cancel(); } catch { /* */ } go(); return; }
           check(t0);
@@ -206,9 +218,91 @@ export function speak(text: string): Promise<void> {
       u.rate = 1;
       u.onend = go;
       u.onerror = go;
-      try { window.speechSynthesis.speak(u); check(Date.now()); } catch { done(); }
+      try { window.speechSynthesis.speak(u); check(Date.now()); } catch { done('refused'); }
     };
     next(0);
+  });
+}
+
+// SPEAK AS IT WRITES (founder 2026-11-27, #1 of the gaps to the Claude app:
+// the answer used to start out loud only once it was fully written). A
+// voice-mode send opens a Realtime channel named by a random id it carries;
+// assistant-feed broadcasts the reply's text as the model writes it
+// (_shared/voiceStream.ts), and each finished sentence is spoken right away.
+// When the saved reply lands, voiceReply speaks only what's left — or, if
+// nothing streamed (or the server threw a draft away), the whole reply as
+// before.
+interface VoiceStream {
+  ch: ReturnType<typeof supabase.channel>;
+  text: string; upto: number; my: number;
+  chain: Promise<unknown>; started: boolean;
+  got: boolean; reset: boolean; ended: boolean; cut: boolean;
+}
+let vstream: VoiceStream | null = null;
+const SENTENCE_END = /[.!?]["'”’)\]]*\s|\n/g;
+function streamSay(s: VoiceStream, seg: string) {
+  if (s.cut || !on) return;
+  const clean = forSpeech(seg);
+  if (!clean) return;
+  if (!s.started) {
+    s.started = true;
+    s.my = ++token;
+    try { window.speechSynthesis.cancel(); } catch { /* */ }
+    speaking = true; emit();
+    hushAllListening();
+    lastSpoken = ''; spokeUntil = Infinity;
+  } else if (s.my !== token) { s.cut = true; return; }
+  lastSpoken = (lastSpoken + ' ' + clean).trim();
+  const my = s.my;
+  s.chain = s.chain.then(async () => {
+    if (my !== token) { s.cut = true; return; }
+    if (await runChunks(chunksOf(clean), my) === 'refused') s.cut = true;
+  });
+}
+function streamSettle(s: VoiceStream) {
+  void s.chain.then(() => {
+    if (s.started && s.my === token && s.ended) { speaking = false; spokeUntil = Date.now(); emit(); }
+  });
+}
+function streamDelta(s: VoiceStream, t: string) {
+  if (s.reset || s.ended) return;
+  s.text += t; s.got = true;
+  const rest = s.text.slice(s.upto);
+  let cut = -1;
+  SENTENCE_END.lastIndex = 0;
+  for (let m = SENTENCE_END.exec(rest); m; m = SENTENCE_END.exec(rest)) cut = m.index + m[0].length;
+  if (cut > 0) { streamSay(s, rest.slice(0, cut)); s.upto += cut; }
+}
+function streamEnd(s: VoiceStream) {
+  if (s.ended || s.reset) return;
+  s.ended = true;
+  const rest = s.text.slice(s.upto);
+  s.upto = s.text.length;
+  if (rest.trim()) streamSay(s, rest);
+  streamSettle(s);
+}
+function streamReset(s: VoiceStream) {
+  if (s.reset) return;
+  s.reset = true; s.cut = true;
+  if (s.started && s.my === token) { token++; try { window.speechSynthesis.cancel(); } catch { /* */ } speaking = false; emit(); }
+}
+export function closeVoiceStream() {
+  if (!vstream) return;
+  try { void supabase.removeChannel(vstream.ch); } catch { /* */ }
+  vstream = null;
+}
+/** Open the channel for a voice-mode send (before the message is posted). */
+export async function openVoiceStream(id: string): Promise<void> {
+  closeVoiceStream();
+  const ch = supabase.channel(`vs:${id}`, { config: { broadcast: { self: false } } });
+  const s: VoiceStream = { ch, text: '', upto: 0, my: 0, chain: Promise.resolve(), started: false, got: false, reset: false, ended: false, cut: false };
+  vstream = s;
+  ch.on('broadcast', { event: 'd' }, ({ payload }) => { if (vstream === s) streamDelta(s, String((payload as { t?: string })?.t ?? '')); })
+    .on('broadcast', { event: 'r' }, () => { if (vstream === s) streamReset(s); })
+    .on('broadcast', { event: 'e' }, () => { if (vstream === s) streamEnd(s); });
+  await new Promise<void>((resolve) => {
+    const t = window.setTimeout(resolve, 1500);
+    ch.subscribe((st) => { if (st === 'SUBSCRIBED') { window.clearTimeout(t); resolve(); } });
   });
 }
 
@@ -227,6 +321,7 @@ export function unlockSpeech() {
 
 export function stopSpeaking() {
   token++;
+  if (vstream) vstream.cut = true;
   try { window.speechSynthesis?.cancel(); } catch { /* */ }
   if (speaking) { speaking = false; emit(); }
 }
@@ -250,7 +345,18 @@ export function listenOnce(onPhrase?: (p: string) => void, background = false): 
  *  the reply is read aloud, then the composer is asked to listen again. */
 export async function voiceReply(text: string) {
   if (!on) return;
-  await speak(text);
+  const s = vstream;
+  if (s && s.got && !s.reset) {
+    // It already spoke as it was written: finish what's left, nothing twice.
+    if (s.cut) { closeVoiceStream(); return; }
+    streamEnd(s);
+    await s.chain;
+    closeVoiceStream();
+    if (s.cut) return;
+  } else {
+    closeVoiceStream();
+    await speak(text);
+  }
   // Let the speakers fall silent before the mic opens — engines report the
   // end of speech a beat before the last of it leaves the speakers.
   await new Promise((r) => setTimeout(r, 900));
