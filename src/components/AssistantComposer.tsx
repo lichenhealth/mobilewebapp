@@ -167,20 +167,22 @@ export default function AssistantComposer({
   // arrow to send it, or the person says over… so that it's easier"): voice
   // mode no longer sends on the first pause. Words write into the box as
   // they come (a pause is just a pause), a red dot says it's recording, and
-  // the message goes when they tap the arrow or end with "over".
+  // the message goes when they tap the arrow or say "send".
   const voiceSent = useRef(false);
   const askNow = useRef('');
   askNow.current = ask;
-  // "over" counts only as its OWN word after a pause (a new stretch of
-  // speech, or set off by the engine's punctuation), or as "over and out" —
-  // so "turn it over" in one breath is a sentence, not a send.
-  const OVER_ALONE = /^\s*over[\s.!?]*$/i;
-  const OVER_SET_OFF = /[,.;!?]\s*over[\s.!?]*$/i;
-  const OVER_AND_OUT = /(?:^|\s)over\s+and\s+out[\s.!?]*$/i;
-  const OVER_TAIL = /[\s,.;:!?-]*\bover(?:\s+and\s+out)?[\s.!?]*$/i;
-  const saidOver = (prev: string, phrase: string) => {
+  // "send" counts only as its OWN word after a pause (a new stretch of
+  // speech, or set off by the engine's punctuation), or "okay, send" /
+  // "please send" / "send it now" — so "send it to Gabe" in one breath is a
+  // sentence, not a send. (Was "over", radio-style, for an hour; founder
+  // 2026-11-27: "maybe we say send when we're ready to send, or we press the
+  // button, so it's the same.")
+  const SEND_ALONE = /^\s*(?:(?:ok(?:ay)?|please|and)\s+)?send(?:\s+it(?:\s+now)?)?[\s.!?]*$/i;
+  const SEND_SET_OFF = /[,.;!?]\s*(?:(?:ok(?:ay)?|please)\s+)?send(?:\s+it(?:\s+now)?)?[\s.!?]*$/i;
+  const SEND_TAIL = /[\s,.;:!?-]*(?:\b(?:ok(?:ay)?|please|and)\s+)?\bsend(?:\s+it(?:\s+now)?)?[\s.!?]*$/i;
+  const saidSend = (prev: string, phrase: string) => {
     const added = phrase.startsWith(prev) ? phrase.slice(prev.length) : '';
-    return (!!prev && OVER_ALONE.test(added)) || OVER_SET_OFF.test(phrase) || OVER_AND_OUT.test(phrase);
+    return (!!prev && SEND_ALONE.test(added)) || SEND_SET_OFF.test(phrase);
   };
   function voiceListen() {
     unlockSpeech();
@@ -204,7 +206,7 @@ export default function AssistantComposer({
       continuous: true,
       onPhrase: (phrase) => {
         if (voiceSent.current) return;
-        if (saidOver(voicePhrase.current, phrase)) { const t = (base + phrase.replace(OVER_TAIL, '')).trim(); setAsk(t); sendIt(t); return; }
+        if (saidSend(voicePhrase.current, phrase)) { const t = (base + phrase.replace(SEND_TAIL, '')).trim(); setAsk(t); sendIt(t); return; }
         voicePhrase.current = phrase;
         setAsk(base + phrase);
       },
@@ -376,7 +378,7 @@ export default function AssistantComposer({
           </button>
         )}
         {voice && listening && !usesLocalSpeech() && (
-          <span className="assist-composer__voicenote is-hint">Talk as long as you like — say “over” or tap the arrow to send</span>
+          <span className="assist-composer__voicenote is-hint">Talk as long as you like — say “send” or tap the arrow</span>
         )}
         {voiceNote && !listening && !speakingNow && (
           <button type="button" className="assist-composer__voicenote"
