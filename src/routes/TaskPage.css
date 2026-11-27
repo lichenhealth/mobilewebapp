@@ -25,3 +25,21 @@
 .taskp__input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--bone-edge); background: #fff; font: inherit; font-size: 16px; }
 .taskp__quiet { color: var(--ink-muted); margin: 0; }
 .taskp__err { color: var(--red-deep, #a3442f); margin: 0; font-size: 14px; }
+
+/* Sharing the list (2026-11-27). */
+.taskp__tool--share { display: inline-flex; align-items: center; gap: 6px; }
+.taskp__tool.is-on { font-weight: 500; }
+.taskp__share {
+  margin-top: var(--s-3); padding: var(--s-3); border: 1px solid var(--bone-edge);
+  border-radius: 14px; background: var(--bone-warm, #fff); display: flex; flex-direction: column; gap: 8px;
+}
+.taskp__share-lead { margin: 0; font-size: 14px; color: var(--ink-soft); }
+.taskp__people, .taskp__hits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.taskp__people li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 15px; }
+.taskp__hits button {
+  width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--bone-edge);
+  border-radius: 10px; background: #fff; font: inherit; color: var(--ink); cursor: pointer;
+}
+.taskp__hits button span { color: var(--peach-deep); }
+.taskp__hits button:hover { border-color: var(--peach); }
+.taskp__share-ok { margin: 0; font-size: 14px; color: var(--green-deep, #3d7a4a); }

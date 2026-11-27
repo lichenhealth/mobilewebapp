@@ -65,12 +65,41 @@ export interface Recipient { type: 'profile' | 'space'; id: string; name?: strin
 const COLS = 'id, profile_id, title, start_date, end_date, at_min, lead_min, recurrence, done_mode, items';
 
 async function writeRecipients(reminderId: string, recipients: Recipient[]): Promise<void> {
-  await supabase.from('reminder_recipients').delete().eq('reminder_id', reminderId);
-  if (recipients.length) {
-    await supabase.from('reminder_recipients')
-      .insert(recipients.map((r) => ({ reminder_id: reminderId, recipient_type: r.type, recipient_id: r.id })));
-    await supabase.rpc('notify_reminder', { p_reminder: reminderId }).then(() => {}, () => {});
+  // Diff, never delete-all-then-insert: the reminder_recipient_added trigger
+  // bells each NEWLY added person once (2026-11-27), so re-inserting everyone
+  // on every edit would ring the whole list again.
+  const { data } = await supabase.from('reminder_recipients')
+    .select('recipient_type, recipient_id').eq('reminder_id', reminderId);
+  const have = ((data as { recipient_type: string; recipient_id: string }[] | null) ?? []);
+  const key = (t: string, id: string) => t + ':' + id;
+  const want = new Set(recipients.map((r) => key(r.type, r.id)));
+  const had = new Set(have.map((r) => key(r.recipient_type, r.recipient_id)));
+  for (const r of have) {
+    if (!want.has(key(r.recipient_type, r.recipient_id))) {
+      await supabase.from('reminder_recipients').delete()
+        .eq('reminder_id', reminderId).eq('recipient_type', r.recipient_type).eq('recipient_id', r.recipient_id);
+    }
   }
+  const adds = recipients.filter((r) => !had.has(key(r.type, r.id)));
+  if (adds.length) {
+    await supabase.from('reminder_recipients')
+      .insert(adds.map((r) => ({ reminder_id: reminderId, recipient_type: r.type, recipient_id: r.id })));
+  }
+}
+
+/** Share a task/checklist with one more person (the owner's door on the
+ *  checklist page). The trigger bells them; they can tick items at once. */
+export async function shareTaskWith(reminderId: string, profileId: string): Promise<void> {
+  const { error } = await supabase.from('reminder_recipients')
+    .insert({ reminder_id: reminderId, recipient_type: 'profile', recipient_id: profileId });
+  if (error && error.code !== '23505') throw new Error(error.message);
+}
+
+/** Take one person off a task (owner only — RLS). */
+export async function unshareTask(reminderId: string, r: Recipient): Promise<void> {
+  const { error } = await supabase.from('reminder_recipients').delete()
+    .eq('reminder_id', reminderId).eq('recipient_type', r.type).eq('recipient_id', r.id);
+  if (error) throw new Error(error.message);
 }
 
 /** Recipients for MANY reminders at once, name-resolved — the To-Do list

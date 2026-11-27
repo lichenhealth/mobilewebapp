@@ -34,7 +34,7 @@ import { SPACE_PAGE_TOOLS, isSpacePageTool, runSpacePageTool } from '../_shared/
 import { READ_WEBSITE_TOOL, SAVE_WEB_IMAGE_TOOL, readWebPage, rehostWebImage, placeImage, webSearchTool, searchLocation, searchResultUrls, joinReplyText, type SearchLocation } from '../_shared/webRead.ts';
 import { readPageState, writePageDraft, DRAFT_NOTE } from '../_shared/pageDraft.ts';
 import { FILE_DEV_REPORT_TOOL, fileDevReport } from '../_shared/devReport.ts';
-import { LIFE_TOOLS, LIFE_TOOL_SECTION, runLifeTool } from '../_shared/lifeTools.ts';
+import { LIFE_TOOLS, LIFE_TOOL_SECTION, runLifeTool, shareReminderByName } from '../_shared/lifeTools.ts';
 import { MAIL_TOOLS, MAIL_TOOL_NAMES, runMailTool } from '../_shared/mailTools.ts';
 import { GDRIVE_TOOLS, GDRIVE_TOOL_NAMES, runGDriveTool } from '../_shared/gdriveTools.ts';
 import { WATCH_TOOLS, WATCH_TOOL_NAMES, runWatchTool } from '../_shared/watchTools.ts';
@@ -783,6 +783,7 @@ const ACT_TOOLS = [
           description: 'Optional CHECKLIST riding the task — a shopping list, packing list, steps. Each item is one thing to tick ({text, group}); group is an optional heading like "Produce" or "Dairy". The task then opens as a checklist page anyone on it can tick off item by item (in a store aisle, say). Use this — not a separate doc — whenever they want to check things off on a date. Never list things that aren\'t to be bought/done (no "tap water" reminders, no equipment they already own unless they asked).',
           items: { type: 'object', properties: { text: { type: 'string' }, group: { type: 'string' } }, required: ['text'] },
         },
+        share_with: { type: 'array', items: { type: 'string' }, description: 'Optional. People to share it with by name ("Gabe Miltner") — they get a bell, it lands on their calendar, and they can tick items off too. Only when the member asked.' },
       },
       required: ['title', 'date'],
     },
@@ -3506,11 +3507,17 @@ Deno.serve(async (req) => {
       const made = await r.json().catch(() => null);
       const rid = Array.isArray(made) ? made[0]?.id : null;
       const when = atMin != null ? `${date} at ${String(Math.floor(atMin / 60)).padStart(2, '0')}:${String(atMin % 60).padStart(2, '0')}` : `${date} (finish-by, morning nudge)`;
+      let shareLine = '';
+      const shareNames = Array.isArray(input.share_with) ? (input.share_with as unknown[]).map(String) : [];
+      if (rid && shareNames.length) {
+        const { added, notes } = await shareReminderByName(sb, profile_id, rid, shareNames);
+        shareLine = [added.length ? ` — shared with ${added.join(', ')} (bell sent; they can check items off too)` : '', ...notes.map((n) => `; ${n}`)].join('');
+      }
       if (items.length && rid) {
         appDoors.push({ path: `/tasks/${rid}`, label: `Open the ${title} checklist` });
-        return { ok: true, change: `added the task "${title}" for ${when} with a ${items.length}-item checklist they can tick off (an "Open the checklist" button is attached)` };
+        return { ok: true, change: `added the task "${title}" for ${when} with a ${items.length}-item checklist they can tick off (an "Open the checklist" button is attached)${shareLine}` };
       }
-      return { ok: true, change: `added the task "${title}" for ${when}` };
+      return { ok: true, change: `added the task "${title}" for ${when}${shareLine}` };
     }
 
     // ── The money read (founder 2026-10-06) ─────────────────────────────
