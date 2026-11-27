@@ -126,6 +126,13 @@ export function startDictation(opts: {
   /** The engine's own error word ('not-allowed', 'no-speech', 'network'…)
    *  — so a caller can say WHY nothing was heard instead of sitting idle. */
   onError?: (code: string) => void;
+  /** LIVE ROUGH WORDS (founder 2026-11-27: "rebuild what I'm experiencing
+   *  here with you and Claude"): present = the engine's not-yet-certain
+   *  words arrive here as they're heard ('' clears), for display only — the
+   *  caller shows them faintly and never treats them as settled. The words
+   *  still on screen when a session ends are handed over through onPhrase,
+   *  so nothing seen is lost. */
+  onInterim?: (rough: string) => void;
 }): DictationSession | null {
   if (opts.background && foreground > 0) return null;
   // ON-PHONE WHISPER (2026-11-26): where the browser can't listen (an
@@ -159,7 +166,7 @@ export function startDictation(opts: {
   if (!opts.background) for (const b of [...background]) b.stop();
   const rec = new Ctor();
   rec.lang = navigator.language || 'en-US';
-  rec.interimResults = false;
+  rec.interimResults = !!opts.onInterim;
   rec.continuous = !!opts.continuous && !opts.background;
   rec.maxAlternatives = 1;
   let ended = false;
@@ -177,34 +184,56 @@ export function startDictation(opts: {
   // one is kept and handed over at the end when nothing final ever came.
   let gotFinal = false;
   let pending = '';
+  let lastFinal = '';
+  let lastRough = '';
   let hushed = false;
-  const hush = () => { hushed = true; pending = ''; try { rec.abort?.(); } catch { /* */ } try { rec.stop(); } catch { end(); } };
+  const hush = () => { hushed = true; pending = ''; if (lastRough) { lastRough = ''; opts.onInterim?.(''); } try { rec.abort?.(); } catch { /* */ } try { rec.stop(); } catch { end(); } };
   hushers.add(hush);
   rec.onresult = (e) => {
     if (hushed) return;
     const parts: string[] = [];
     const loose: string[] = [];
+    const rough: string[] = [];
     for (let i = 0; i < e.results.length; i++) {
       const r = e.results[i];
       const t = (r[0]?.transcript ?? '').trim();
       if (t && loose[loose.length - 1] !== t) loose.push(t);
-      if (r.isFinal === false) continue; // an engine that ignores interimResults
+      if (r.isFinal === false) { if (t && rough[rough.length - 1] !== t) rough.push(t); continue; }
       // The same segment twice in a row is a duplicate delivery, not speech.
       if (t && parts[parts.length - 1] !== t) parts.push(t);
     }
-    if (parts.length) { gotFinal = true; opts.onPhrase(parts.join(' ')); }
-    else if (loose.length) pending = loose.join(' ');
+    if (parts.length) {
+      gotFinal = true;
+      const f = parts.join(' ');
+      if (f !== lastFinal) { lastFinal = f; opts.onPhrase(f); }
+    } else if (loose.length) pending = loose.join(' ');
+    if (opts.onInterim) {
+      let r = rough.join(' ');
+      // An engine re-sending settled words as rough ones is not new speech.
+      if (r && lastFinal.endsWith(r)) r = '';
+      if (r !== lastRough) { lastRough = r; opts.onInterim(r); }
+    }
+  };
+  // Whatever was still showing when listening stops is kept, never dropped.
+  let settled = false;
+  const settle = () => {
+    if (hushed || settled) return;
+    settled = true;
+    if (opts.onInterim && lastRough) {
+      opts.onPhrase((lastFinal ? lastFinal + ' ' : '') + lastRough);
+    } else if (!gotFinal && pending) opts.onPhrase(pending);
+    if (lastRough) { lastRough = ''; opts.onInterim?.(''); }
   };
   rec.onend = () => {
     hushers.delete(hush);
-    if (!hushed && !gotFinal && pending) opts.onPhrase(pending);
+    settle();
     end();
   };
   rec.onerror = (ev: unknown) => {
     const code = (ev as { error?: string })?.error ?? 'error';
     hushers.delete(hush);
     if (code !== 'aborted' && !hushed) opts.onError?.(code);
-    if (!hushed && !gotFinal && pending) opts.onPhrase(pending);
+    settle();
     end();
   };
   // A refused start (mic permission, engine state) is "no session" — the
