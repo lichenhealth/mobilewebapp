@@ -239,7 +239,8 @@ interface VoiceStream {
   got: boolean; reset: boolean; ended: boolean; cut: boolean;
 }
 let vstream: VoiceStream | null = null;
-const SENTENCE_END = /[.!?]["'”’)\]]*\s|\n/g;
+// A list number ("2.") is not the end of a sentence — never spoken alone.
+const SENTENCE_END = /(?<!(?:^|\s)\d{1,2})[.!?]["'”’)\]]*\s|\n(?=\s*\S)/g;
 function streamSay(s: VoiceStream, seg: string) {
   if (s.cut || !on) return;
   const clean = forSpeech(seg);
