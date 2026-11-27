@@ -8,6 +8,23 @@
 // section's AI switch (`offSections`), checked before any read or write.
 
 type SbFn = (path: string, init?: RequestInit) => Promise<Response>;
+
+/** Share a task with people by name (2026-11-27). The reminder_recipient_added
+ *  trigger bells each newly added person; RLS + set_task_item_done already let
+ *  anyone on the task tick its items. Names resolve through findMember — a
+ *  near-miss spelling is reported so the model says the real name back. */
+export async function shareReminderByName(sb: SbFn, me: string, reminderId: string, names: string[]): Promise<{ added: string[]; notes: string[] }> {
+  const added: string[] = []; const notes: string[] = [];
+  for (const raw of names.map((x) => String(x).trim()).filter(Boolean).slice(0, 12)) {
+    const found = await findMember(sb, me, raw);
+    if (found.kind === 'several') { notes.push(`"${raw}" could be ${found.candidates.map((c) => c.name).join(' or ')} — ask which`); continue; }
+    if (found.kind === 'none') { notes.push(`no Lichen member matches "${raw}" (offer to invite them to Lichen)`); continue; }
+    const res = await sb('reminder_recipients', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify({ reminder_id: reminderId, recipient_type: 'profile', recipient_id: found.member.id }) });
+    if (!res.ok) { notes.push(`couldn't share with ${found.member.name}`); continue; }
+    added.push(found.member.name + (found.exact ? '' : ` (read "${raw}" as ${found.member.name})`));
+  }
+  return { added, notes };
+}
 type Out = { ok: boolean; change?: string; error?: string; [k: string]: unknown };
 
 import { findMember } from './findMember.ts';
@@ -21,7 +38,7 @@ export const LIFE_TOOLS = [
   },
   {
     name: 'change_task',
-    description: 'Change one of THEIR OWN tasks/reminders/to-dos by its exact title (from my_lists tasks): mark it done (or not done), rename it, move its date or time, or delete it — and work its CHECKLIST: add_items, remove_items (exact item texts), check_items / uncheck_items (exact item texts). To ADD a task use add_task (which can carry a checklist from the start).',
+    description: 'Change one of THEIR OWN tasks/reminders/to-dos by its exact title (from my_lists tasks): mark it done (or not done), rename it, move its date or time, or delete it — work its CHECKLIST: add_items, remove_items (exact item texts), check_items / uncheck_items (exact item texts) — and SHARE it: share_with / unshare people by name, so they can tick items off together (a checklist is shareable like a Drive file; you CAN do this). To ADD a task use add_task (which can carry a checklist from the start).',
     input_schema: {
       type: 'object',
       properties: {
@@ -35,6 +52,8 @@ export const LIFE_TOOLS = [
         remove_items: { type: 'array', items: { type: 'string' }, description: 'Exact texts of checklist items to remove.' },
         check_items: { type: 'array', items: { type: 'string' }, description: 'Exact texts of checklist items to tick off.' },
         uncheck_items: { type: 'array', items: { type: 'string' }, description: 'Exact texts of checklist items to untick.' },
+        share_with: { type: 'array', items: { type: 'string' }, description: 'People to SHARE the task/checklist with, by name as the member said it ("Gabe Miltner"). They get a bell, it shows on their calendar, and they can check items off too. Only when the member asked to share it.' },
+        unshare: { type: 'array', items: { type: 'string' }, description: 'Names of people to take off the task.' },
       },
       required: ['title'],
     },
@@ -399,12 +418,19 @@ export async function runLifeTool(
 
   if (name === 'my_lists') {
     if (which === 'tasks') {
-      const rems = await (await sb(`reminders?profile_id=eq.${me}&end_date=gte.${today()}&select=title,start_date,at_min,recurrence,items&order=start_date.asc&limit=40`)).json();
+      const rems = await (await sb(`reminders?profile_id=eq.${me}&end_date=gte.${today()}&select=id,title,start_date,at_min,recurrence,items&order=start_date.asc&limit=40`)).json();
+      const rIds = (Array.isArray(rems) ? rems : []).map((r: { id: string }) => r.id);
+      const recs = rIds.length ? await (await sb(`reminder_recipients?reminder_id=in.(${rIds.join(',')})&recipient_type=eq.profile&select=reminder_id,recipient_id`)).json() : [];
+      const recIds = [...new Set((Array.isArray(recs) ? recs : []).map((x: { recipient_id: string }) => x.recipient_id))];
+      const recNames = recIds.length ? await (await sb(`profiles?id=in.(${recIds.join(',')})&select=id,full_name`)).json() : [];
+      const nm = new Map((Array.isArray(recNames) ? recNames : []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name ?? 'someone']));
+      const withOf = (rid: string) => (Array.isArray(recs) ? recs : []).filter((x: { reminder_id: string }) => x.reminder_id === rid).map((x: { recipient_id: string }) => nm.get(x.recipient_id) ?? 'someone');
       const todos = await (await sb(`todos?profile_id=eq.${me}&done=eq.false&select=title&order=created_at.desc&limit=40`)).json();
       return {
         ok: true,
-        reminders: (Array.isArray(rems) ? rems : []).map((r: { title: string; start_date: string; at_min: number | null; recurrence: unknown; items?: { text: string; group?: string | null; done?: boolean }[] }) => {
-          const head = `"${r.title}" ${r.start_date}${r.at_min != null ? ` at minute ${r.at_min}` : ''}${r.recurrence ? ' (repeats)' : ''}`;
+        reminders: (Array.isArray(rems) ? rems : []).map((r: { id: string; title: string; start_date: string; at_min: number | null; recurrence: unknown; items?: { text: string; group?: string | null; done?: boolean }[] }) => {
+          const w = withOf(r.id);
+          const head = `"${r.title}" ${r.start_date}${r.at_min != null ? ` at minute ${r.at_min}` : ''}${r.recurrence ? ' (repeats)' : ''}${w.length ? ` (shared with ${w.join(', ')})` : ''}`;
           const its = Array.isArray(r.items) ? r.items : [];
           return its.length ? `${head} — checklist: ${its.map((i) => `${i.done ? '[x]' : '[ ]'} ${i.group ? i.group + ': ' : ''}${i.text}`).join('; ')}` : head;
         }),
@@ -511,12 +537,28 @@ export async function runLifeTool(
       patch.items = items;
       if (missing.length) changes.push(`couldn't find: ${missing.slice(0, 8).join(', ')}`);
     }
+    if (arr(input.share_with).length) {
+      const { added, notes } = await shareReminderByName(sb, me, rem.id, arr(input.share_with).map(String));
+      if (added.length) changes.push(`shared with ${added.join(', ')} — they got a bell and can check items off too`);
+      notes.forEach((n) => changes.push(n));
+    }
+    if (arr(input.unshare).length) {
+      const on = await (await sb(`reminder_recipients?reminder_id=eq.${rem.id}&recipient_type=eq.profile&select=recipient_id`)).json();
+      const ids = (Array.isArray(on) ? on : []).map((x: { recipient_id: string }) => x.recipient_id);
+      const profs = ids.length ? await (await sb(`profiles?id=in.(${ids.join(',')})&select=id,full_name`)).json() : [];
+      for (const raw of arr(input.unshare).map((x) => String(x).trim().toLowerCase())) {
+        const hit = (Array.isArray(profs) ? profs : []).find((p: { full_name: string | null }) => (p.full_name ?? '').toLowerCase().includes(raw));
+        if (!hit) { changes.push(`"${raw}" isn't on this task`); continue; }
+        await sb(`reminder_recipients?reminder_id=eq.${rem.id}&recipient_type=eq.profile&recipient_id=eq.${hit.id}`, { method: 'DELETE' });
+        changes.push(`took ${hit.full_name} off`);
+      }
+    }
     if (Object.keys(patch).length) {
       const res = await sb(`reminders?id=eq.${rem.id}&profile_id=eq.${me}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
       if (!res.ok) return { ok: false, error: 'The task would not save.' };
     }
-    if (!changes.length) return { ok: false, error: 'Nothing to change — pass done, new_title, date, time_min, delete or checklist items.' };
-    return { ok: true, change: `task "${rem.title}": ${changes.join('; ')}`, door: (patch.items || (rem as { items?: unknown[] }).items?.length) ? { path: `/tasks/${rem.id}`, label: `Open the ${rem.title} checklist` } : undefined };
+    if (!changes.length) return { ok: false, error: 'Nothing to change — pass done, new_title, date, time_min, delete, checklist items, share_with or unshare.' };
+    return { ok: true, change: `task "${rem.title}": ${changes.join('; ')}`, door: (patch.items || (rem as { items?: unknown[] }).items?.length || arr(input.share_with).length) ? { path: `/tasks/${rem.id}`, label: `Open the ${rem.title} checklist` } : undefined };
   }
 
   if (name === 'coupons') {

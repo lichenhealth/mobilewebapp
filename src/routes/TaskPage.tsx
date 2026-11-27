@@ -3,9 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { Icon } from '../components/Icon';
 import { useTopBackFor } from '../lib/topBack';
+import { supabase } from '../lib/supabase';
 import {
-  getReminder, newItemId, saveTaskItems, setTaskItemDone,
-  type Reminder, type TaskItem,
+  getReminder, newItemId, saveTaskItems, setTaskItemDone, loadReminderRecipients,
+  shareTaskWith, unshareTask, leaveReminder,
+  type Reminder, type TaskItem, type Recipient,
 } from '../lib/remindersApi';
 import './TaskPage.css';
 
@@ -32,6 +34,13 @@ export default function TaskPage() {
   const [draft, setDraft] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Sharing (founder 2026-11-27): a checklist is shareable like a Drive file —
+  // the people on it tick items too.
+  const [people, setPeople] = useState<Recipient[]>([]);
+  const [sharing, setSharing] = useState(false);
+  const [q, setQ] = useState('');
+  const [hits, setHits] = useState<{ id: string; full_name: string | null }[]>([]);
+  const [shareNote, setShareNote] = useState<string | null>(null);
 
   useTopBackFor(() => {
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
@@ -47,6 +56,42 @@ export default function TaskPage() {
   }, [id]);
 
   useEffect(() => { void load(); }, [load]);
+  const loadPeople = useCallback(async () => {
+    if (!id) return;
+    setPeople(await loadReminderRecipients(id).catch(() => []));
+  }, [id]);
+  useEffect(() => { void loadPeople(); }, [loadPeople]);
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) { setHits([]); return; }
+    const t = window.setTimeout(async () => {
+      const { data } = await supabase.from('profiles').select('id, full_name')
+        .eq('findable', true).eq('onboarded', true).ilike('full_name', `%${term.replace(/[%_]/g, '')}%`).limit(6);
+      const on = new Set(people.map((p) => p.id));
+      setHits(((data as { id: string; full_name: string | null }[] | null) ?? []).filter((h) => h.id !== me && !on.has(h.id)));
+    }, 220);
+    return () => window.clearTimeout(t);
+  }, [q, people, me]);
+
+  const addPerson = async (h: { id: string; full_name: string | null }) => {
+    if (!task) return;
+    try {
+      await shareTaskWith(task.id, h.id);
+      setQ(''); setHits([]);
+      setShareNote(`Shared with ${h.full_name ?? 'them'} ✓ — they'll get a bell and can check items off too.`);
+      void loadPeople();
+    } catch (e) { setErr((e as Error).message); }
+  };
+  const removePerson = async (r: Recipient) => {
+    if (!task) return;
+    try { await unshareTask(task.id, r); setShareNote(null); void loadPeople(); }
+    catch (e) { setErr((e as Error).message); }
+  };
+  const leave = async () => {
+    if (!task) return;
+    try { await leaveReminder(task.id, me); navigate('/calendar'); }
+    catch (e) { setErr((e as Error).message); }
+  };
   // Shopping together: someone else may tick while you stand in the aisle.
   useEffect(() => {
     const onVis = () => { if (document.visibilityState === 'visible') void load(); };
@@ -119,6 +164,9 @@ export default function TaskPage() {
         <p className="taskp__when">
           {dayLabel(task.start_date)}
           {task.owner?.full_name && !isOwner ? <> · from {task.owner.full_name}</> : null}
+          {people.length > 0 && (
+            <> · with {people.filter((p) => p.id !== me).map((p) => (p.name ?? 'someone').split(' ')[0]).join(', ') || 'you'}</>
+          )}
         </p>
         {items.length > 0 && (
           <div className="taskp__prog" aria-label={`${doneCount} of ${items.length} checked off`}>
@@ -138,7 +186,46 @@ export default function TaskPage() {
           {isOwner && (
             <button className="taskp__tool" onClick={() => navigate(`/calendar/new?reminder=${task.id}`)}>Change date</button>
           )}
+          {isOwner && (
+            <button className={'taskp__tool taskp__tool--share' + (sharing ? ' is-on' : '')} onClick={() => setSharing((v) => !v)}>
+              <Icon name="user-multiple" size={14} /> Share
+            </button>
+          )}
+          {!isOwner && (
+            <button className="taskp__tool" onClick={() => void leave()}>Leave this list</button>
+          )}
         </div>
+        {isOwner && sharing && (
+          <div className="taskp__share">
+            <p className="taskp__share-lead">People on this list can check items off with you. It stays on everyone's calendar.</p>
+            {people.length > 0 && (
+              <ul className="taskp__people">
+                {people.map((p) => (
+                  <li key={p.type + p.id}>
+                    <span>{p.name ?? 'Member'}{p.type === 'space' ? ' (group)' : ''}</span>
+                    <button className="taskp__tool" onClick={() => void removePerson(p)}>Remove</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <input
+              className="taskp__input"
+              value={q}
+              placeholder="Add a person by name…"
+              autoFocus
+              onChange={(e) => { setQ(e.target.value); setShareNote(null); }}
+            />
+            {hits.length > 0 && (
+              <ul className="taskp__hits">
+                {hits.map((h) => (
+                  <li key={h.id}><button onClick={() => void addPerson(h)}>{h.full_name ?? 'Member'} <span>· add</span></button></li>
+                ))}
+              </ul>
+            )}
+            {q.trim().length >= 2 && hits.length === 0 && <p className="taskp__quiet">No member by that name yet.</p>}
+            {shareNote && <p className="taskp__share-ok">{shareNote}</p>}
+          </div>
+        )}
       </header>
 
       {err && <p className="taskp__err">{err}</p>}

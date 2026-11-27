@@ -978,5 +978,11 @@
  },
  "extensionApi:revokeExtensionToken": {
   "exempt": "disconnecting a browser is a security act the person takes on the screen; the brain never removes a sign-in"
+ },
+ "remindersApi:shareTaskWith": {
+  "tool": "change_task share_with / add_task share_with"
+ },
+ "remindersApi:unshareTask": {
+  "tool": "change_task unshare"
  }
 }
