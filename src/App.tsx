@@ -85,6 +85,8 @@ import AreaFeed from './routes/AreaFeed';
 import Courses from './routes/Courses';
 import BottomNav from './components/BottomNav';
 import GuideCompanion from './components/GuideCompanion';
+import BrainCompanion from './components/BrainCompanion';
+import { inCompanion, tellParent } from './lib/companion';
 import GuestGate from './components/GuestGate';
 import AccountMismatch from './components/AccountMismatch';
 import TopBar from './components/TopBar';
@@ -161,12 +163,32 @@ export default function App() {
   // shared decision, src/lib/siteView.ts — founder 2026-09-09 after the
   // builder's Preview showed the side nav and bone ground). The chrome
   // around the page stands down for all of them.
-  const isEmbed = nakedSiteView(search);
+  // Inside the BRAIN COMPANION's frame (2026-11-27) the app shows only the
+  // conversation — no chrome of its own.
+  const companionFrame = inCompanion();
+  const isEmbed = nakedSiteView(search) || companionFrame;
   const customHandle = hostSpaceHandle();        // this hostname IS a space's website
   const isAbout = pathname === '/about';         // About page has its own header
   const isMaps = pathname === '/maps';   // full-bleed map, no scroll padding
   const navigate = useNavigate();
   const { user, loading, onboarded, isAdmin, reconnecting } = useAuth();
+  // THE COMPANION'S FRAME stays on the brain: any door the brain hands out
+  // (a draft, a doc, an event) opens in the MAIN window, where the member
+  // is, and the frame steps back to the conversation it was showing. It also
+  // tells the panel where it is, so the conversation reopens after a reload.
+  const lastBrainUrl = useRef('');
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!companionFrame) return;
+    const here = pathname + search + hash;
+    if (pathname.startsWith('/assistant')) {
+      lastBrainUrl.current = here;
+      tellParent({ type: 'lichen:companion-at', url: here });
+      return;
+    }
+    tellParent({ type: 'lichen:navigate', path: here });
+    navigate(lastBrainUrl.current || '/assistant/feed?thread=general&convo=new', { replace: true });
+  }, [companionFrame, pathname, search, hash, navigate]);
   useEffect(() => {
     if (loading || onboarded === null) return;
     if (user && onboarded === false && !isAuth) {
@@ -583,6 +605,7 @@ export default function App() {
       {/* Claude's walkthrough companion (founder 2026-10-19) — floats over
           the real screens while a new member's tour is active. */}
       {!isAuth && !isGuest && !isEmbed && <GuideCompanion />}
+      {!isAuth && !isGuest && !isEmbed && !isAbout && user && onboarded !== false && <BrainCompanion />}
       {/* The guest gate (founder 2026-11-01): signed-out taps on member
           doors land here — Sign in, or Request to join. */}
       {!isAuth && !isGuest && !isEmbed && <GuestGate />}
