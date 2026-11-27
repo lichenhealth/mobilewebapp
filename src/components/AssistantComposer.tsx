@@ -186,7 +186,16 @@ export default function AssistantComposer({
   };
   function voiceListen() {
     unlockSpeech();
-    if (!SR || dictation.current) return;
+    if (!SR) return;
+    // A session still winding down (stop() is asynchronous) used to make
+    // the next listen quietly do nothing — stop it and start fresh.
+    if (dictation.current) {
+      const old = dictation.current;
+      dictation.current = null;
+      try { old.stop(); } catch { /* */ }
+      window.setTimeout(() => voiceListen(), 350);
+      return;
+    }
     voicePhrase.current = '';
     voiceSent.current = false;
     setVoiceNote(null);
@@ -202,6 +211,7 @@ export default function AssistantComposer({
       if (!said || heardOwnWords(said)) { setAsk(''); if (said) setVoiceNote('That was me talking — tap here, then talk'); return; }
       void submitRef.current(said);
     };
+    let mine: DictationSession | null = null;
     const s = startDictation({
       continuous: true,
       onPhrase: (phrase) => {
@@ -213,6 +223,8 @@ export default function AssistantComposer({
       onState: setHearState,
       onError: (code) => { errored = true; micErr(code); if (code === 'no-speech') setVoiceNote('Didn’t hear anything — tap to talk'); },
       onEnd: () => {
+        // A replaced session ending late must not clear the live one.
+        if (dictation.current && dictation.current !== mine) return;
         setListening(false); setHearState(null); dictation.current = null;
         if (voiceSent.current) return;
         // The phone stopped listening on its own (a long silence): the words
@@ -221,6 +233,7 @@ export default function AssistantComposer({
         else if (!errored) setVoiceNote('Didn’t catch that — tap to talk');
       },
     });
+    mine = s;
     dictation.current = s;
     setListening(!!s);
     if (!s) setVoiceNote('Couldn’t start listening — tap to try again');
