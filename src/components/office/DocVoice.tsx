@@ -6,7 +6,7 @@ import { postToAssistantFeed } from '../../lib/assistantFeedApi';
 import { aiDoorOn } from '../AssistantDoor';
 import { renderBold } from '../../lib/inlineBold';
 import {
-  canListen, canSpeak, listenOnce, pushWakeHandler, speak, stopSpeaking, useSpeaking,
+  canListen, canSpeak, heardOwnWords, listenOnce, pushWakeHandler, speak, stopSpeaking, useSpeaking,
 } from '../../lib/voice';
 import { iosCantListen } from '../../lib/browserHandoff';
 import { ensureLocalSpeech, usesLocalSpeech } from '../../lib/dictation';
@@ -122,7 +122,7 @@ export default function DocVoice({ doc, html, body, onClose }: {
     const l = listenOnce((p) => setQ(p));
     const said = await l.done;
     setListening(false);
-    if (said) void ask(said, true);
+    if (said && !heardOwnWords(said)) void ask(said, true);
   };
 
   // HANDS-FREE: "Hey Brain, next" / "Hey Brain, how much butter?"

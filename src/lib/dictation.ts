@@ -15,7 +15,7 @@ export interface SpeechRecognitionLike {
     results: ArrayLike<{ isFinal?: boolean } & ArrayLike<{ transcript: string }>>;
   }) => void) | null;
   onend: (() => void) | null; onerror: ((ev?: unknown) => void) | null;
-  start: () => void; stop: () => void;
+  start: () => void; stop: () => void; abort?: () => void;
 }
 
 export function speechRecognition(): (new () => SpeechRecognitionLike) | null {
@@ -88,6 +88,12 @@ export function usesLocalSpeech(): boolean {
 // a foreground session is live.
 const background = new Set<DictationSession>();
 let foreground = 0;
+// THE BRAIN NEVER HEARS ITSELF (founder 2026-11-27: "the brain is listening
+// to itself when it responds to me and thinking i'm saying it"): every live
+// session can be HUSHED — its words dropped, then ended — the moment the
+// brain starts speaking (voice.ts speak()).
+const hushers = new Set<() => void>();
+export function hushAllListening() { for (const h of [...hushers]) h(); }
 export const foregroundListening = () => foreground > 0;
 
 /** One dictation session, duplicate-proof — THE one way every mic button
@@ -171,7 +177,11 @@ export function startDictation(opts: {
   // one is kept and handed over at the end when nothing final ever came.
   let gotFinal = false;
   let pending = '';
+  let hushed = false;
+  const hush = () => { hushed = true; pending = ''; try { rec.abort?.(); } catch { /* */ } try { rec.stop(); } catch { end(); } };
+  hushers.add(hush);
   rec.onresult = (e) => {
+    if (hushed) return;
     const parts: string[] = [];
     const loose: string[] = [];
     for (let i = 0; i < e.results.length; i++) {
@@ -186,13 +196,15 @@ export function startDictation(opts: {
     else if (loose.length) pending = loose.join(' ');
   };
   rec.onend = () => {
-    if (!gotFinal && pending) opts.onPhrase(pending);
+    hushers.delete(hush);
+    if (!hushed && !gotFinal && pending) opts.onPhrase(pending);
     end();
   };
   rec.onerror = (ev: unknown) => {
     const code = (ev as { error?: string })?.error ?? 'error';
-    if (code !== 'aborted') opts.onError?.(code);
-    if (!gotFinal && pending) opts.onPhrase(pending);
+    hushers.delete(hush);
+    if (code !== 'aborted' && !hushed) opts.onError?.(code);
+    if (!hushed && !gotFinal && pending) opts.onPhrase(pending);
     end();
   };
   // A refused start (mic permission, engine state) is "no session" — the
