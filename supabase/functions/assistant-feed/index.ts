@@ -3824,8 +3824,13 @@ Deno.serve(async (req) => {
         messages.push({ role: 'assistant', content: data.content });
         continue;
       }
-      if (!said && stop === 'max_tokens' && !starved) {
-        console.error('starved-retry', JSON.stringify({ feed_post_id, thread, output_tokens: outputTokens }));
+      // THINKING WITH NO WORDS (founder 2026-11-27, "remove the chocolate
+      // chip cookie items" → "I hit a snag"): after four tool rounds the
+      // model ended its turn holding only a thinking block — end_turn, not
+      // max_tokens, so the old guard let it fall through to the snag note.
+      // Any wordless final turn now gets the same one re-run, thinking off.
+      if (!said && (stop === 'max_tokens' || stop === 'end_turn') && !starved) {
+        console.error('starved-retry', JSON.stringify({ feed_post_id, thread, stop, output_tokens: outputTokens }));
         starved = true;
         continue;
       }
