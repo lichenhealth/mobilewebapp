@@ -39,6 +39,11 @@ export function speechRecognition(): (new () => SpeechRecognitionLike) | null {
 
 export interface DictationSession { stop: () => void }
 
+function isIOS(): boolean {
+  return /iP(hone|ad|od)/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 
 /** Can this page hear at all — the browser's own speech service, or the
  *  on-phone Whisper (2026-11-26) where the browser has none? */
@@ -166,7 +171,10 @@ export function startDictation(opts: {
   if (!opts.background) for (const b of [...background]) b.stop();
   const rec = new Ctor();
   rec.lang = navigator.language || 'en-US';
-  rec.interimResults = !!opts.onInterim;
+  // iPhone Safari heard nothing with live rough words switched on (founder
+  // 2026-11-27, the day they shipped: "no words appeared") — before them it
+  // worked. Live words stay where they're proven: computers and Android.
+  rec.interimResults = !!opts.onInterim && !isIOS();
   rec.continuous = !!opts.continuous && !opts.background;
   rec.maxAlternatives = 1;
   let ended = false;
@@ -187,7 +195,8 @@ export function startDictation(opts: {
   let lastFinal = '';
   let lastRough = '';
   let hushed = false;
-  const hush = () => { hushed = true; pending = ''; if (lastRough) { lastRough = ''; opts.onInterim?.(''); } try { rec.abort?.(); } catch { /* */ } try { rec.stop(); } catch { end(); } };
+  const hush = () => { hushed = true; pending = ''; if (lastRough) { lastRough = ''; opts.onInterim?.(''); }
+    window.setTimeout(() => { if (!ended) { hushers.delete(hush); end(); } }, 1500); try { rec.abort?.(); } catch { /* */ } try { rec.stop(); } catch { end(); } };
   hushers.add(hush);
   rec.onresult = (e) => {
     if (hushed) return;
@@ -239,7 +248,15 @@ export function startDictation(opts: {
   // A refused start (mic permission, engine state) is "no session" — the
   // caller never lights the button for it.
   try { rec.start(); } catch { return null; }
-  session = { stop: () => { try { rec.stop(); } catch { end(); } } };
+  // iPhones sometimes never fire onend after stop(): the session then looked
+  // alive forever and every later tap went nowhere. Give it 1.5s, then abort
+  // and end it ourselves.
+  session = {
+    stop: () => {
+      try { rec.stop(); } catch { end(); return; }
+      window.setTimeout(() => { if (!ended) { try { rec.abort?.(); } catch { /* */ } hushers.delete(hush); settle(); end(); } }, 1500);
+    },
+  };
   if (opts.background) background.add(session); else foreground++;
   return session;
 }
