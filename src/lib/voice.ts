@@ -163,19 +163,61 @@ export function speak(text: string): Promise<void> {
   hushAllListening();
   lastSpoken = clean; spokeUntil = Infinity;
   return new Promise((resolve) => {
-    const done = () => { if (my === token) { speaking = false; spokeUntil = Date.now(); emit(); } resolve(); };
+    // A WATCHDOG (founder 2026-11-27: on iPhone Safari "it never stopped
+    // having speaking be on"): iOS silently refuses speech no tap started,
+    // and then never fires onend — `speaking` stuck true kept the mic shut
+    // forever. Each chunk gets a deadline (never started in 2.5s, or ran far
+    // past its length, or the engine says it's no longer speaking) and moves
+    // on; the whole reply ends the same way.
+    let finished = false;
+    let timer = 0;
+    const done = () => {
+      if (finished) return; finished = true; window.clearTimeout(timer);
+      if (my === token) { speaking = false; spokeUntil = Date.now(); emit(); }
+      resolve();
+    };
     const next = (i: number) => {
+      window.clearTimeout(timer);
       if (my !== token || i >= chunks.length) { done(); return; }
       const u = new SpeechSynthesisUtterance(chunks[i]);
+      let started = false;
+      let moved = false;
+      const go = () => { if (moved) return; moved = true; window.clearTimeout(timer); next(i + 1); };
+      const words = chunks[i].split(/\s+/).length;
+      const limit = 4000 + words * 600;
+      const check = (t0: number) => {
+        timer = window.setTimeout(() => {
+          if (moved || my !== token) return;
+          const synth = window.speechSynthesis;
+          if (!started && Date.now() - t0 > 2500 && !synth.speaking) { try { synth.cancel(); } catch { /* */ } done(); return; }
+          if (started && !synth.speaking && !synth.pending) { go(); return; }
+          if (Date.now() - t0 > limit) { try { synth.cancel(); } catch { /* */ } go(); return; }
+          check(t0);
+        }, 500);
+      };
+      u.onstart = () => { started = true; };
       const v = pickVoice();
       if (v) { u.voice = v; u.lang = v.lang; } else u.lang = navigator.language || 'en-US';
       u.rate = 1;
-      u.onend = () => next(i + 1);
-      u.onerror = () => next(i + 1);
-      try { window.speechSynthesis.speak(u); } catch { done(); }
+      u.onend = go;
+      u.onerror = go;
+      try { window.speechSynthesis.speak(u); check(Date.now()); } catch { done(); }
     };
     next(0);
   });
+}
+
+/** iPhones only let speech start from a tap — call this inside one (voice
+ *  switch, send, "tap here, then talk") and later replies can speak. */
+let unlocked = false;
+export function unlockSpeech() {
+  if (unlocked || !canSpeak()) return;
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+    unlocked = true;
+  } catch { /* */ }
 }
 
 export function stopSpeaking() {

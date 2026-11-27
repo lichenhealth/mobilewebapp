@@ -7,7 +7,7 @@ import { askIosVoice, askVoiceChoice, canDictate, startDictation, usesLocalSpeec
 import { localSpeechAgreed, localSpeechStatusNow, useLocalSpeechStatus } from '../lib/localSpeech';
 import { revealBelow } from '../lib/smartReveal';
 import VoiceSettings from './VoiceSettings';
-import { canListen, canSpeak, heardOwnWords, setVoiceOn, stopSpeaking, useSpeaking, useVoiceMode } from '../lib/voice';
+import { canListen, canSpeak, heardOwnWords, setVoiceOn, unlockSpeech, stopSpeaking, useSpeaking, useVoiceMode } from '../lib/voice';
 import './AssistantComposer.css';
 
 /** The text box every surface that talks to Claude sends through — the
@@ -163,6 +163,7 @@ export default function AssistantComposer({
   };
   const submitRef = useRef<(t?: string) => Promise<void>>(async () => {});
   function voiceListen() {
+    unlockSpeech();
     if (!SR || dictation.current) return;
     voicePhrase.current = '';
     setVoiceNote(null);
@@ -186,6 +187,10 @@ export default function AssistantComposer({
     if (!s) setVoiceNote('Couldn’t start listening — tap to try again');
   }
   function toggleVoice() {
+    unlockSpeech();
+    // While the brain is reading aloud, a tap means "stop — I'll talk now",
+    // not "voice off" (founder 2026-11-27: stuck on Speaking…).
+    if (voice && speakingNow) { stopSpeaking(); window.setTimeout(() => voiceListen(), 250); return; }
     if (voice) { dictation.current?.stop(); stopSpeaking(); setVoiceOn(false); setVoiceNote(null); return; }
     if (iosApp) {
       void askIosVoice('talk').then((c) => {
@@ -261,6 +266,7 @@ export default function AssistantComposer({
 
   async function submit(override?: string) {
     const text = (override ?? ask).trim();
+    if (voice) unlockSpeech();
     if ((!text && images.length === 0 && !attachment) || sending || upBusy) return;
     setSending(true);
     try {
@@ -346,9 +352,9 @@ export default function AssistantComposer({
           <button type="button" className={'assist-composer__btn assist-composer__voice' + (voice ? ' is-live' : '')}
             onClick={toggleVoice} aria-pressed={voice}
             aria-label={voice ? 'Turn voice mode off' : 'Voice mode — talk, and hear the reply'}
-            data-tip={voice ? 'Voice mode on — tap to turn off' : 'Voice mode'}>
+            data-tip={voice ? (speakingNow ? 'Tap to stop and talk' : 'Voice mode on — tap to turn off') : 'Voice mode'}>
             <Icon name="speaker" size={17} />
-            {voice && <span className="assist-composer__voiceword">{speakingNow ? 'Speaking…' : listening ? 'Listening…' : canListen() ? 'Voice on' : 'Replies read aloud'}</span>}
+            {voice && <span className="assist-composer__voiceword">{speakingNow ? 'Speaking… tap to talk' : listening ? 'Listening…' : canListen() ? 'Voice on' : 'Replies read aloud'}</span>}
           </button>
         )}
         <button className="assist-composer__send" type="submit"
