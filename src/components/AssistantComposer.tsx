@@ -7,6 +7,7 @@ import { askIosVoice, askVoiceChoice, canDictate, startDictation, usesLocalSpeec
 import { localSpeechAgreed, localSpeechStatusNow, useLocalSpeechStatus } from '../lib/localSpeech';
 import { revealBelow } from '../lib/smartReveal';
 import VoiceSettings from './VoiceSettings';
+import VoiceMeter from './VoiceMeter';
 import { canListen, canSpeak, heardOwnWords, setVoiceOn, unlockSpeech, stopSpeaking, useSpeaking, useVoiceMode } from '../lib/voice';
 import './AssistantComposer.css';
 
@@ -70,12 +71,14 @@ export default function AssistantComposer({
   // the brief renders this same composer mid-page and must not auto-scroll
   // to it on arrival.
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
   const typedYet = useRef(false);
   useLayoutEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+    if (mirrorRef.current) mirrorRef.current.scrollTop = ta.scrollTop;
     // 'auto' (instant), never smooth: per-keystroke smooth scrolls cancel
     // each other into zero net motion (smartReveal.ts has the story).
     if (typedYet.current) revealBelow(ta.closest('form'), 'auto');
@@ -83,6 +86,22 @@ export default function AssistantComposer({
   }, [ask]);
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
+  // LIVE ROUGH WORDS (founder 2026-11-27: make it feel like talking to
+  // Claude): the tail of the box the phone hasn't settled yet, shown faint.
+  const [rough, setRough] = useState('');
+  // Bumps each time the engine hears something — moves the voice bars.
+  const [pulse, setPulse] = useState(0);
+  // Each listening session's words count only while it's the live one: a
+  // send (or a new session) retires it, so a late phrase can't refill a
+  // box that was just sent.
+  const gen = useRef(0);
+  /** Settled words + rough words → the box, rough remembered as the tail. */
+  const live = (base: string, final: string, r: string) => {
+    const head = base + final;
+    const tail = r ? (head && !/\s$/.test(head) ? ' ' : '') + r : '';
+    setRough(tail);
+    setAsk(head + tail);
+  };
   const [images, setImages] = useState<string[]>([]);
   const [upBusy, setUpBusy] = useState(false);
   // DRAG IT STRAIGHT IN (founder 2026-11-02: "pull a screenshot from
@@ -126,9 +145,12 @@ export default function AssistantComposer({
     // deliveries re-set the same text instead of appending it again
     // (src/lib/dictation.ts has the whole story).
     const base = ask.trim() ? ask.replace(/\s+$/, '') + ' ' : '';
+    const my = ++gen.current;
+    let final = '';
     const s = startDictation({
-      onPhrase: (phrase) => setAsk(base + phrase),
-      onEnd: () => { setListening(false); setHearState(null); dictation.current = null; },
+      onPhrase: (phrase) => { if (my !== gen.current) return; final = phrase; live(base, final, ''); setPulse((n) => n + 1); },
+      onInterim: (r) => { if (my !== gen.current) return; live(base, final, r); if (r) setPulse((n) => n + 1); },
+      onEnd: () => { setListening(false); setHearState(null); setRough(''); dictation.current = null; },
       onError: micErr,
       // Plain voice-to-text keeps listening across pauses until the mic is
       // tapped again (founder 2026-11-26: "it stopped recording the stuff I
@@ -156,6 +178,15 @@ export default function AssistantComposer({
   // reading "Voice on" with nobody listening. Now it says so, with a tap to
   // try again; a refused microphone says that instead.
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  // THINKING (2026-11-27): between a spoken send and the reply being read
+  // aloud, the pill says Claude is working on it — never a blank wait.
+  const [thinking, setThinking] = useState(false);
+  useEffect(() => {
+    if (!thinking) return;
+    if (speakingNow || listening) { setThinking(false); return; }
+    const t = window.setTimeout(() => setThinking(false), 90_000);
+    return () => window.clearTimeout(t);
+  }, [thinking, speakingNow, listening]);
   const micErr = (code: string) => {
     if (code === 'not-allowed' || code === 'service-not-allowed') setVoiceNote('Lichen can’t use your microphone — allow it for this site in your browser’s settings, then tap to talk');
     else if (code === 'network') setVoiceNote('The speech service didn’t answer — check your connection, then tap to talk');
@@ -212,20 +243,27 @@ export default function AssistantComposer({
       void submitRef.current(said);
     };
     let mine: DictationSession | null = null;
+    const my = ++gen.current;
     const s = startDictation({
       continuous: true,
       onPhrase: (phrase) => {
-        if (voiceSent.current) return;
-        if (saidSend(voicePhrase.current, phrase)) { const t = (base + phrase.replace(SEND_TAIL, '')).trim(); setAsk(t); sendIt(t); return; }
+        if (voiceSent.current || my !== gen.current) return;
+        setPulse((n) => n + 1);
+        if (saidSend(voicePhrase.current, phrase)) { const t = (base + phrase.replace(SEND_TAIL, '')).trim(); setRough(''); setAsk(t); sendIt(t); return; }
         voicePhrase.current = phrase;
-        setAsk(base + phrase);
+        live(base, phrase, '');
+      },
+      onInterim: (r) => {
+        if (voiceSent.current || my !== gen.current) return;
+        live(base, voicePhrase.current, r);
+        if (r) setPulse((n) => n + 1);
       },
       onState: setHearState,
       onError: (code) => { errored = true; micErr(code); if (code === 'no-speech') setVoiceNote('Didn’t hear anything — tap to talk'); },
       onEnd: () => {
         // A replaced session ending late must not clear the live one.
         if (dictation.current && dictation.current !== mine) return;
-        setListening(false); setHearState(null); dictation.current = null;
+        setListening(false); setHearState(null); setRough(''); dictation.current = null;
         if (voiceSent.current) return;
         // The phone stopped listening on its own (a long silence): the words
         // stay in the box for the arrow; one tap keeps talking.
@@ -319,11 +357,16 @@ export default function AssistantComposer({
   async function submit(override?: string) {
     const text = (override ?? ask).trim();
     if (voice) unlockSpeech();
-    if (dictation.current && voice) { voiceSent.current = true; dictation.current.stop(); }
+    // Sending retires the live session — its late words never refill the box.
+    gen.current++;
+    if (voice) voiceSent.current = true;
+    if (dictation.current) dictation.current.stop();
+    setRough('');
     if ((!text && images.length === 0 && !attachment) || sending || upBusy) return;
     setSending(true);
     try {
       await onSend(text, images.length ? images : undefined);
+      if (voice) setThinking(true);
       setAsk('');
       setImages([]);
       setVoiceNote(null);
@@ -353,18 +396,26 @@ export default function AssistantComposer({
       {/* Words on top, full width; the tools ride a bar beneath (founder
           2026-11-19: the placeholder broke onto two lines beside an empty
           column of icons — "move the text over so its 1 line"). */}
-      <textarea
-        className="assist-composer__input"
-        rows={1}
-        ref={taRef}
-        value={ask}
-        placeholder={placeholder}
-        onChange={(e) => setAsk(e.target.value)}
-        onPaste={onPaste}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit(); }
-        }}
-      />
+      <div className="assist-composer__field">
+        <textarea
+          className={'assist-composer__input' + (rough ? ' is-ghosted' : '')}
+          rows={1}
+          ref={taRef}
+          value={ask}
+          placeholder={placeholder}
+          onChange={(e) => { setRough(''); setAsk(e.target.value); }}
+          onScroll={(e) => { if (mirrorRef.current) mirrorRef.current.scrollTop = e.currentTarget.scrollTop; }}
+          onPaste={onPaste}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit(); }
+          }}
+        />
+        {rough && ask.endsWith(rough) && (
+          <div className="assist-composer__mirror" ref={mirrorRef} aria-hidden="true">
+            {ask.slice(0, ask.length - rough.length)}<span className="assist-composer__rough">{rough}</span>
+          </div>
+        )}
+      </div>
       <div className="assist-composer__row">
         {uploaderId && (
           <label className={'assist-composer__btn' + (upBusy ? ' is-live' : '')} aria-label="Add a photo">
@@ -379,12 +430,15 @@ export default function AssistantComposer({
             <Icon name="mic" size={17} />
           </button>
         )}
+        {listening && !voice && !usesLocalSpeech() && (
+          <span className="assist-composer__voiceword"><VoiceMeter active pulse={pulse} />Listening — tap the mic when done</span>
+        )}
         {kbHint && <span className="assist-composer__voiceword">Tap the mic on your keyboard</span>}
         {/* VOICE ON, NOBODY LISTENING (founder 2026-11-27: "opened up voice
             mode and spoke again but nothing happened"): switching voice on in
             settings, or arriving with it on, can't start the mic by itself —
             a phone needs a tap. Say so, and make the line the tap. */}
-        {voice && !voiceNote && !listening && !speakingNow && !sending && (
+        {voice && !voiceNote && !listening && !speakingNow && !sending && !thinking && (
           <button type="button" className="assist-composer__voicenote"
             onClick={() => { if (SR && !iosApp) voiceListen(); else { taRef.current?.focus(); setKbHint(true); window.setTimeout(() => setKbHint(false), 6000); } }}>
             {SR && !iosApp ? 'Voice is on — tap here, then talk' : 'Voice is on — tap the box, then the mic on your keyboard, to talk'}
@@ -410,7 +464,7 @@ export default function AssistantComposer({
             aria-label={voice ? 'Turn voice mode off' : 'Voice mode — talk, and hear the reply'}
             data-tip={voice ? (speakingNow ? 'Tap to stop and talk' : 'Voice mode on — tap to turn off') : 'Voice mode'}>
             <Icon name="speaker" size={17} />
-            {voice && <span className="assist-composer__voiceword">{speakingNow ? 'Speaking… tap to talk' : listening ? <><span className="assist-composer__recdot" aria-hidden="true" />Recording</> : canListen() ? 'Voice on' : 'Replies read aloud'}</span>}
+            {voice && <span className="assist-composer__voiceword">{speakingNow ? 'Speaking… tap to talk' : listening ? <><VoiceMeter active pulse={pulse} />Listening</> : thinking ? <><span className="assist-composer__thinking" aria-hidden="true"><i /><i /><i /></span>Thinking…</> : canListen() ? 'Voice on' : 'Replies read aloud'}</span>}
           </button>
         )}
         <button className="assist-composer__send" type="submit"
