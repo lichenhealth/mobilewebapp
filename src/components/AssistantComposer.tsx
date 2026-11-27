@@ -39,7 +39,10 @@ export default function AssistantComposer({
   attachment?: React.ReactNode;
   /** A second composer on the same screen (the brief's summary reply beside
    *  the last conversation): it never catches window-wide drops or the
-   *  voice-mode listen cue, and wears no voice switch — one ear, one drop zone. */
+   *  voice-mode listen cue — one drop zone, one ear for the after-reply
+   *  re-listen. It DOES wear the voice switch since 2026-11-27 (founder: the
+   *  summary "seems to have only voice to text"): a spoken reply to the
+   *  summary sends, the conversation opens, and its box speaks + listens. */
   secondary?: boolean;
 }) {
   const [ask, setAsk] = useState(initialText ?? '');
@@ -322,7 +325,7 @@ export default function AssistantComposer({
             mode and spoke again but nothing happened"): switching voice on in
             settings, or arriving with it on, can't start the mic by itself —
             a phone needs a tap. Say so, and make the line the tap. */}
-        {voice && !secondary && !voiceNote && !listening && !speakingNow && !sending && (
+        {voice && !voiceNote && !listening && !speakingNow && !sending && (
           <button type="button" className="assist-composer__voicenote"
             onClick={() => { if (SR && !iosApp) voiceListen(); else { taRef.current?.focus(); setKbHint(true); window.setTimeout(() => setKbHint(false), 6000); } }}>
             {SR && !iosApp ? 'Voice is on — tap here, then talk' : 'Voice is on — tap the box, then the mic on your keyboard, to talk'}
@@ -339,7 +342,7 @@ export default function AssistantComposer({
           : hearState === 'thinking' ? <span className="assist-composer__voiceword">Writing it out…</span>
           : !voice && hearState ? <span className="assist-composer__voiceword">Listening… tap the mic when done</span>
           : null)}
-        {canSpeak() && !secondary && (
+        {canSpeak() && (
           <button type="button" className={'assist-composer__btn assist-composer__voice' + (voice ? ' is-live' : '')}
             onClick={toggleVoice} aria-pressed={voice}
             aria-label={voice ? 'Turn voice mode off' : 'Voice mode — talk, and hear the reply'}
