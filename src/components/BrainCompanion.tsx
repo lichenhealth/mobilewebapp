@@ -75,9 +75,13 @@ export default function BrainCompanion() {
     <>
       {!open && (
         <button type="button" className={'brainc__fab' + (chatThread ? ' brainc__fab--high' : '')}
-          onClick={openPanel} aria-label="Talk with your brain" data-tip="Your brain — ask or do anything, from here">
+          onClick={openPanel} aria-label="Talk with your brain" title="Your brain — ask or do anything, from here">
           <Icon name="brain" size={22} />
         </button>
+      )}
+      {src && open && (
+        // Phones: a tap anywhere above the sheet closes it (the conversation stays).
+        <div className="brainc__veil" onClick={() => setOpen(false)} aria-hidden="true" />
       )}
       {src && (
         <aside className={'brainc' + (open ? ' is-open' : '')} aria-label="Your brain" aria-hidden={!open}>
@@ -87,13 +91,13 @@ export default function BrainCompanion() {
               <strong>Claude</strong>
               <span>Here with you on every page</span>
             </div>
-            <button type="button" className="brainc__btn" onClick={fresh} data-tip="New conversation" aria-label="New conversation">
+            <button type="button" className="brainc__btn" onClick={fresh} title="New conversation" aria-label="New conversation">
               <Icon name="plus" size={16} />
             </button>
-            <button type="button" className="brainc__btn" onClick={expand} data-tip="Open full screen" aria-label="Open full screen">
+            <button type="button" className="brainc__btn" onClick={expand} title="Open full screen" aria-label="Open full screen">
               <Icon name="arrow-up" size={16} />
             </button>
-            <button type="button" className="brainc__btn" onClick={() => setOpen(false)} data-tip="Close — it stays here" aria-label="Close">
+            <button type="button" className="brainc__btn" onClick={() => setOpen(false)} title="Close — it stays here" aria-label="Close">
               <Icon name="close" size={16} />
             </button>
           </div>

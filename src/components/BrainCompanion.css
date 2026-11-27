@@ -12,6 +12,8 @@
   box-shadow: 0 6px 18px rgba(40, 30, 20, 0.16);
   cursor: pointer;
 }
+/* Wins over global.css's [data-tip]{position:relative} if a tip ever returns. */
+.brainc__fab.brainc__fab { position: fixed; left: auto; }
 .brainc__fab:hover { background: var(--peach-tint); }
 /* Above a chat thread's send button. */
 .brainc__fab--high { bottom: calc(var(--nav-h, 90px) + var(--safe-bot, 0px) + 84px); }
@@ -29,6 +31,12 @@
   overflow: hidden;
 }
 .brainc.is-open { display: flex; }
+/* The page above the sheet: tap it to close. Transparent, phones only. */
+.brainc__veil {
+  position: fixed; z-index: 74; inset: 0;
+  bottom: calc(var(--nav-h, 90px) + var(--safe-bot, 0px));
+  background: rgba(30, 24, 18, 0.12);
+}
 
 .brainc__head {
   display: flex; align-items: center; gap: 8px;
@@ -61,6 +69,7 @@
   }
   /* The page makes room for the panel instead of hiding under it. */
   body.has-brain-panel { padding-right: 420px; }
+  .brainc__veil { display: none; }
 }
 
 /* Inside the panel the conversation drops its own masthead and rails —
