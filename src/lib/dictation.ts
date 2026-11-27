@@ -14,7 +14,7 @@ export interface SpeechRecognitionLike {
   onresult: ((e: {
     results: ArrayLike<{ isFinal?: boolean } & ArrayLike<{ transcript: string }>>;
   }) => void) | null;
-  onend: (() => void) | null; onerror: (() => void) | null;
+  onend: (() => void) | null; onerror: ((ev?: unknown) => void) | null;
   start: () => void; stop: () => void;
 }
 
@@ -27,6 +27,9 @@ export function speechRecognition(): (new () => SpeechRecognitionLike) | null {
   const standalone = window.matchMedia?.('(display-mode: standalone)').matches
     || (navigator as unknown as { standalone?: boolean }).standalone === true;
   if (iOS && standalone) return null;
+  // iPhone Chrome/Firefox/Edge expose the object but never hear anything
+  // (Apple's in-app web view) — refuse it so callers offer Safari instead.
+  if (iOS && /CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(navigator.userAgent)) return null;
   const w = window as unknown as {
     webkitSpeechRecognition?: new () => SpeechRecognitionLike;
     SpeechRecognition?: new () => SpeechRecognitionLike;
@@ -114,6 +117,9 @@ export function startDictation(opts: {
   continuous?: boolean;
   /** On-device only: listening / hearing / thinking (writing it out). */
   onState?: (s: 'listening' | 'hearing' | 'thinking') => void;
+  /** The engine's own error word ('not-allowed', 'no-speech', 'network'…)
+   *  — so a caller can say WHY nothing was heard instead of sitting idle. */
+  onError?: (code: string) => void;
 }): DictationSession | null {
   if (opts.background && foreground > 0) return null;
   // ON-PHONE WHISPER (2026-11-26): where the browser can't listen (an
@@ -158,19 +164,37 @@ export function startDictation(opts: {
     if (opts.background) { if (session) background.delete(session); } else foreground = Math.max(0, foreground - 1);
     opts.onEnd();
   };
+  // iPHONE SAFARI OFTEN NEVER SAYS "FINAL" (founder 2026-11-27: voice mode
+  // on her phone "didn't pick anything up"): it delivers what it heard as a
+  // non-final result and then ends. Non-final results still never reach the
+  // caller mid-session (the duplicate-delivery rule above), but the latest
+  // one is kept and handed over at the end when nothing final ever came.
+  let gotFinal = false;
+  let pending = '';
   rec.onresult = (e) => {
     const parts: string[] = [];
+    const loose: string[] = [];
     for (let i = 0; i < e.results.length; i++) {
       const r = e.results[i];
-      if (r.isFinal === false) continue; // an engine that ignores interimResults
       const t = (r[0]?.transcript ?? '').trim();
+      if (t && loose[loose.length - 1] !== t) loose.push(t);
+      if (r.isFinal === false) continue; // an engine that ignores interimResults
       // The same segment twice in a row is a duplicate delivery, not speech.
       if (t && parts[parts.length - 1] !== t) parts.push(t);
     }
-    if (parts.length) opts.onPhrase(parts.join(' '));
+    if (parts.length) { gotFinal = true; opts.onPhrase(parts.join(' ')); }
+    else if (loose.length) pending = loose.join(' ');
   };
-  rec.onend = end;
-  rec.onerror = end;
+  rec.onend = () => {
+    if (!gotFinal && pending) opts.onPhrase(pending);
+    end();
+  };
+  rec.onerror = (ev: unknown) => {
+    const code = (ev as { error?: string })?.error ?? 'error';
+    if (code !== 'aborted') opts.onError?.(code);
+    if (!gotFinal && pending) opts.onPhrase(pending);
+    end();
+  };
   // A refused start (mic permission, engine state) is "no session" — the
   // caller never lights the button for it.
   try { rec.start(); } catch { return null; }

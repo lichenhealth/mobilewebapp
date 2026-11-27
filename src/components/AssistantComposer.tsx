@@ -2,7 +2,7 @@ import { isHeic } from '../lib/heic';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { uploadPageImage } from '../lib/avatarApi';
-import { isIosHomeScreenApp } from '../lib/browserHandoff';
+import { iosCantListen } from '../lib/browserHandoff';
 import { askIosVoice, askVoiceChoice, canDictate, startDictation, usesLocalSpeech, type DictationSession } from '../lib/dictation';
 import { localSpeechAgreed, localSpeechStatusNow, useLocalSpeechStatus } from '../lib/localSpeech';
 import { revealBelow } from '../lib/smartReveal';
@@ -93,7 +93,7 @@ export default function AssistantComposer({
   const SR = canDictate();
   // The iPhone home-screen app can't run speech recognition: the mic points
   // to the keyboard's own (Apple's dictation), voice mode offers Safari.
-  const iosApp = !SR && isIosHomeScreenApp();
+  const iosApp = !SR && iosCantListen();
   const [kbHint, setKbHint] = useState(false);
   const localSt = useLocalSpeechStatus();
   const dictation = useRef<DictationSession | null>(null);
@@ -126,6 +126,7 @@ export default function AssistantComposer({
     const s = startDictation({
       onPhrase: (phrase) => setAsk(base + phrase),
       onEnd: () => { setListening(false); setHearState(null); dictation.current = null; },
+      onError: micErr,
       // Plain voice-to-text keeps listening across pauses until the mic is
       // tapped again (founder 2026-11-26: "it stopped recording the stuff I
       // said after that").
@@ -147,24 +148,39 @@ export default function AssistantComposer({
   const voice = useVoiceMode();
   const speakingNow = useSpeaking();
   const voicePhrase = useRef('');
+  // WHY NOTHING WAS HEARD (founder 2026-11-27, voice on her phone "didn't
+  // pick anything up"): a session that ends empty used to leave the switch
+  // reading "Voice on" with nobody listening. Now it says so, with a tap to
+  // try again; a refused microphone says that instead.
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const micErr = (code: string) => {
+    if (code === 'not-allowed' || code === 'service-not-allowed') setVoiceNote('Lichen can’t use your microphone — allow it for this site in your browser’s settings, then tap to talk');
+    else if (code === 'network') setVoiceNote('The speech service didn’t answer — check your connection, then tap to talk');
+    else if (code === 'audio-capture') setVoiceNote('No microphone found — tap to try again');
+  };
   const submitRef = useRef<(t?: string) => Promise<void>>(async () => {});
   function voiceListen() {
     if (!SR || dictation.current) return;
     voicePhrase.current = '';
+    setVoiceNote(null);
+    let errored = false;
     const s = startDictation({
       onPhrase: (phrase) => { voicePhrase.current = phrase; setAsk(phrase); },
       onState: setHearState,
+      onError: (code) => { errored = true; micErr(code); if (code === 'no-speech') setVoiceNote('Didn’t hear anything — tap to talk'); },
       onEnd: () => {
         setListening(false); setHearState(null); dictation.current = null;
         const said = voicePhrase.current.trim();
         if (said) void submitRef.current(said);
+        else if (!errored) setVoiceNote('Didn’t catch that — tap to talk');
       },
     });
     dictation.current = s;
     setListening(!!s);
+    if (!s) setVoiceNote('Couldn’t start listening — tap to try again');
   }
   function toggleVoice() {
-    if (voice) { dictation.current?.stop(); stopSpeaking(); setVoiceOn(false); return; }
+    if (voice) { dictation.current?.stop(); stopSpeaking(); setVoiceOn(false); setVoiceNote(null); return; }
     if (iosApp) {
       void askIosVoice('talk').then((c) => {
         if (c === 'talk') setVoiceOn(true);
@@ -245,6 +261,7 @@ export default function AssistantComposer({
       await onSend(text, images.length ? images : undefined);
       setAsk('');
       setImages([]);
+      setVoiceNote(null);
     } finally {
       setSending(false);
     }
@@ -298,6 +315,12 @@ export default function AssistantComposer({
           </button>
         )}
         {kbHint && <span className="assist-composer__voiceword">Tap the mic on your keyboard</span>}
+        {voiceNote && !listening && !speakingNow && (
+          <button type="button" className="assist-composer__voicenote"
+            onClick={() => { if (voice) voiceListen(); else { setVoiceNote(null); dictate(); } }}>
+            {voiceNote}
+          </button>
+        )}
         {listening && usesLocalSpeech() && (localSt.state === 'loading'
           ? <span className="assist-composer__voiceword">Getting ready… {localSt.pct}%</span>
           : hearState === 'thinking' ? <span className="assist-composer__voiceword">Writing it out…</span>

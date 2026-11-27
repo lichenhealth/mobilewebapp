@@ -50,7 +50,7 @@ export default function LocalSpeechChoice() {
         <h2 className="lsc__title">How would you like to use your voice?</h2>
         <div className={'lsc__opt' + (req.prefer === 'talk' ? ' is-lead' : '')}>
           <div className="lsc__opthead"><Icon name="speaker" size={18} /><strong>Voice conversations with Claude</strong></div>
-          <p className="lsc__optp">You talk, and Claude talks back — hands free. Lichen opens in your browser, signed in on this same screen, with voice on.</p>
+          <p className="lsc__optp">You talk, and Claude talks back — hands free. Lichen opens in Safari, signed in on this same screen, with voice on.</p>
           <OpenInBrowser flags={{ voice: '1' }} />
           <button className="lsc__link" onClick={() => close('talk')}>Or stay here and just have replies read aloud</button>
         </div>
@@ -59,7 +59,7 @@ export default function LocalSpeechChoice() {
           <p className="lsc__optp">Tap the box, then the <strong>mic on your keyboard</strong> — your words appear as you speak, and you press send.</p>
           <button className="btn btn-primary lsc__btn" onClick={() => close('keyboard')}>Use my keyboard’s mic</button>
         </div>
-        <p className="lsc__fine">Apple doesn’t let home-screen apps use its speech recognition for hands-free listening, so for that Lichen opens in your browser.</p>
+        <p className="lsc__fine">On an iPhone only Safari can listen — Apple keeps speech recognition from home-screen apps and from Chrome — so for hands-free listening Lichen opens in Safari.</p>
       </div>
     </div>
   );
