@@ -1,3 +1,4 @@
+import { canSpeak, openVoiceStream, voiceOn } from './voice';
 import { supabase } from './supabase';
 
 /** A photo pasted into the feed — the same shape chat attachments wear — or
@@ -38,6 +39,8 @@ export type FeedAttachment =
    *  was on her screen so the model knows what "it" means. NEVER rendered —
    *  the member saw it as the brief card already. */
   | { type: 'brief_ctx'; section: string; text: string; reply?: boolean }
+  /** Voice mode: the channel the reply's text streams on (never rendered). */
+  | { type: 'voice_stream'; id: string }
   | { type: 'mailref'; account_id: string; account: string; thread_id: string; subject: string; from: string }
   /** GOOGLE DRIVE → LICHEN (2026-11-15): files the brain picked; the card's
    *  tap re-creates each as a Lichen file through the member's own session. */
@@ -448,7 +451,13 @@ export async function postToAssistantFeed(
   if (!user) throw new Error('Not signed in');
   const convo = convoId === undefined ? crypto.randomUUID() : convoId;
   const here = await hereForRouteAsk(body);
+  // SPEAK AS IT WRITES (2026-11-27): in voice mode the reply streams to the
+  // phone sentence by sentence (voice.ts openVoiceStream). A doc's own
+  // Claude panel speaks its answers itself, so it never streams.
+  const vsId = voiceOn() && canSpeak() && !docCtx ? crypto.randomUUID() : null;
+  if (vsId) await openVoiceStream(vsId).catch(() => {});
   const atts = [
+    ...(vsId ? [{ type: 'voice_stream', id: vsId } as const] : []),
     ...(here ? [{ type: 'here', lat: here[0], lng: here[1] } as const] : []),
     ...(images ?? []).map((url) => ({ type: 'photo', url } as const)),
     ...(briefCtx?.text.trim()

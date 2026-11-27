@@ -43,6 +43,7 @@ import { mailTester } from '../_shared/gmail.ts';
 import { KNOCK_TOOLS, KNOCK_TOOL_NAMES, runKnockTool, type KnockDraft } from '../_shared/knockTools.ts';
 import { CONFIRM_TOOLS, CONFIRM_TOOL_SECTION, runConfirmTool, type ConfirmDoor } from '../_shared/confirmTools.ts';
 import { videoServiceOf } from '../_shared/videoHosts.ts';
+import { readMessageStream, voiceBroadcaster } from '../_shared/voiceStream.ts';
 
 const FOOD_TALK_RE = /\b(recipes?|cook(?:ing|ed)?|bak(?:e|ing|ed)|ingredients?|grocer(?:y|ies)|shopping list|meals?|dinner|lunch|breakfast|thanksgiving|stuffing|turkey|soups?|salads?|dessert|pies?|cookies|food|kitchen|harvest)\b/i;
 const ANTHROPIC_API_KEY = (Deno.env.get('ANTHROPIC_API_KEY') ?? '').replace(/[^\x21-\x7E]/g, '');
@@ -3717,6 +3718,12 @@ Deno.serve(async (req) => {
     usage?: { input_tokens?: number; output_tokens?: number };
   } = {};
 
+  // SPEAK AS IT WRITES (founder 2026-11-27): voice mode's message carries a
+  // voice_stream id — the call streams and each new piece of text reaches
+  // the phone at once (_shared/voiceStream.ts). Saved output is unchanged.
+  const vsId = ((Array.isArray(trigger?.attachments) ? trigger.attachments : [])
+    .find((a: { type?: string; id?: string }) => a?.type === 'voice_stream' && typeof a.id === 'string') as { id: string } | undefined)?.id;
+  const vb = vsId && /^[0-9a-f-]{36}$/i.test(vsId) ? voiceBroadcaster(SUPABASE_URL!, SERVICE_KEY!, vsId) : null;
   for (;;) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -3731,6 +3738,7 @@ Deno.serve(async (req) => {
         // 1600 tokens) — a cap is a ceiling, not a spend, so give tool
         // threads real room.
         ...(starved ? { thinking: { type: 'disabled' } } : {}),
+        ...(vb ? { stream: true } : {}),
         max_tokens: (canEdit || canCalendar || canCourses || canPosts || canLife || canSpaceEdit || canAct || thread === 'currentcy' || spaceRoom === 'currentcy') ? 8192 : 2048,
         // The PULSE rides its OWN, UNCACHED system block AFTER the cached one
         // (claude-chat's roster pattern): it changes with every message, and
@@ -3786,7 +3794,14 @@ Deno.serve(async (req) => {
       console.error('anthropic-failed', res.status, detail);
       return json({ error: 'Anthropic call failed', detail }, 502);
     }
-    data = await res.json();
+    if (vb) {
+      try { data = await readMessageStream(res, (t) => vb.text(t)) as typeof data; }
+      catch (e) {
+        console.error('anthropic-stream-failed', String(e).slice(0, 300));
+        vb.reset(); await vb.end();
+        return json({ error: 'Anthropic stream failed' }, 502);
+      }
+    } else data = await res.json();
     inputTokens += data?.usage?.input_tokens ?? 0;
     outputTokens += data?.usage?.output_tokens ?? 0;
     {
@@ -3832,6 +3847,7 @@ Deno.serve(async (req) => {
       // guessed. Re-run once with the tool.
       if (canLife && !routeRetried && !driveTimeCalled && (ROUTE_ASK_RE.test(String(trigger.body ?? '')) || TRAVEL_CLAIM_RE.test(text))) {
         routeRetried = true;
+        vb?.reset();
         console.error('route-retry', JSON.stringify({ feed_post_id, thread }));
         messages.push({ role: 'assistant', content: data.content });
         messages.push({ role: 'user', content: '[System check, not the member:] They asked for directions or travel time. Never answer that from memory or an earlier route — call drive_time now for exactly what they asked (their words for the place; "home" when no start is given), then write the reply from its result. Its buttons ride under your reply. No mention of this check.' });
@@ -3839,6 +3855,7 @@ Deno.serve(async (req) => {
       }
       if (anyToolsArmed && DEFLECT_RE.test(text) && !deflectRetried && !askedForManual) {
         deflectRetried = true;
+        vb?.reset();
         console.error('parity-deflect-retry', JSON.stringify({ feed_post_id, thread }));
         messages.push({ role: 'assistant', content: data.content });
         messages.push({ role: 'user', content: '[System check, not the member:] Your draft reply sends them to do it by hand. Lichen\'s rule: anything a member can do manually, you do from their words with your tools — fill the draft/rows as far as they have said, leave undecided parts blank, and hand the review button; their tap is only for publishing, sending to others, or money. Re-check your tools and use the one that fits. If truly none fits, say plainly that you can\'t do that part yet, and call file_dev_report naming the missing tool. Write the reply to the member now (no mention of this check).' });
@@ -3857,7 +3874,7 @@ Deno.serve(async (req) => {
     messages.push({ role: 'assistant', content: data.content });
     {
       const said = joinReplyText(data?.content ?? []).trim();
-      if (said) interimText.push(said);
+      if (said) { interimText.push(said); vb?.text('\n\n'); }
     }
     // Parallel calls come back in ONE user message — splitting them teaches
     // the model to stop batching.
@@ -3887,6 +3904,9 @@ Deno.serve(async (req) => {
     round++;
   }
 
+  // Every spoken piece is out before the row lands, so the phone never
+  // speaks the finished reply on top of the streamed one.
+  if (vb) await vb.end();
   // Parse EVERY text block, not content[0] — a non-text leading block silently
   // yielded an empty result in profile-snapshot.
   let reply = [...interimText, joinReplyText(data?.content ?? []).trim()]
