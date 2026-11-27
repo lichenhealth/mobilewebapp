@@ -1,0 +1,71 @@
+/* THE BRAIN THAT FOLLOWS YOU (2026-11-27). One circle on every screen; the
+   panel is a side panel on a computer, a sheet on a phone. */
+
+.brainc__fab {
+  position: fixed; z-index: 70;
+  right: 14px;
+  bottom: calc(var(--nav-h, 90px) + var(--safe-bot, 0px) + 14px);
+  width: 48px; height: 48px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--bone-warm, #fff); color: var(--peach-deep);
+  border: 1.5px solid var(--peach);
+  box-shadow: 0 6px 18px rgba(40, 30, 20, 0.16);
+  cursor: pointer;
+}
+.brainc__fab:hover { background: var(--peach-tint); }
+/* Above a chat thread's send button. */
+.brainc__fab--high { bottom: calc(var(--nav-h, 90px) + var(--safe-bot, 0px) + 84px); }
+
+.brainc {
+  position: fixed; z-index: 75;
+  left: 0; right: 0;
+  bottom: calc(var(--nav-h, 90px) + var(--safe-bot, 0px));
+  height: min(64dvh, 620px);
+  display: none; flex-direction: column;
+  background: var(--bone, #f7f2ea);
+  border-top: 1px solid var(--bone-edge);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -10px 30px rgba(40, 30, 20, 0.18);
+  overflow: hidden;
+}
+.brainc.is-open { display: flex; }
+
+.brainc__head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 10px 10px 14px;
+  border-bottom: 1px solid var(--bone-edge);
+  background: var(--bone-warm, #fff);
+}
+.brainc__face { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; }
+.brainc__who { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.2; }
+.brainc__who strong { font-size: 15px; color: var(--ink); }
+.brainc__who span { font-size: 12px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brainc__btn {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: #fff; border: 1px solid var(--bone-edge); color: var(--ink-soft);
+  cursor: pointer;
+}
+.brainc__btn:hover { border-color: var(--peach); color: var(--peach-deep); }
+.brainc__btn:nth-of-type(2) svg { transform: rotate(45deg); }
+.brainc__frame { flex: 1; width: 100%; border: 0; background: var(--bone, #f7f2ea); }
+
+@media (min-width: 1024px) {
+  .brainc__fab, .brainc__fab--high { bottom: 24px; right: 24px; }
+  .brainc {
+    left: auto; right: 0; top: var(--top-h, 110px); bottom: 0;
+    width: 420px; height: auto;
+    border-top: 0; border-left: 1px solid var(--bone-edge);
+    border-radius: 0;
+    box-shadow: -10px 0 30px rgba(40, 30, 20, 0.12);
+  }
+  /* The page makes room for the panel instead of hiding under it. */
+  body.has-brain-panel { padding-right: 420px; }
+}
+
+/* Inside the panel the conversation drops its own masthead and rails —
+   the panel's head names it, and the brain's other rooms are one tap away
+   through "Open full screen". */
+.afeed--companion .afeed__head,
+.afeed--companion .scrollrow:has(> .afeed__threads),
+.afeed--companion .afeed__tools { display: none; }

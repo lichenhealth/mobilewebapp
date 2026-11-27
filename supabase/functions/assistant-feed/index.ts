@@ -926,6 +926,17 @@ Deno.serve(async (req) => {
     briefContext += `\n\n[They attached an email thread from Mail: "${String(mailRefAtt.subject ?? '').slice(0, 200)}" from ${String(mailRefAtt.from ?? '').slice(0, 200)} — inbox ${String(mailRefAtt.account ?? '').slice(0, 120)}, thread_id ${String(mailRefAtt.thread_id).slice(0, 80)}. Read it with read_mail (that account and thread_id) before answering; their words above are their context about it.]`;
   }
 
+  // THE BRAIN THAT FOLLOWS YOU (founder 2026-11-27: "your brain should just
+  // be there with you everywhere"): a send from the companion panel names
+  // the page the member is on. Path + heading only — whatever they want done
+  // there, the tools do (a doc on the page also rides doc_ctx below).
+  const pageAtt = (Array.isArray(trigger?.attachments) ? trigger.attachments : [])
+    .find((a: { type?: string; path?: string }) => a?.type === 'page_ctx' && typeof a.path === 'string') as
+    { path: string; title?: string } | undefined;
+  if (pageAtt) {
+    briefContext += `\n\n[They wrote this from the brain panel that follows them around Lichen. Right now they're on the page ${JSON.stringify(String(pageAtt.title ?? '').slice(0, 160))} (${String(pageAtt.path).slice(0, 300)}). "This", "here" and "it" usually mean what's on that page. They may ask about it, or about anything else in their life on Lichen — and asking from one page doesn't limit what you can do: use any of your tools (a shopping list, the calendar, a doc, mail) wherever the work lives.]`;
+  }
+
   // A DOC ATTACHED FROM THE DOC ITSELF (founder 2026-11-26: "i want to be
   // able to ask claude a question, like, how much butter do I add again? And
   // have it scan the recipe and reply"): the doc_ctx card names a doc; we
@@ -965,7 +976,7 @@ Deno.serve(async (req) => {
             .map((sl, i) => `Slide ${i + 1}: ${sl.title ?? ''}\n${sl.body ?? ''}${sl.body2 ? '\n' + sl.body2 : ''}${sl.notes ? '\nNotes: ' + sl.notes : ''}`).join('\n\n');
         } else text = d.body ?? '';
         const noun = d.kind === 'sheet' ? 'spreadsheet' : d.kind === 'slides' ? 'presentation' : 'doc';
-        briefContext += `\n\n[They are looking at their ${noun} «${d.title}» right now and asked about it. Answer from what it says — quote amounts, steps and times exactly as written; if it doesn't say, say so plainly, then offer what you know. Here it is:\n<<<\n${text.slice(0, 14000)}\n>>>]`;
+        briefContext += `\n\n[They are looking at their ${noun} «${d.title}» right now${pageAtt ? '' : ' and asked about it'}. When their question is about it, answer from what it says — quote amounts, steps and times exactly as written; if it doesn't say, say so plainly, then offer what you know. Here it is:\n<<<\n${text.slice(0, 14000)}\n>>>]`;
         if (docAtt.voice) briefContext += `\n\n[VOICE: your reply will be READ ALOUD — their hands are busy (cooking, working). Answer in one to three short spoken sentences, the answer first. No lists, headings, links or symbols.]`;
       } else if (d && why) {
         briefContext += `\n\n[They asked about a doc, but you can't read it — ${why}. Say that plainly in one sentence.]`;

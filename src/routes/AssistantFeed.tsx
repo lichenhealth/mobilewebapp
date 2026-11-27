@@ -2,6 +2,7 @@ import { voiceReply, speak, stopSpeaking, canSpeak } from '../lib/voice';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { isAppleMapsUrl, isGoogleMapsUrl, outsideOrder, rememberNavApp } from '../lib/navApp';
 import { renderBold } from '../lib/inlineBold';
+import { inCompanion } from '../lib/companion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import ConfirmCard from '../components/ConfirmCard';
@@ -1001,7 +1002,7 @@ export default function AssistantFeed() {
   );
 
   return (
-    <div className={'afeed' + (paged ? ' afeed--paged' : '')}>
+    <div className={'afeed' + (paged ? ' afeed--paged' : '') + (inCompanion() ? ' afeed--companion' : '')}>
       {builderMode ? (
         /* A TRUE TOGGLE, FROZEN (founder 2026-09-09: "let's have a toggle
            back to manual mode frozen in the upper bar, instead of the

@@ -1,5 +1,6 @@
 import { canSpeak, openVoiceStream, voiceOn } from './voice';
 import { supabase } from './supabase';
+import { companionPage } from './companion';
 
 /** A photo pasted into the feed — the same shape chat attachments wear — or
  *  the marker a Claude reply carries after editing a page (founder
@@ -41,6 +42,10 @@ export type FeedAttachment =
   | { type: 'brief_ctx'; section: string; text: string; reply?: boolean }
   /** Voice mode: the channel the reply's text streams on (never rendered). */
   | { type: 'voice_stream'; id: string }
+  /** The page the member was on when they wrote from the companion panel
+   *  (never rendered). */
+  | { type: 'page_ctx'; path: string; title: string }
+  | { type: 'doc_ctx'; doc_id: string; title: string; voice?: boolean }
   | { type: 'mailref'; account_id: string; account: string; thread_id: string; subject: string; from: string }
   /** GOOGLE DRIVE → LICHEN (2026-11-15): files the brain picked; the card's
    *  tap re-creates each as a Lichen file through the member's own session. */
@@ -454,7 +459,11 @@ export async function postToAssistantFeed(
   // SPEAK AS IT WRITES (2026-11-27): in voice mode the reply streams to the
   // phone sentence by sentence (voice.ts openVoiceStream). A doc's own
   // Claude panel speaks its answers itself, so it never streams.
-  const vsId = voiceOn() && canSpeak() && !docCtx ? crypto.randomUUID() : null;
+  // THE BRAIN THAT FOLLOWS YOU (2026-11-27): a send from the companion
+  // panel carries the page the member is on, and a doc page carries the doc.
+  const page = companionPage();
+  if (page?.doc_id && !docCtx) docCtx = { doc_id: page.doc_id, title: page.title };
+  const vsId = voiceOn() && canSpeak() && !(docCtx?.voice) ? crypto.randomUUID() : null;
   if (vsId) await openVoiceStream(vsId).catch(() => {});
   const atts = [
     ...(vsId ? [{ type: 'voice_stream', id: vsId } as const] : []),
@@ -464,6 +473,7 @@ export async function postToAssistantFeed(
       ? [{ type: 'brief_ctx', section: briefCtx.section, text: briefCtx.text.slice(0, 2000), ...(briefCtx.reply ? { reply: true } : {}) } as const]
       : []),
     ...(mailRef ? [{ type: 'mailref', ...mailRef, subject: mailRef.subject.slice(0, 200), from: mailRef.from.slice(0, 200) } as const] : []),
+    ...(page ? [{ type: 'page_ctx', path: page.path, title: page.title } as const] : []),
     ...(docCtx ? [{ type: 'doc_ctx', doc_id: docCtx.doc_id, title: docCtx.title.slice(0, 160), voice: !!docCtx.voice } as const] : []),
   ];
   const { data, error } = await supabase.from('assistant_feed_posts').insert({
