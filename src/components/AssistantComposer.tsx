@@ -162,23 +162,60 @@ export default function AssistantComposer({
     else if (code === 'audio-capture') setVoiceNote('No microphone found — tap to try again');
   };
   const submitRef = useRef<(t?: string) => Promise<void>>(async () => {});
+  // TALK, THEN SEND — LIKE A RADIO (founder 2026-11-27: "transcribe what is
+  // being spoken, and show that it's being recorded, and then we have the
+  // arrow to send it, or the person says over… so that it's easier"): voice
+  // mode no longer sends on the first pause. Words write into the box as
+  // they come (a pause is just a pause), a red dot says it's recording, and
+  // the message goes when they tap the arrow or end with "over".
+  const voiceSent = useRef(false);
+  const askNow = useRef('');
+  askNow.current = ask;
+  // "over" counts only as its OWN word after a pause (a new stretch of
+  // speech, or set off by the engine's punctuation), or as "over and out" —
+  // so "turn it over" in one breath is a sentence, not a send.
+  const OVER_ALONE = /^\s*over[\s.!?]*$/i;
+  const OVER_SET_OFF = /[,.;!?]\s*over[\s.!?]*$/i;
+  const OVER_AND_OUT = /(?:^|\s)over\s+and\s+out[\s.!?]*$/i;
+  const OVER_TAIL = /[\s,.;:!?-]*\bover(?:\s+and\s+out)?[\s.!?]*$/i;
+  const saidOver = (prev: string, phrase: string) => {
+    const added = phrase.startsWith(prev) ? phrase.slice(prev.length) : '';
+    return (!!prev && OVER_ALONE.test(added)) || OVER_SET_OFF.test(phrase) || OVER_AND_OUT.test(phrase);
+  };
   function voiceListen() {
     unlockSpeech();
     if (!SR || dictation.current) return;
     voicePhrase.current = '';
+    voiceSent.current = false;
     setVoiceNote(null);
     let errored = false;
+    const base = askNow.current.trim() ? askNow.current.replace(/\s+$/, '') + ' ' : '';
+    const sendIt = (text: string) => {
+      if (voiceSent.current) return;
+      voiceSent.current = true;
+      dictation.current?.stop();
+      const said = text.trim();
+      // The brain's own reply coming back through the speakers is never
+      // sent as the person's words.
+      if (!said || heardOwnWords(said)) { setAsk(''); if (said) setVoiceNote('That was me talking — tap here, then talk'); return; }
+      void submitRef.current(said);
+    };
     const s = startDictation({
-      onPhrase: (phrase) => { voicePhrase.current = phrase; setAsk(phrase); },
+      continuous: true,
+      onPhrase: (phrase) => {
+        if (voiceSent.current) return;
+        if (saidOver(voicePhrase.current, phrase)) { const t = (base + phrase.replace(OVER_TAIL, '')).trim(); setAsk(t); sendIt(t); return; }
+        voicePhrase.current = phrase;
+        setAsk(base + phrase);
+      },
       onState: setHearState,
       onError: (code) => { errored = true; micErr(code); if (code === 'no-speech') setVoiceNote('Didn’t hear anything — tap to talk'); },
       onEnd: () => {
         setListening(false); setHearState(null); dictation.current = null;
-        const said = voicePhrase.current.trim();
-        // The brain's own reply coming back through the speakers is never
-        // sent as the person's words.
-        if (said && heardOwnWords(said)) { setAsk(''); setVoiceNote('That was me talking — tap here, then talk'); return; }
-        if (said) void submitRef.current(said);
+        if (voiceSent.current) return;
+        // The phone stopped listening on its own (a long silence): the words
+        // stay in the box for the arrow; one tap keeps talking.
+        if (voicePhrase.current.trim()) setVoiceNote('Paused — tap here to keep talking, or tap the arrow to send');
         else if (!errored) setVoiceNote('Didn’t catch that — tap to talk');
       },
     });
@@ -267,6 +304,7 @@ export default function AssistantComposer({
   async function submit(override?: string) {
     const text = (override ?? ask).trim();
     if (voice) unlockSpeech();
+    if (dictation.current && voice) { voiceSent.current = true; dictation.current.stop(); }
     if ((!text && images.length === 0 && !attachment) || sending || upBusy) return;
     setSending(true);
     try {
@@ -337,6 +375,9 @@ export default function AssistantComposer({
             {SR && !iosApp ? 'Voice is on — tap here, then talk' : 'Voice is on — tap the box, then the mic on your keyboard, to talk'}
           </button>
         )}
+        {voice && listening && !usesLocalSpeech() && (
+          <span className="assist-composer__voicenote is-hint">Talk as long as you like — say “over” or tap the arrow to send</span>
+        )}
         {voiceNote && !listening && !speakingNow && (
           <button type="button" className="assist-composer__voicenote"
             onClick={() => { if (voice) voiceListen(); else { setVoiceNote(null); dictate(); } }}>
@@ -354,7 +395,7 @@ export default function AssistantComposer({
             aria-label={voice ? 'Turn voice mode off' : 'Voice mode — talk, and hear the reply'}
             data-tip={voice ? (speakingNow ? 'Tap to stop and talk' : 'Voice mode on — tap to turn off') : 'Voice mode'}>
             <Icon name="speaker" size={17} />
-            {voice && <span className="assist-composer__voiceword">{speakingNow ? 'Speaking… tap to talk' : listening ? 'Listening…' : canListen() ? 'Voice on' : 'Replies read aloud'}</span>}
+            {voice && <span className="assist-composer__voiceword">{speakingNow ? 'Speaking… tap to talk' : listening ? <><span className="assist-composer__recdot" aria-hidden="true" />Recording</> : canListen() ? 'Voice on' : 'Replies read aloud'}</span>}
           </button>
         )}
         <button className="assist-composer__send" type="submit"
